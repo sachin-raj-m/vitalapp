@@ -7,6 +7,7 @@ import { Button } from '../components/ui/Button';
 import { supabase } from '../lib/supabase';
 import { Loader2 } from 'lucide-react';
 import type { BloodGroup } from '../types';
+import { useAuth } from '../contexts/AuthContext';
 
 const MAX_FILE_SIZE = 1024 * 1024; // 1MB in bytes
 
@@ -25,6 +26,7 @@ interface CompleteRegistrationForm {
 
 export function CompleteRegistration() {
     const navigate = useNavigate();
+    const { user } = useAuth();
     const [error, setError] = useState<string>('');
     const [status, setStatus] = useState<string>('loading');
     const [progress, setProgress] = useState<number>(0);
@@ -39,25 +41,33 @@ export function CompleteRegistration() {
 
     useEffect(() => {
         const init = async () => {
+            console.log('Initializing CompleteRegistration page');
             try {
-                // Check if user is authenticated
-                const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-                if (sessionError) throw sessionError;
-                if (!session) {
+                // First check if we have a user
+                if (!user) {
+                    console.log('No user found, redirecting to login');
                     navigate('/login');
                     return;
                 }
 
+                console.log('Current user:', user);
+
                 // Check if registration is already complete
-                const isComplete = await isRegistrationComplete(session.user.id);
+                const isComplete = await isRegistrationComplete(user.id);
+                console.log('Registration status:', isComplete);
+
                 if (isComplete) {
+                    console.log('Registration already complete, redirecting to dashboard');
                     navigate('/dashboard');
                     return;
                 }
 
                 // Get stored registration data
                 const storedData = localStorage.getItem('pendingRegistration');
+                console.log('Stored registration data:', storedData);
+
                 if (!storedData) {
+                    console.log('No pending registration data found');
                     setError('Registration data not found. Please register again.');
                     navigate('/register');
                     return;
@@ -65,12 +75,17 @@ export function CompleteRegistration() {
 
                 try {
                     const data = JSON.parse(storedData);
-                    if (data.userId !== session.user.id) {
+                    console.log('Parsed registration data:', data);
+
+                    if (data.userId !== user.id) {
+                        console.log('User ID mismatch:', { stored: data.userId, current: user.id });
                         throw new Error('User ID mismatch');
                     }
+
                     setPendingData(data);
                     setStatus('form');
                 } catch (err) {
+                    console.error('Error processing stored data:', err);
                     throw new Error('Invalid registration data');
                 }
             } catch (err: any) {
@@ -81,7 +96,7 @@ export function CompleteRegistration() {
         };
 
         init();
-    }, [navigate]);
+    }, [navigate, user]);
 
     const validateForm = () => {
         const errors: Record<string, string> = {};

@@ -21,24 +21,36 @@ export function LoginPage() {
   useEffect(() => {
     const checkUserRegistration = async () => {
       if (user) {
+        console.log('Checking registration for user:', user);
         try {
           const isComplete = await isRegistrationComplete(user.id);
+          console.log('Registration check result:', isComplete);
+
           if (!isComplete) {
+            console.log('Registration incomplete, redirecting to complete registration');
             // Store basic info for registration completion
-            localStorage.setItem('pendingRegistration', JSON.stringify({
+            const pendingData = {
               userId: user.id,
               email: user.email,
               phone: user.phone || ''
-            }));
+            };
+            console.log('Storing pending registration data:', pendingData);
+            localStorage.setItem('pendingRegistration', JSON.stringify(pendingData));
             navigate('/complete-registration');
           } else {
+            console.log('Registration complete, redirecting to dashboard');
             navigate('/dashboard');
           }
         } catch (err) {
-          console.error('Error checking registration:', err);
-          // If there's an error checking registration, we'll still redirect to dashboard
-          // The RegistrationGuard will handle the check again
-          navigate('/dashboard');
+          console.error('Error in registration check:', err);
+          // On error, we'll treat it as incomplete registration
+          const pendingData = {
+            userId: user.id,
+            email: user.email,
+            phone: user.phone || ''
+          };
+          localStorage.setItem('pendingRegistration', JSON.stringify(pendingData));
+          navigate('/complete-registration');
         }
       }
     };
