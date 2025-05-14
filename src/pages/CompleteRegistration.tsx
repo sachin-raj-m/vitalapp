@@ -1,22 +1,26 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardHeader, CardBody } from '../components/ui/Card';
+import { Input, Select } from '../components/ui/Input';
 import { Alert } from '../components/ui/Alert';
 import { Button } from '../components/ui/Button';
 import { supabase } from '../lib/supabase';
 import { Loader2 } from 'lucide-react';
+import type { BloodGroup } from '../types';
+
+const MAX_FILE_SIZE = 1024 * 1024; // 1MB in bytes
 
 interface PendingRegistration {
     userId: string;
     email: string;
-    fullName: string;
     phone: string;
-    bloodGroup: string;
+}
+
+interface CompleteRegistrationForm {
+    fullName: string;
+    bloodGroup: BloodGroup;
     proofType: string;
-    proofFileName: string;
-    proofFileType: string;
-    proofFileSize: number;
-    proofFileData: string;
+    proofFile: File | null;
 }
 
 export function CompleteRegistration() {
@@ -24,56 +28,93 @@ export function CompleteRegistration() {
     const [error, setError] = useState<string>('');
     const [status, setStatus] = useState<string>('loading');
     const [progress, setProgress] = useState<number>(0);
+    const [pendingData, setPendingData] = useState<PendingRegistration | null>(null);
+    const [formData, setFormData] = useState<CompleteRegistrationForm>({
+        fullName: '',
+        bloodGroup: '' as BloodGroup,
+        proofType: '',
+        proofFile: null,
+    });
+    const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
     useEffect(() => {
-        completeRegistration();
+        loadPendingRegistration();
     }, []);
 
-    const completeRegistration = async () => {
+    const loadPendingRegistration = async () => {
+        const storedData = localStorage.getItem('pendingRegistration');
+        if (!storedData) {
+            setError('Registration data not found. Please register again.');
+            navigate('/register');
+            return;
+        }
+
+        try {
+            const data = JSON.parse(storedData);
+            setPendingData(data);
+            setStatus('form');
+        } catch (err) {
+            setError('Invalid registration data. Please register again.');
+            navigate('/register');
+        }
+    };
+
+    const validateForm = () => {
+        const errors: Record<string, string> = {};
+
+        if (!formData.fullName.trim()) {
+            errors.fullName = 'Full name is required';
+        }
+
+        if (!formData.bloodGroup) {
+            errors.bloodGroup = 'Blood group is required';
+        }
+
+        if (!formData.proofType) {
+            errors.proofType = 'Please select proof type';
+        }
+
+        if (!formData.proofFile) {
+            errors.proofFile = 'Please upload proof document';
+        } else if (formData.proofFile.size > MAX_FILE_SIZE) {
+            errors.proofFile = 'File size must be less than 1MB';
+        }
+
+        setFieldErrors(errors);
+        return Object.keys(errors).length === 0;
+    };
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!validateForm() || !pendingData) return;
+
+        setStatus('uploading');
+        setProgress(25);
+
         try {
             // Check if user is authenticated
             const { data: { session }, error: sessionError } = await supabase.auth.getSession();
             if (sessionError) throw sessionError;
             if (!session) {
                 setError('Authentication required. Please sign in again.');
-                setTimeout(() => navigate('/login'), 3000);
+                navigate('/login');
                 return;
             }
-
-            // Get stored registration data
-            const storedData = localStorage.getItem('pendingRegistration');
-            if (!storedData) {
-                setError('Registration data not found. Please register again.');
-                setTimeout(() => navigate('/register'), 3000);
-                return;
-            }
-
-            const registrationData: PendingRegistration = JSON.parse(storedData);
 
             // Verify user ID matches
-            if (session.user.id !== registrationData.userId) {
+            if (session.user.id !== pendingData.userId) {
                 setError('Session mismatch. Please register again.');
-                setTimeout(() => navigate('/register'), 3000);
+                navigate('/register');
                 return;
             }
 
-            setStatus('uploading');
-            setProgress(25);
-
-            // Convert base64 to file
-            const base64Response = await fetch(registrationData.proofFileData);
-            const blob = await base64Response.blob();
-            const file = new File([blob], registrationData.proofFileName, {
-                type: registrationData.proofFileType
-            });
-
             // Upload the proof file
-            const filePath = `${session.user.id}/${Date.now()}-${registrationData.proofFileName}`;
+            const filePath = `${session.user.id}/${Date.now()}-${formData.proofFile!.name}`;
             const { error: uploadError } = await supabase.storage
                 .from('proofs')
-                .upload(filePath, file, {
+                .upload(filePath, formData.proofFile!, {
                     upsert: false,
-                    contentType: registrationData.proofFileType
+                    contentType: formData.proofFile!.type
                 });
 
             if (uploadError) throw uploadError;
@@ -87,11 +128,11 @@ export function CompleteRegistration() {
                 .insert([
                     {
                         id: session.user.id,
-                        email: registrationData.email,
-                        full_name: registrationData.fullName,
-                        phone: registrationData.phone,
-                        blood_group: registrationData.bloodGroup,
-                        blood_group_proof_type: registrationData.proofType,
+                        email: pendingData.email,
+                        full_name: formData.fullName,
+                        phone: pendingData.phone,
+                        blood_group: formData.bloodGroup,
+                        blood_group_proof_type: formData.proofType,
                         blood_group_proof_url: filePath,
                         is_donor: true,
                         is_available: true,
@@ -123,7 +164,7 @@ export function CompleteRegistration() {
             // Clean up stored data
             localStorage.removeItem('pendingRegistration');
 
-            // Redirect to dashboard
+            // Redirect to dashboard after completion
             setTimeout(() => navigate('/dashboard'), 1500);
         } catch (err: any) {
             console.error('Registration completion error:', err);
@@ -132,13 +173,108 @@ export function CompleteRegistration() {
         }
     };
 
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            if (file.size > MAX_FILE_SIZE) {
+                setFieldErrors(prev => ({
+                    ...prev,
+                    proofFile: 'File size must be less than 1MB'
+                }));
+            } else {
+                setFieldErrors(prev => {
+                    const newErrors = { ...prev };
+                    delete newErrors.proofFile;
+                    return newErrors;
+                });
+                setFormData(prev => ({ ...prev, proofFile: file }));
+            }
+        }
+    };
+
     const renderContent = () => {
         switch (status) {
             case 'loading':
                 return (
                     <>
-                        <h2 className="text-xl font-semibold mb-4">Preparing Registration</h2>
+                        <h2 className="text-xl font-semibold mb-4">Loading Registration Data</h2>
                         <Loader2 className="h-8 w-8 animate-spin text-primary-500" />
+                    </>
+                );
+
+            case 'form':
+                return (
+                    <>
+                        <h2 className="text-xl font-semibold mb-4">Complete Your Registration</h2>
+                        {error && (
+                            <Alert variant="error" className="mb-4">
+                                {error}
+                            </Alert>
+                        )}
+                        <form onSubmit={handleSubmit} className="space-y-4">
+                            <Input
+                                label="Full Name"
+                                value={formData.fullName}
+                                onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
+                                required
+                                autoComplete="name"
+                                placeholder="Enter your full name"
+                                error={fieldErrors.fullName}
+                            />
+                            <Select
+                                label="Blood Group"
+                                value={formData.bloodGroup}
+                                onChange={(e) => setFormData({ ...formData, bloodGroup: e.target.value as BloodGroup })}
+                                options={[
+                                    { value: '', label: 'Select Blood Group' },
+                                    { value: 'A+', label: 'A+' },
+                                    { value: 'A-', label: 'A-' },
+                                    { value: 'B+', label: 'B+' },
+                                    { value: 'B-', label: 'B-' },
+                                    { value: 'AB+', label: 'AB+' },
+                                    { value: 'AB-', label: 'AB-' },
+                                    { value: 'O+', label: 'O+' },
+                                    { value: 'O-', label: 'O-' },
+                                ]}
+                                required
+                                error={fieldErrors.bloodGroup}
+                            />
+                            <Select
+                                label="Blood Group Proof Type"
+                                value={formData.proofType}
+                                onChange={(e) => setFormData({ ...formData, proofType: e.target.value })}
+                                options={[
+                                    { value: '', label: 'Select Proof Type' },
+                                    { value: 'medical_certificate', label: 'Medical Certificate' },
+                                    { value: 'hospital_report', label: 'Hospital Report' },
+                                    { value: 'blood_donation_card', label: 'Blood Donation Card' },
+                                    { value: 'lab_report', label: 'Laboratory Report' },
+                                ]}
+                                required
+                                error={fieldErrors.proofType}
+                            />
+                            <div className="space-y-2">
+                                <label className="block text-sm font-medium text-gray-700">Upload Proof</label>
+                                <Input
+                                    type="file"
+                                    onChange={handleFileChange}
+                                    accept=".pdf,.jpg,.jpeg,.png"
+                                    required
+                                    className="w-full"
+                                    error={fieldErrors.proofFile}
+                                />
+                                <p className="text-xs text-gray-500">
+                                    Accepted formats: PDF, JPG, JPEG, PNG (Max size: 1MB)
+                                </p>
+                            </div>
+                            <Button
+                                type="submit"
+                                variant="primary"
+                                className="w-full"
+                            >
+                                Complete Registration
+                            </Button>
+                        </form>
                     </>
                 );
 
