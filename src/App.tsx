@@ -15,6 +15,7 @@ import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
 import { AuthCallback } from './pages/AuthCallback';
 import { CompleteRegistration } from './pages/CompleteRegistration';
+import { ProfilePage } from './pages/ProfilePage';
 
 function App() {
   return (
@@ -39,6 +40,13 @@ function App() {
                 <ProtectedRoute>
                   <RegistrationGuard>
                     <DashboardPage />
+                  </RegistrationGuard>
+                </ProtectedRoute>
+              } />
+              <Route path="/profile" element={
+                <ProtectedRoute>
+                  <RegistrationGuard>
+                    <ProfilePage />
                   </RegistrationGuard>
                 </ProtectedRoute>
               } />
