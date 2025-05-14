@@ -27,6 +27,7 @@ export function RegisterPage() {
   const [error, setError] = useState('');
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(false);
+  const [verificationSent, setVerificationSent] = useState(false);
 
   const validateForm = () => {
     const errors: Record<string, string> = {};
@@ -96,108 +97,68 @@ export function RegisterPage() {
     setIsLoading(true);
 
     try {
-      console.log('Starting registration process...');
-
-      // First create the auth user to get their ID
-      const signUpData = {
+      // First, create the auth user with email verification enabled
+      const { data: authData, error: authError } = await supabase.auth.signUp({
         email: formData.email,
         password: formData.password,
         options: {
           data: {
             full_name: formData.fullName,
-          }
+            phone: formData.phone,
+            blood_group: formData.bloodGroup,
+            proof_type: formData.proofType,
+            is_donor: true,
+            registration_completed: false // Flag to track completion
+          },
+          emailRedirectTo: `${window.location.origin}/complete-registration`
         }
-      };
+      });
 
-      const { data: authData, error: authError } = await supabase.auth.signUp(signUpData);
-
-      if (authError) {
-        if (authError.message.includes('Password')) {
-          setError('Password must be at least 6 characters long');
-        } else if (authError.message.includes('email')) {
-          setError('Please enter a valid email address');
-        } else {
-          setError(authError.message);
-        }
-        return;
-      }
+      if (authError) throw authError;
 
       if (!authData.user || !formData.proofFile) {
-        throw new Error('Failed to create user account');
+        throw new Error('Failed to create account');
       }
 
-      // Get the session to ensure we have proper authentication for upload
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-
-      if (sessionError || !session) {
-        throw new Error('Authentication failed. Please try again.');
-      }
-
-      // Upload the proof file
-      const fileExt = formData.proofFile.name.split('.').pop() || 'file';
-      const fileName = `${Date.now()}.${fileExt}`;
-      const filePath = `${authData.user.id}/${fileName}`;
+      // Store the registration data in localStorage for completion after verification
+      const registrationData = {
+        userId: authData.user.id,
+        email: formData.email,
+        fullName: formData.fullName,
+        phone: formData.phone,
+        bloodGroup: formData.bloodGroup,
+        proofType: formData.proofType,
+        proofFileName: formData.proofFile.name,
+        proofFileType: formData.proofFile.type,
+        proofFileSize: formData.proofFile.size
+      };
 
       try {
-        const { error: uploadError } = await supabase.storage
-          .from('proofs')
-          .upload(filePath, formData.proofFile as File, {
-            upsert: false,
-            contentType: formData.proofFile.type
-          });
+        // Store file in localStorage (as base64)
+        const reader = new FileReader();
+        reader.readAsDataURL(formData.proofFile);
 
-        if (uploadError) {
-          throw uploadError;
-        }
-      } catch (uploadError: any) {
-        // If upload fails, attempt to delete the user account to maintain consistency
-        await supabase.auth.admin.deleteUser(authData.user.id);
-        throw new Error(`Failed to upload proof document: ${uploadError.message}`);
-      }
-
-      // Create the user profile
-      try {
-        const profileData = {
-          id: authData.user.id,
-          email: formData.email,
-          full_name: formData.fullName,
-          phone: formData.phone,
-          blood_group: formData.bloodGroup,
-          blood_group_proof_type: formData.proofType,
-          blood_group_proof_url: filePath,
-          is_donor: true,
-          is_available: true,
-          location: {
-            latitude: 0,
-            longitude: 0,
-            address: '',
-          },
+        reader.onload = function (e) {
+          if (e.target?.result) {
+            localStorage.setItem(
+              'pendingRegistration',
+              JSON.stringify({
+                ...registrationData,
+                proofFileData: e.target.result
+              })
+            );
+          }
         };
 
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .insert([profileData]);
-
-        if (profileError) {
-          // If profile creation fails, clean up by deleting the uploaded file and user
-          await supabase.storage.from('proofs').remove([filePath]);
-          await supabase.auth.admin.deleteUser(authData.user.id);
-          throw profileError;
-        }
-      } catch (error) {
-        // Clean up uploaded file and user if profile creation fails
-        await supabase.storage.from('proofs').remove([filePath]);
-        await supabase.auth.admin.deleteUser(authData.user.id);
-        throw error;
+        setVerificationSent(true);
+      } catch (err) {
+        console.error('Failed to store registration data:', err);
+        throw new Error('Failed to prepare registration data. Please try again.');
       }
-
-      navigate('/dashboard');
     } catch (err: any) {
       console.error('Registration error:', err);
       if (err?.message?.includes('User already registered')) {
         setError('An account with this email already exists');
-      } else if (err?.message?.includes('row-level security')) {
-        setError('Failed to upload file. Please try again.');
       } else if (err?.message) {
         setError(err.message);
       } else {
@@ -226,6 +187,35 @@ export function RegisterPage() {
       }
     }
   };
+
+  if (verificationSent) {
+    return (
+      <div className="max-w-md mx-auto">
+        <Card>
+          <CardBody className="text-center py-8">
+            <h2 className="text-2xl font-bold text-gray-900 mb-4">
+              Verify Your Email
+            </h2>
+            <p className="text-gray-600 mb-6">
+              We've sent a verification link to <strong>{formData.email}</strong>
+            </p>
+            <p className="text-gray-600 mb-6">
+              Please check your email and click the verification link to complete your registration.
+            </p>
+            <div className="text-sm text-gray-500">
+              Didn't receive the email?{' '}
+              <button
+                onClick={() => setVerificationSent(false)}
+                className="text-primary-500 hover:text-primary-600"
+              >
+                Try again
+              </button>
+            </div>
+          </CardBody>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-md mx-auto">
