@@ -98,6 +98,7 @@ export function RegisterPage() {
     try {
       console.log('Starting registration process...');
 
+      // First create the auth user to get their ID
       const signUpData = {
         email: formData.email,
         password: formData.password,
@@ -111,7 +112,6 @@ export function RegisterPage() {
       const { data: authData, error: authError } = await supabase.auth.signUp(signUpData);
 
       if (authError) {
-        console.error('Auth error:', authError);
         if (authError.message.includes('Password')) {
           setError('Password must be at least 6 characters long');
         } else if (authError.message.includes('email')) {
@@ -126,46 +126,69 @@ export function RegisterPage() {
         throw new Error('Failed to create user account');
       }
 
+      // Get the session to ensure we have proper authentication for upload
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+
+      if (sessionError || !session) {
+        throw new Error('Authentication failed. Please try again.');
+      }
+
       // Upload the proof file
       const fileExt = formData.proofFile.name.split('.').pop() || 'file';
       const fileName = `${Date.now()}.${fileExt}`;
       const filePath = `${authData.user.id}/${fileName}`;
 
-      const { error: uploadError } = await supabase.storage
-        .from('proofs')
-        .upload(filePath, formData.proofFile as File, {
-          upsert: false,
-          contentType: formData.proofFile.type
-        });
+      try {
+        const { error: uploadError } = await supabase.storage
+          .from('proofs')
+          .upload(filePath, formData.proofFile as File, {
+            upsert: false,
+            contentType: formData.proofFile.type
+          });
 
-      if (uploadError) {
-        throw new Error('Failed to upload proof document: ' + uploadError.message);
+        if (uploadError) {
+          throw uploadError;
+        }
+      } catch (uploadError: any) {
+        // If upload fails, attempt to delete the user account to maintain consistency
+        await supabase.auth.admin.deleteUser(authData.user.id);
+        throw new Error(`Failed to upload proof document: ${uploadError.message}`);
       }
 
       // Create the user profile
-      const profileData = {
-        id: authData.user.id,
-        email: formData.email,
-        full_name: formData.fullName,
-        phone: formData.phone,
-        blood_group: formData.bloodGroup,
-        blood_group_proof_type: formData.proofType,
-        blood_group_proof_url: filePath,
-        is_donor: true,
-        is_available: true,
-        location: {
-          latitude: 0,
-          longitude: 0,
-          address: '',
-        },
-      };
+      try {
+        const profileData = {
+          id: authData.user.id,
+          email: formData.email,
+          full_name: formData.fullName,
+          phone: formData.phone,
+          blood_group: formData.bloodGroup,
+          blood_group_proof_type: formData.proofType,
+          blood_group_proof_url: filePath,
+          is_donor: true,
+          is_available: true,
+          location: {
+            latitude: 0,
+            longitude: 0,
+            address: '',
+          },
+        };
 
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .insert([profileData]);
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .insert([profileData]);
 
-      if (profileError) {
-        throw profileError;
+        if (profileError) {
+          // If profile creation fails, clean up by deleting the uploaded file and user
+          await supabase.storage.from('proofs').remove([filePath]);
+          await supabase.auth.admin.deleteUser(authData.user.id);
+          throw profileError;
+        }
+      } catch (error) {
+        // Clean up uploaded file and user if profile creation fails
+        await supabase.storage.from('proofs').remove([filePath]);
+        await supabase.auth.admin.deleteUser(authData.user.id);
+        throw error;
       }
 
       navigate('/dashboard');
@@ -173,6 +196,8 @@ export function RegisterPage() {
       console.error('Registration error:', err);
       if (err?.message?.includes('User already registered')) {
         setError('An account with this email already exists');
+      } else if (err?.message?.includes('row-level security')) {
+        setError('Failed to upload file. Please try again.');
       } else if (err?.message) {
         setError(err.message);
       } else {
