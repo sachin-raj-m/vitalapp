@@ -162,10 +162,10 @@ export function CompleteRegistration() {
             setProgress(50);
             setStatus('creating_profile');
 
-            // Create user profile
+            // Create or update user profile using upsert
             const { error: profileError } = await supabase
                 .from('profiles')
-                .insert([
+                .upsert(
                     {
                         id: session.user.id,
                         email: pendingData.email,
@@ -181,8 +181,12 @@ export function CompleteRegistration() {
                             longitude: 0,
                             address: '',
                         },
+                    },
+                    {
+                        onConflict: 'id',
+                        ignoreDuplicates: false
                     }
-                ]);
+                );
 
             if (profileError) throw profileError;
 
