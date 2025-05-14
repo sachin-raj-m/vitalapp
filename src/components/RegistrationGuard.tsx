@@ -16,28 +16,43 @@ export function RegistrationGuard({ children }: RegistrationGuardProps) {
 
     useEffect(() => {
         const checkRegistration = async () => {
+            console.log('RegistrationGuard: Checking registration status');
             if (!user) {
+                console.log('RegistrationGuard: No user found, redirecting to login');
                 navigate('/login');
                 return;
             }
 
             try {
+                console.log('RegistrationGuard: Checking completion for user:', user.id);
                 const isComplete = await isRegistrationComplete(user.id);
+                console.log('RegistrationGuard: Registration complete?', isComplete);
 
                 if (!isComplete) {
+                    console.log('RegistrationGuard: Registration incomplete, redirecting to complete registration');
                     // Store basic info for registration completion
-                    localStorage.setItem('pendingRegistration', JSON.stringify({
+                    const pendingData = {
                         userId: user.id,
                         email: user.email,
                         phone: user.phone || ''
-                    }));
+                    };
+                    console.log('RegistrationGuard: Storing pending data:', pendingData);
+                    localStorage.setItem('pendingRegistration', JSON.stringify(pendingData));
                     navigate('/complete-registration');
                 } else {
+                    console.log('RegistrationGuard: Registration complete, allowing access');
                     setIsChecking(false);
                 }
             } catch (error) {
-                console.error('Error checking registration:', error);
-                navigate('/login');
+                console.error('RegistrationGuard: Error checking registration:', error);
+                // On error, redirect to complete registration
+                const pendingData = {
+                    userId: user.id,
+                    email: user.email,
+                    phone: user.phone || ''
+                };
+                localStorage.setItem('pendingRegistration', JSON.stringify(pendingData));
+                navigate('/complete-registration');
             }
         };
 
