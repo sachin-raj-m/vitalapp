@@ -9,6 +9,8 @@ import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import type { BloodGroup } from '../types';
 
+const MAX_FILE_SIZE = 1024 * 1024; // 1MB in bytes
+
 export function RegisterPage() {
   const navigate = useNavigate();
   const { signUp } = useAuth();
@@ -23,27 +25,80 @@ export function RegisterPage() {
     proofFile: null as File | null,
   });
   const [error, setError] = useState('');
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(false);
+
+  const validateForm = () => {
+    const errors: Record<string, string> = {};
+
+    // Email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!formData.email) {
+      errors.email = 'Email is required';
+    } else if (!emailRegex.test(formData.email)) {
+      errors.email = 'Please enter a valid email address';
+    }
+
+    // Password validation
+    if (!formData.password) {
+      errors.password = 'Password is required';
+    } else if (formData.password.length < 6) {
+      errors.password = 'Password must be at least 6 characters long';
+    }
+
+    // Confirm password
+    if (!formData.confirmPassword) {
+      errors.confirmPassword = 'Please confirm your password';
+    } else if (formData.password !== formData.confirmPassword) {
+      errors.confirmPassword = 'Passwords do not match';
+    }
+
+    // Full name validation
+    if (!formData.fullName.trim()) {
+      errors.fullName = 'Full name is required';
+    }
+
+    // Phone validation
+    if (!formData.phone) {
+      errors.phone = 'Phone number is required';
+    }
+
+    // Blood group validation
+    if (!formData.bloodGroup) {
+      errors.bloodGroup = 'Blood group is required';
+    }
+
+    // Proof type validation
+    if (!formData.proofType) {
+      errors.proofType = 'Please select proof type';
+    }
+
+    // File validation
+    if (!formData.proofFile) {
+      errors.proofFile = 'Please upload proof document';
+    } else if (formData.proofFile.size > MAX_FILE_SIZE) {
+      errors.proofFile = 'File size must be less than 1MB';
+    }
+
+    setFieldErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setFieldErrors({});
 
-    if (formData.password !== formData.confirmPassword) {
-      setError('Passwords do not match');
-      return;
-    }
-
-    if (!formData.proofFile) {
-      setError('Please upload proof of blood group');
+    if (!validateForm()) {
       return;
     }
 
     setIsLoading(true);
 
     try {
-      // First create the auth user to get their ID
-      const { data: authData, error: authError } = await supabase.auth.signUp({
+      console.log('Starting registration process...');
+
+      const signUpData = {
         email: formData.email,
         password: formData.password,
         options: {
@@ -51,64 +106,77 @@ export function RegisterPage() {
             full_name: formData.fullName,
           }
         }
-      });
+      };
 
-      if (authError) throw authError;
-      if (!authData.user) throw new Error('Failed to create user account');
+      const { data: authData, error: authError } = await supabase.auth.signUp(signUpData);
 
-      // Upload the proof file to Supabase storage with the user's ID in the path
-      const fileExt = formData.proofFile.name.split('.').pop();
+      if (authError) {
+        console.error('Auth error:', authError);
+        if (authError.message.includes('Password')) {
+          setError('Password must be at least 6 characters long');
+        } else if (authError.message.includes('email')) {
+          setError('Please enter a valid email address');
+        } else {
+          setError(authError.message);
+        }
+        return;
+      }
+
+      if (!authData.user || !formData.proofFile) {
+        throw new Error('Failed to create user account');
+      }
+
+      // Upload the proof file
+      const fileExt = formData.proofFile.name.split('.').pop() || 'file';
       const fileName = `${Date.now()}.${fileExt}`;
       const filePath = `${authData.user.id}/${fileName}`;
 
       const { error: uploadError } = await supabase.storage
         .from('proofs')
-        .upload(filePath, formData.proofFile, {
-          upsert: false
+        .upload(filePath, formData.proofFile as File, {
+          upsert: false,
+          contentType: formData.proofFile.type
         });
 
       if (uploadError) {
-        throw new Error('Failed to upload proof document');
+        throw new Error('Failed to upload proof document: ' + uploadError.message);
       }
 
-      // Create a signed URL that expires in 1 hour (for initial verification)
-      const { data, error: signedUrlError } = await supabase.storage
-        .from('proofs')
-        .createSignedUrl(filePath, 3600); // 1 hour expiry
+      // Create the user profile
+      const profileData = {
+        id: authData.user.id,
+        email: formData.email,
+        full_name: formData.fullName,
+        phone: formData.phone,
+        blood_group: formData.bloodGroup,
+        blood_group_proof_type: formData.proofType,
+        blood_group_proof_url: filePath,
+        is_donor: true,
+        is_available: true,
+        location: {
+          latitude: 0,
+          longitude: 0,
+          address: '',
+        },
+      };
 
-      if (signedUrlError || !data) {
-        throw new Error('Failed to generate secure URL for proof document');
-      }
-
-      // Create the user profile with the secure file path
       const { error: profileError } = await supabase
         .from('profiles')
-        .insert({
-          id: authData.user.id,
-          email: formData.email,
-          full_name: formData.fullName,
-          phone: formData.phone,
-          blood_group: formData.bloodGroup,
-          blood_group_proof_type: formData.proofType,
-          blood_group_proof_url: filePath, // Store the path, not the URL
-          is_donor: true,
-          is_available: true,
-          location: {
-            latitude: 0,
-            longitude: 0,
-            address: '',
-          },
-        });
+        .insert([profileData]);
 
-      if (profileError) throw profileError;
+      if (profileError) {
+        throw profileError;
+      }
 
       navigate('/dashboard');
     } catch (err: any) {
+      console.error('Registration error:', err);
       if (err?.message?.includes('User already registered')) {
         setError('An account with this email already exists');
+      } else if (err?.message) {
+        setError(err.message);
       } else {
         setError('Failed to create account. Please try again.');
-        console.error('Registration error:', err);
       }
     } finally {
       setIsLoading(false);
@@ -116,8 +184,21 @@ export function RegisterPage() {
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      setFormData({ ...formData, proofFile: e.target.files[0] });
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > MAX_FILE_SIZE) {
+        setFieldErrors(prev => ({
+          ...prev,
+          proofFile: 'File size must be less than 1MB'
+        }));
+      } else {
+        setFieldErrors(prev => {
+          const newErrors = { ...prev };
+          delete newErrors.proofFile;
+          return newErrors;
+        });
+        setFormData(prev => ({ ...prev, proofFile: file }));
+      }
     }
   };
 
@@ -142,6 +223,8 @@ export function RegisterPage() {
               onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
               required
               autoComplete="name"
+              placeholder="Enter your full name"
+              error={fieldErrors.fullName}
             />
             <Input
               label="Email"
@@ -150,6 +233,8 @@ export function RegisterPage() {
               onChange={(e) => setFormData({ ...formData, email: e.target.value })}
               required
               autoComplete="email"
+              placeholder="your.email@example.com"
+              error={fieldErrors.email}
             />
             <Input
               label="Phone"
@@ -158,6 +243,8 @@ export function RegisterPage() {
               onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
               required
               autoComplete="tel"
+              placeholder="Enter your phone number"
+              error={fieldErrors.phone}
             />
             <Select
               label="Blood Group"
@@ -175,6 +262,7 @@ export function RegisterPage() {
                 { value: 'O-', label: 'O-' },
               ]}
               required
+              error={fieldErrors.bloodGroup}
             />
             <Select
               label="Blood Group Proof Type"
@@ -188,6 +276,7 @@ export function RegisterPage() {
                 { value: 'lab_report', label: 'Laboratory Report' },
               ]}
               required
+              error={fieldErrors.proofType}
             />
             <div className="space-y-2">
               <label className="block text-sm font-medium text-gray-700">Upload Proof</label>
@@ -197,8 +286,11 @@ export function RegisterPage() {
                 accept=".pdf,.jpg,.jpeg,.png"
                 required
                 className="w-full"
+                error={fieldErrors.proofFile}
               />
-              <p className="text-xs text-gray-500">Accepted formats: PDF, JPG, JPEG, PNG</p>
+              <p className="text-xs text-gray-500">
+                Accepted formats: PDF, JPG, JPEG, PNG (Max size: 1MB)
+              </p>
             </div>
             <Input
               label="Password"
@@ -207,6 +299,8 @@ export function RegisterPage() {
               onChange={(e) => setFormData({ ...formData, password: e.target.value })}
               required
               autoComplete="new-password"
+              placeholder="Minimum 6 characters"
+              error={fieldErrors.password}
             />
             <Input
               label="Confirm Password"
@@ -215,6 +309,8 @@ export function RegisterPage() {
               onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
               required
               autoComplete="new-password"
+              placeholder="Re-enter your password"
+              error={fieldErrors.confirmPassword}
             />
 
             <Button
