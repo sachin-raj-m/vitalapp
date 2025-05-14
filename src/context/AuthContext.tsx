@@ -16,6 +16,7 @@ interface AuthContextType extends AuthState {
   updateProfile: (data: Partial<User>) => Promise<void>;
   signInWithGoogle: () => Promise<void>;
   refreshProfile: () => Promise<void>;
+  forceResetAuth: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -53,80 +54,74 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     error: null,
   });
 
+  // Add this state monitoring useEffect
+  useEffect(() => {
+    // This effect will detect problematic states and try to recover
+    if (state.session?.user?.id && !state.user && !state.loading) {
+      console.warn('Inconsistent state: Session exists but no user profile');
+      const userId = state.session.user.id;
+      console.log('Attempting recovery for user:', userId);
+      
+      // Try to recover from localStorage first
+      const cachedProfile = getCachedUserProfile(userId);
+      if (cachedProfile) {
+        console.log('Recovered profile from cache:', cachedProfile);
+        setState(prev => ({ ...prev, user: cachedProfile }));
+      } else {
+        console.log('No cached profile, refreshing from DB');
+        refreshProfile().catch(err => {
+          console.error('Recovery attempt failed:', err);
+        });
+      }
+    }
+  }, [state.session, state.user, state.loading]);
+
   const fetchUserProfile = async (userId: string) => {
     try {
       console.log('Fetching user profile for:', userId);
       setState(prev => ({ ...prev, loading: true }));
-      
-      // Add retry logic for better reliability
-      let retries = 0;
-      const maxRetries = 3;
-      let data = null;
-      let error = null;
-      
-      while (retries < maxRetries && !data && !error) {
-        const result = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', userId)
-          .maybeSingle();
-        
-        data = result.data;
-        error = result.error;
-        
-        if (!data && !error) {
-          retries++;
-          console.log(`No profile found, retrying (${retries}/${maxRetries})...`);
-          await new Promise(resolve => setTimeout(resolve, 500)); // Wait before retry
-        }
-      }
+
+      // Profile fetch promise - simplified for reliability
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .maybeSingle();
 
       if (error) {
         console.error('Error fetching profile:', error);
+        setState(prev => ({ ...prev, loading: false, error: error as Error }));
         throw error;
       }
 
       if (data) {
-        console.log('User profile fetched:', data);
+        console.log('User profile fetched successfully:', data);
         
         // Cache the profile in localStorage
         cacheUserProfile(data as User);
         
+        // Set user immediately
         setState(prev => ({
           ...prev,
           user: data as User,
           loading: false,
           error: null
         }));
+        
+        return data as User;
       } else {
-        console.log('No profile found after retries, creating new profile');
+        console.log('No profile found, creating new profile');
+        
         // Get user data from auth
         const { data: { user: authUser } } = await supabase.auth.getUser();
-        console.log('Auth user data:', authUser);
-
-        // First check if profile exists again (race condition protection)
-        const { data: existingProfile } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', userId)
-          .maybeSingle();
-
-        if (existingProfile) {
-          console.log('Profile found on double-check:', existingProfile);
-          
-          // Cache the profile in localStorage
-          cacheUserProfile(existingProfile as User);
-          
-          setState(prev => ({
-            ...prev,
-            user: existingProfile as User,
-            loading: false,
-            error: null
-          }));
-          return;
+        
+        if (!authUser) {
+          throw new Error('No auth user found');
         }
-
-        // Create a new profile if it doesn't exist
+        
+        console.log('Creating profile with auth data:', authUser);
+        
+        // Create a new profile
         const { data: newProfile, error: createError } = await supabase
           .from('profiles')
           .insert({
@@ -141,41 +136,42 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         if (createError) {
           console.error('Error creating profile:', createError);
-          // If there's a conflict, try to fetch the profile again
+          
+          // Check for duplicate key error (profile might have been created in another tab/request)
           if (createError.code === '23505') {
-            const { data: conflictProfile } = await supabase
+            console.log('Profile already exists, fetching it instead');
+            const { data: existingProfile } = await supabase
               .from('profiles')
               .select('*')
               .eq('id', userId)
               .single();
-
-            if (conflictProfile) {
-              // Cache the profile in localStorage
-              cacheUserProfile(conflictProfile as User);
               
+            if (existingProfile) {
+              cacheUserProfile(existingProfile as User);
               setState(prev => ({
                 ...prev,
-                user: conflictProfile as User,
+                user: existingProfile as User,
                 loading: false,
                 error: null
               }));
-              return;
+              return existingProfile as User;
             }
           }
+          
+          setState(prev => ({ ...prev, loading: false, error: createError as Error }));
           throw createError;
         }
 
         console.log('New profile created:', newProfile);
-        
-        // Cache the new profile in localStorage
         cacheUserProfile(newProfile as User);
-        
         setState(prev => ({
           ...prev,
           user: newProfile as User,
           loading: false,
           error: null
         }));
+        
+        return newProfile as User;
       }
     } catch (error) {
       console.error('Error in fetchUserProfile:', error);
@@ -184,6 +180,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         loading: false,
         error: error as Error
       }));
+      throw error;
+    }
+  };
+
+  // Add this function to force reset auth state
+  const forceResetAuth = async () => {
+    try {
+      // Clear all auth state
+      localStorage.removeItem('vital_user_profile');
+      localStorage.removeItem('vital_supabase_auth');
+      
+      // Sign out from supabase
+      await supabase.auth.signOut({ scope: 'global' });
+      
+      // Reset state
+      setState({
+        user: null,
+        session: null,
+        loading: false,
+        error: null,
+      });
+    } catch (error) {
+      console.error('Error in force reset:', error);
+      setState({
+        user: null,
+        session: null,
+        loading: false,
+        error: error as Error,
+      });
     }
   };
 
@@ -192,38 +217,46 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const initializeAuth = async () => {
       try {
         console.log('Initializing auth...');
-        // First check if we have a session
         const { data: { session } } = await supabase.auth.getSession();
         console.log('Initial session check:', session);
-        
+
+        // Set session immediately
         setState(prev => ({ ...prev, session }));
 
         if (session?.user?.id) {
           console.log('Found session user, fetching profile:', session.user.id);
           
-          // Try to get profile from localStorage while fetching from DB
+          // Try cached profile first for immediate display
           const cachedProfile = getCachedUserProfile(session.user.id);
           if (cachedProfile) {
-            console.log('Using cached profile while fetching from DB');
+            console.log('Using cached profile:', cachedProfile);
             setState(prev => ({
               ...prev,
               user: cachedProfile,
-              // Still loading as we want the fresh data
-              loading: true
+              loading: false
             }));
           }
           
-          await fetchUserProfile(session.user.id);
+          // Still fetch fresh profile from DB
+          try {
+            await fetchUserProfile(session.user.id);
+          } catch (err) {
+            console.error('Error fetching profile during init:', err);
+            // Don't set loading=false again if we already set it with cached profile
+            if (!cachedProfile) {
+              setState(prev => ({ ...prev, loading: false }));
+            }
+          }
         } else {
           console.log('No session found');
           setState(prev => ({ ...prev, loading: false }));
         }
       } catch (error) {
         console.error('Error initializing auth:', error);
-        setState(prev => ({ 
-          ...prev, 
-          loading: false, 
-          error: error as Error 
+        setState(prev => ({
+          ...prev,
+          loading: false,
+          error: error as Error
         }));
       }
     };
@@ -231,31 +264,52 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Run initialization
     initializeAuth();
 
-    // Listen for auth changes
+    // Listen for auth changes with improved error handling
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        console.log('Auth state changed:', event, session);
-        setState(prev => ({ ...prev, session }));
-
-        if (event === 'SIGNED_IN' && session?.user?.id) {
-          console.log('User signed in:', session.user);
-          await fetchUserProfile(session.user.id);
-        } else if (event === 'SIGNED_OUT') {
-          console.log('User signed out');
-          setState(prev => ({ ...prev, user: null, loading: false }));
-          // Clear cached profile on sign out
-          localStorage.removeItem('vital_user_profile');
-        } else if (event === 'TOKEN_REFRESHED' && session?.user?.id) {
-          // Make sure to handle token refreshes as well
-          console.log('Token refreshed, ensuring profile is up to date');
+        try {
+          console.log('Auth state changed:', event, session);
           
-          // Only re-fetch if we don't have a user already
-          if (!state.user && !state.loading) {
-            await fetchUserProfile(session.user.id);
+          // Update session state immediately
+          setState(prev => ({ ...prev, session }));
+
+          if (event === 'SIGNED_IN' && session?.user?.id) {
+            console.log('User signed in:', session.user);
+            
+            // Try cached profile first for immediate display
+            const cachedProfile = getCachedUserProfile(session.user.id);
+            if (cachedProfile) {
+              console.log('Using cached profile after sign in:', cachedProfile);
+              setState(prev => ({
+                ...prev,
+                user: cachedProfile
+              }));
+            }
+            
+            try {
+              await fetchUserProfile(session.user.id);
+            } catch (err) {
+              console.error('Error fetching profile after sign in:', err);
+              setState(prev => ({ ...prev, loading: false }));
+            }
+          } else if (event === 'SIGNED_OUT') {
+            console.log('User signed out');
+            localStorage.removeItem('vital_user_profile');
+            setState(prev => ({ ...prev, user: null, loading: false }));
+          } else if (event === 'TOKEN_REFRESHED' && session?.user?.id) {
+            console.log('Token refreshed');
+            if (!state.user) {
+              try {
+                await fetchUserProfile(session.user.id);
+              } catch (err) {
+                console.error('Error fetching profile after token refresh:', err);
+                setState(prev => ({ ...prev, loading: false }));
+              }
+            }
           }
-        } else if (event === 'USER_UPDATED' && session?.user?.id) {
-          console.log('User updated, refreshing profile');
-          await fetchUserProfile(session.user.id);
+        } catch (err) {
+          console.error('Error handling auth state change:', err);
+          setState(prev => ({ ...prev, loading: false }));
         }
       }
     );
@@ -272,8 +326,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       console.log('Sign in response:', { data, error });
       if (error) throw error;
-      
-      // The user profile will be fetched via the auth state change listener
     } catch (error) {
       console.error('Sign in error:', error);
       setState(prev => ({ ...prev, error: error as Error, loading: false }));
@@ -285,18 +337,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       console.log('Starting Google sign in...');
       setState(prev => ({ ...prev, loading: true, error: null }));
-      
+
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
           redirectTo: `${window.location.origin}/auth/callback`,
         },
       });
-      
+
       console.log('Google sign in response:', { data, error });
       if (error) throw error;
-      
-      // The redirect happens automatically, so we don't need to do anything else here
     } catch (error) {
       console.error('Google sign in error:', error);
       setState(prev => ({ ...prev, error: error as Error, loading: false }));
@@ -349,8 +399,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setState(prev => ({ ...prev, loading: true }));
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
-      
-      // Clear cached profile
       localStorage.removeItem('vital_user_profile');
     } catch (error) {
       setState(prev => ({ ...prev, error: error as Error, loading: false }));
@@ -383,25 +431,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       console.log('Manually refreshing profile...');
       setState(prev => ({ ...prev, loading: true, error: null }));
-      
+
       // Get current user from session
       const { data: { session } } = await supabase.auth.getSession();
-      
+
       if (session?.user?.id) {
         await fetchUserProfile(session.user.id);
       } else {
-        setState(prev => ({ 
-          ...prev, 
+        setState(prev => ({
+          ...prev,
           loading: false,
           error: new Error('No authenticated user found')
         }));
       }
     } catch (error) {
       console.error('Error refreshing profile:', error);
-      setState(prev => ({ 
-        ...prev, 
-        loading: false, 
-        error: error as Error 
+      setState(prev => ({
+        ...prev,
+        loading: false,
+        error: error as Error
       }));
     }
   };
@@ -414,6 +462,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     updateProfile,
     signInWithGoogle,
     refreshProfile,
+    forceResetAuth,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
