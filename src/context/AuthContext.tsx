@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import type { User } from '../types';
 
@@ -53,35 +53,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     loading: true,
     error: null,
   });
-
-  // Add this state monitoring useEffect
-  useEffect(() => {
-    // This effect will detect problematic states and try to recover
-    if (state.session?.user?.id && !state.user && !state.loading) {
-      console.warn('Inconsistent state: Session exists but no user profile');
-      const userId = state.session.user.id;
-      console.log('Attempting recovery for user:', userId);
-      
-      // Try to recover from localStorage first
-      const cachedProfile = getCachedUserProfile(userId);
-      if (cachedProfile) {
-        console.log('Recovered profile from cache:', cachedProfile);
-        setState(prev => ({ ...prev, user: cachedProfile }));
-      } else {
-        console.log('No cached profile, refreshing from DB');
-        refreshProfile().catch(err => {
-          console.error('Recovery attempt failed:', err);
-        });
-      }
-    }
-  }, [state.session, state.user, state.loading]);
+  
+  // Use refs to prevent infinite loops
+  const isInitialized = useRef(false);
+  const isRefreshing = useRef(false);
+  const lastProfileFetch = useRef<number>(0);
 
   const fetchUserProfile = async (userId: string) => {
+    // Prevent duplicate fetches within 2 seconds
+    const now = Date.now();
+    if (now - lastProfileFetch.current < 2000) {
+      console.log('Skipping duplicate profile fetch (throttled)');
+      return state.user;
+    }
+    
+    if (isRefreshing.current) {
+      console.log('Profile fetch already in progress, skipping');
+      return state.user;
+    }
+    
+    isRefreshing.current = true;
+    lastProfileFetch.current = now;
+    
     try {
       console.log('Fetching user profile for:', userId);
       setState(prev => ({ ...prev, loading: true }));
 
-      // Profile fetch promise - simplified for reliability
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
@@ -181,6 +178,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         error: error as Error
       }));
       throw error;
+    } finally {
+      isRefreshing.current = false;
     }
   };
 
@@ -211,6 +210,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
     }
   };
+
+  // Add this state monitoring useEffect
+  useEffect(() => {
+    // Skip recovery during initialization
+    if (!isInitialized.current) return;
+    
+    // Only attempt recovery if we have a session but no user
+    if (state.session?.user?.id && !state.user && !state.loading && !isRefreshing.current) {
+      console.warn('Inconsistent state: Session exists but no user profile');
+      
+      // Try to recover from localStorage first
+      const userId = state.session.user.id;
+      const cachedProfile = getCachedUserProfile(userId);
+      
+      if (cachedProfile) {
+        console.log('Recovered profile from cache:', cachedProfile);
+        setState(prev => ({ ...prev, user: cachedProfile }));
+      } else {
+        // Only refresh if not already refreshing
+        console.log('No cached profile, refreshing from DB');
+        refreshProfile().catch(err => {
+          console.error('Recovery attempt failed:', err);
+        });
+      }
+    }
+  }, [state.session, state.user, state.loading]);
 
   useEffect(() => {
     // Initialize auth
@@ -251,6 +276,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           console.log('No session found');
           setState(prev => ({ ...prev, loading: false }));
         }
+        
+        // Mark initialization as complete
+        isInitialized.current = true;
       } catch (error) {
         console.error('Error initializing auth:', error);
         setState(prev => ({
@@ -258,6 +286,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           loading: false,
           error: error as Error
         }));
+        isInitialized.current = true;
       }
     };
 
@@ -286,19 +315,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               }));
             }
             
-            try {
-              await fetchUserProfile(session.user.id);
-            } catch (err) {
-              console.error('Error fetching profile after sign in:', err);
-              setState(prev => ({ ...prev, loading: false }));
-            }
+            // Wait a moment before fetching profile to avoid race conditions
+            setTimeout(async () => {
+              try {
+                await fetchUserProfile(session.user.id);
+              } catch (err) {
+                console.error('Error fetching profile after sign in:', err);
+                setState(prev => ({ ...prev, loading: false }));
+              }
+            }, 500);
           } else if (event === 'SIGNED_OUT') {
             console.log('User signed out');
             localStorage.removeItem('vital_user_profile');
             setState(prev => ({ ...prev, user: null, loading: false }));
           } else if (event === 'TOKEN_REFRESHED' && session?.user?.id) {
             console.log('Token refreshed');
-            if (!state.user) {
+            // Only fetch profile if we don't have one and not already loading
+            if (!state.user && !state.loading && !isRefreshing.current) {
               try {
                 await fetchUserProfile(session.user.id);
               } catch (err) {
@@ -429,6 +462,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const refreshProfile = async () => {
     try {
+      // If already refreshing, exit early
+      if (isRefreshing.current) {
+        console.log('Profile refresh already in progress, skipping');
+        return;
+      }
+      
       console.log('Manually refreshing profile...');
       setState(prev => ({ ...prev, loading: true, error: null }));
 
