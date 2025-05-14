@@ -6,7 +6,6 @@ import { Input, Select } from '../components/ui/Input';
 import { Button } from '../components/ui/Button';
 import { Alert } from '../components/ui/Alert';
 import { useAuth } from '../context/AuthContext';
-import { supabase } from '../lib/supabase';
 import type { BloodGroup } from '../types';
 
 export function RegisterPage() {
@@ -19,6 +18,8 @@ export function RegisterPage() {
     fullName: '',
     phone: '',
     bloodGroup: '' as BloodGroup,
+    proofType: '',
+    proofFile: null as File | null,
   });
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -32,13 +33,23 @@ export function RegisterPage() {
       return;
     }
 
+    if (!formData.proofFile) {
+      setError('Please upload proof of blood group');
+      return;
+    }
+
     setIsLoading(true);
 
     try {
+      // TODO: Handle file upload to storage
+      const proofUrl = ''; // This should be the uploaded file URL
+
       await signUp(formData.email, formData.password, {
         full_name: formData.fullName,
         phone: formData.phone,
         blood_group: formData.bloodGroup,
+        blood_group_proof_type: formData.proofType,
+        blood_group_proof_url: proofUrl,
         is_donor: true,
         is_available: true,
         location: {
@@ -59,17 +70,9 @@ export function RegisterPage() {
     }
   };
 
-  const handleGoogleSignUp = async () => {
-    try {
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: `${window.location.origin}/dashboard`,
-        },
-      });
-      if (error) throw error;
-    } catch (err) {
-      setError('Failed to sign up with Google');
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setFormData({ ...formData, proofFile: e.target.files[0] });
     }
   };
 
@@ -128,6 +131,30 @@ export function RegisterPage() {
               ]}
               required
             />
+            <Select
+              label="Blood Group Proof Type"
+              value={formData.proofType}
+              onChange={(e) => setFormData({ ...formData, proofType: e.target.value })}
+              options={[
+                { value: '', label: 'Select Proof Type' },
+                { value: 'medical_certificate', label: 'Medical Certificate' },
+                { value: 'hospital_report', label: 'Hospital Report' },
+                { value: 'blood_donation_card', label: 'Blood Donation Card' },
+                { value: 'lab_report', label: 'Laboratory Report' },
+              ]}
+              required
+            />
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700">Upload Proof</label>
+              <Input
+                type="file"
+                onChange={handleFileChange}
+                accept=".pdf,.jpg,.jpeg,.png"
+                required
+                className="w-full"
+              />
+              <p className="text-xs text-gray-500">Accepted formats: PDF, JPG, JPEG, PNG</p>
+            </div>
             <Input
               label="Password"
               type="password"
@@ -155,24 +182,6 @@ export function RegisterPage() {
               Create Account
             </Button>
           </form>
-
-          <div className="relative my-6">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-gray-300"></div>
-            </div>
-            <div className="relative flex justify-center text-sm">
-              <span className="px-2 bg-white text-gray-500">Or continue with</span>
-            </div>
-          </div>
-
-          <Button
-            type="button"
-            variant="secondary"
-            className="w-full"
-            onClick={handleGoogleSignUp}
-          >
-            Sign up with Google
-          </Button>
 
           <div className="mt-6 text-center">
             <p className="text-sm text-gray-600">
