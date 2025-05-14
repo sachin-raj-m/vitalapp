@@ -7,6 +7,7 @@ import { Button } from '../components/ui/Button';
 import { Alert } from '../components/ui/Alert';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
+import { isRegistrationComplete } from '../utils/auth';
 
 export function LoginPage() {
   const navigate = useNavigate();
@@ -18,9 +19,31 @@ export function LoginPage() {
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
 
   useEffect(() => {
-    if (user) {
-      navigate('/dashboard');
-    }
+    const checkUserRegistration = async () => {
+      if (user) {
+        try {
+          const isComplete = await isRegistrationComplete(user.id);
+          if (!isComplete) {
+            // Store basic info for registration completion
+            localStorage.setItem('pendingRegistration', JSON.stringify({
+              userId: user.id,
+              email: user.email,
+              phone: user.phone || ''
+            }));
+            navigate('/complete-registration');
+          } else {
+            navigate('/dashboard');
+          }
+        } catch (err) {
+          console.error('Error checking registration:', err);
+          // If there's an error checking registration, we'll still redirect to dashboard
+          // The RegistrationGuard will handle the check again
+          navigate('/dashboard');
+        }
+      }
+    };
+
+    checkUserRegistration();
   }, [user, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -39,7 +62,6 @@ export function LoginPage() {
       } else {
         setError(err.message || 'An error occurred during sign in');
       }
-    } finally {
       setIsLoading(false);
     }
   };
@@ -48,8 +70,7 @@ export function LoginPage() {
     setIsGoogleLoading(true);
     setError('');
     try {
-      console.log('Starting Google sign in...');
-      const { data, error } = await supabase.auth.signInWithOAuth({
+      const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
           redirectTo: `${window.location.origin}/auth/callback`,
@@ -60,19 +81,12 @@ export function LoginPage() {
         },
       });
 
-      console.log('OAuth response:', { data, error });
-
       if (error) {
-        if (error.message.includes('User already registered')) {
-          setError('This Google account is already registered. Please sign in with your email and password.');
-        } else {
-          setError(error.message || 'Failed to sign in with Google');
-        }
+        throw error;
       }
     } catch (err: any) {
       console.error('Google sign in error:', err);
       setError(err.message || 'Failed to sign in with Google');
-    } finally {
       setIsGoogleLoading(false);
     }
   };
