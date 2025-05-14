@@ -8,6 +8,8 @@ export interface User {
   full_name: string;
   phone: string;
   blood_group: BloodGroup;
+  blood_group_proof_type?: string;
+  blood_group_proof_url?: string;
   location: {
     latitude: number;
     longitude: number;
