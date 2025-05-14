@@ -2,6 +2,7 @@ import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
+import { RegistrationGuard } from './components/RegistrationGuard';
 import { Header } from './components/Header';
 import { Footer } from './components/Footer';
 import { HomePage } from './pages/HomePage';
@@ -27,32 +28,46 @@ function App() {
               <Route path="/login" element={<LoginPage />} />
               <Route path="/register" element={<RegisterPage />} />
               <Route path="/auth/callback" element={<AuthCallback />} />
-              <Route path="/complete-registration" element={<CompleteRegistration />} />
+              <Route path="/complete-registration" element={
+                <ProtectedRoute>
+                  <CompleteRegistration />
+                </ProtectedRoute>
+              } />
 
-              {/* Protected Routes */}
+              {/* Protected Routes with Registration Guard */}
               <Route path="/dashboard" element={
                 <ProtectedRoute>
-                  <DashboardPage />
+                  <RegistrationGuard>
+                    <DashboardPage />
+                  </RegistrationGuard>
                 </ProtectedRoute>
               } />
               <Route path="/requests" element={
                 <ProtectedRoute>
-                  <RequestsPage />
+                  <RegistrationGuard>
+                    <RequestsPage />
+                  </RegistrationGuard>
                 </ProtectedRoute>
               } />
               <Route path="/requests/new" element={
                 <ProtectedRoute>
-                  <CreateRequestPage />
+                  <RegistrationGuard>
+                    <CreateRequestPage />
+                  </RegistrationGuard>
                 </ProtectedRoute>
               } />
               <Route path="/donations" element={
                 <ProtectedRoute>
-                  <DonationsPage />
+                  <RegistrationGuard>
+                    <DonationsPage />
+                  </RegistrationGuard>
                 </ProtectedRoute>
               } />
               <Route path="/achievements" element={
                 <ProtectedRoute>
-                  <AchievementsPage />
+                  <RegistrationGuard>
+                    <AchievementsPage />
+                  </RegistrationGuard>
                 </ProtectedRoute>
               } />
             </Routes>
