@@ -38,26 +38,50 @@ export function CompleteRegistration() {
     const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
     useEffect(() => {
-        loadPendingRegistration();
-    }, []);
+        const init = async () => {
+            try {
+                // Check if user is authenticated
+                const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+                if (sessionError) throw sessionError;
+                if (!session) {
+                    navigate('/login');
+                    return;
+                }
 
-    const loadPendingRegistration = async () => {
-        const storedData = localStorage.getItem('pendingRegistration');
-        if (!storedData) {
-            setError('Registration data not found. Please register again.');
-            navigate('/register');
-            return;
-        }
+                // Check if registration is already complete
+                const isComplete = await isRegistrationComplete(session.user.id);
+                if (isComplete) {
+                    navigate('/dashboard');
+                    return;
+                }
 
-        try {
-            const data = JSON.parse(storedData);
-            setPendingData(data);
-            setStatus('form');
-        } catch (err) {
-            setError('Invalid registration data. Please register again.');
-            navigate('/register');
-        }
-    };
+                // Get stored registration data
+                const storedData = localStorage.getItem('pendingRegistration');
+                if (!storedData) {
+                    setError('Registration data not found. Please register again.');
+                    navigate('/register');
+                    return;
+                }
+
+                try {
+                    const data = JSON.parse(storedData);
+                    if (data.userId !== session.user.id) {
+                        throw new Error('User ID mismatch');
+                    }
+                    setPendingData(data);
+                    setStatus('form');
+                } catch (err) {
+                    throw new Error('Invalid registration data');
+                }
+            } catch (err: any) {
+                console.error('Initialization error:', err);
+                setError(err.message || 'Failed to load registration data');
+                navigate('/register');
+            }
+        };
+
+        init();
+    }, [navigate]);
 
     const validateForm = () => {
         const errors: Record<string, string> = {};
