@@ -6,6 +6,7 @@ import { Input, Select } from '../components/ui/Input';
 import { Button } from '../components/ui/Button';
 import { Alert } from '../components/ui/Alert';
 import { useAuth } from '../context/AuthContext';
+import { supabase } from '../lib/supabase';
 import type { BloodGroup } from '../types';
 
 export function RegisterPage() {
@@ -41,29 +42,73 @@ export function RegisterPage() {
     setIsLoading(true);
 
     try {
-      // TODO: Handle file upload to storage
-      const proofUrl = ''; // This should be the uploaded file URL
-
-      await signUp(formData.email, formData.password, {
-        full_name: formData.fullName,
-        phone: formData.phone,
-        blood_group: formData.bloodGroup,
-        blood_group_proof_type: formData.proofType,
-        blood_group_proof_url: proofUrl,
-        is_donor: true,
-        is_available: true,
-        location: {
-          latitude: 0,
-          longitude: 0,
-          address: '',
-        },
+      // First create the auth user to get their ID
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: formData.email,
+        password: formData.password,
+        options: {
+          data: {
+            full_name: formData.fullName,
+          }
+        }
       });
+
+      if (authError) throw authError;
+      if (!authData.user) throw new Error('Failed to create user account');
+
+      // Upload the proof file to Supabase storage with the user's ID in the path
+      const fileExt = formData.proofFile.name.split('.').pop();
+      const fileName = `${Date.now()}.${fileExt}`;
+      const filePath = `${authData.user.id}/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('proofs')
+        .upload(filePath, formData.proofFile, {
+          upsert: false
+        });
+
+      if (uploadError) {
+        throw new Error('Failed to upload proof document');
+      }
+
+      // Create a signed URL that expires in 1 hour (for initial verification)
+      const { data, error: signedUrlError } = await supabase.storage
+        .from('proofs')
+        .createSignedUrl(filePath, 3600); // 1 hour expiry
+
+      if (signedUrlError || !data) {
+        throw new Error('Failed to generate secure URL for proof document');
+      }
+
+      // Create the user profile with the secure file path
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .insert({
+          id: authData.user.id,
+          email: formData.email,
+          full_name: formData.fullName,
+          phone: formData.phone,
+          blood_group: formData.bloodGroup,
+          blood_group_proof_type: formData.proofType,
+          blood_group_proof_url: filePath, // Store the path, not the URL
+          is_donor: true,
+          is_available: true,
+          location: {
+            latitude: 0,
+            longitude: 0,
+            address: '',
+          },
+        });
+
+      if (profileError) throw profileError;
+
       navigate('/dashboard');
     } catch (err: any) {
       if (err?.message?.includes('User already registered')) {
         setError('An account with this email already exists');
       } else {
         setError('Failed to create account. Please try again.');
+        console.error('Registration error:', err);
       }
     } finally {
       setIsLoading(false);
