@@ -7,7 +7,8 @@ import { Button } from '../components/ui/Button';
 import { supabase } from '../lib/supabase';
 import { Loader2 } from 'lucide-react';
 import type { BloodGroup } from '../types';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '../context/AuthContext';
+import { isRegistrationComplete } from '../utils/auth';
 
 const MAX_FILE_SIZE = 1024 * 1024; // 1MB in bytes
 
