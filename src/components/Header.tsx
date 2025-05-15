@@ -2,7 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from './ui/Button';
 import { useAuth } from '../context/AuthContext';
-import { LogIn, User } from 'lucide-react';
+import { LogIn, User, HeartPulse } from 'lucide-react';
 
 export function Header() {
   const { user } = useAuth();
@@ -11,8 +11,9 @@ export function Header() {
     <header className="bg-white border-b border-gray-200">
       <div className="container mx-auto px-4 py-4">
         <div className="flex items-center justify-between">
-          <Link to="/" className="text-2xl font-bold text-primary-600">
-            VitalDrop
+          <Link to="/" className="text-2xl font-bold text-primary-600 flex items-center">
+            <HeartPulse className="h-8 w-8 mr-2" />
+            Vital
           </Link>
 
           <nav>
