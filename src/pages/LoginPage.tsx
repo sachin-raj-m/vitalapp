@@ -7,6 +7,7 @@ import { Button } from '../components/ui/Button';
 import { Alert } from '../components/ui/Alert';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
+import { isRegistrationComplete } from '../utils/auth';
 
 export function LoginPage() {
   const navigate = useNavigate();
@@ -18,9 +19,43 @@ export function LoginPage() {
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
 
   useEffect(() => {
-    if (user) {
-      navigate('/dashboard');
-    }
+    const checkUserRegistration = async () => {
+      if (user) {
+        console.log('Checking registration for user:', user);
+        try {
+          const isComplete = await isRegistrationComplete(user.id);
+          console.log('Registration check result:', isComplete);
+
+          if (!isComplete) {
+            console.log('Registration incomplete, redirecting to complete registration');
+            // Store basic info for registration completion
+            const pendingData = {
+              userId: user.id,
+              email: user.email,
+              phone: user.phone || ''
+            };
+            console.log('Storing pending registration data:', pendingData);
+            localStorage.setItem('pendingRegistration', JSON.stringify(pendingData));
+            navigate('/complete-registration');
+          } else {
+            console.log('Registration complete, redirecting to dashboard');
+            navigate('/dashboard');
+          }
+        } catch (err) {
+          console.error('Error in registration check:', err);
+          // On error, we'll treat it as incomplete registration
+          const pendingData = {
+            userId: user.id,
+            email: user.email,
+            phone: user.phone || ''
+          };
+          localStorage.setItem('pendingRegistration', JSON.stringify(pendingData));
+          navigate('/complete-registration');
+        }
+      }
+    };
+
+    checkUserRegistration();
   }, [user, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -39,7 +74,6 @@ export function LoginPage() {
       } else {
         setError(err.message || 'An error occurred during sign in');
       }
-    } finally {
       setIsLoading(false);
     }
   };
@@ -48,8 +82,7 @@ export function LoginPage() {
     setIsGoogleLoading(true);
     setError('');
     try {
-      console.log('Starting Google sign in...');
-      const { data, error } = await supabase.auth.signInWithOAuth({
+      const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
           redirectTo: `${window.location.origin}/auth/callback`,
@@ -60,19 +93,12 @@ export function LoginPage() {
         },
       });
 
-      console.log('OAuth response:', { data, error });
-
       if (error) {
-        if (error.message.includes('User already registered')) {
-          setError('This Google account is already registered. Please sign in with your email and password.');
-        } else {
-          setError(error.message || 'Failed to sign in with Google');
-        }
+        throw error;
       }
     } catch (err: any) {
       console.error('Google sign in error:', err);
       setError(err.message || 'Failed to sign in with Google');
-    } finally {
       setIsGoogleLoading(false);
     }
   };
