@@ -21,15 +21,10 @@ export function HomePage() {
         <p className="text-xl text-gray-600 max-w-2xl mx-auto">
           Connect with blood donors in real-time and help save lives. Join our community of heroes making a difference.
         </p>
-        <div className="flex justify-center gap-4">
+        <div className="flex justify-center">
           <Link to="/register">
             <Button size="lg" variant="primary">
               Become a Donor
-            </Button>
-          </Link>
-          <Link to="/login">
-            <Button size="lg" variant="secondary">
-              Sign In
             </Button>
           </Link>
         </div>
@@ -74,7 +69,7 @@ export function HomePage() {
         </p>
         <Link to="/register">
           <Button size="lg" variant="primary">
-            Sign Up Now
+            Become a Donor Now
           </Button>
         </Link>
       </section>
