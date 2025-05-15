@@ -52,11 +52,13 @@ CREATE POLICY "Users can update own profile"
   TO authenticated
   USING (auth.uid() = id);
 
+DROP POLICY IF EXISTS "Public can read donor profiles" ON public.profiles;
+
 CREATE POLICY "Public can read donor profiles"
   ON public.profiles
   FOR SELECT
   TO anon, authenticated
-  USING (is_donor = true);
+  USING (true);
 
 -- Create index for faster donor lookups
 CREATE INDEX IF NOT EXISTS idx_profiles_is_donor ON public.profiles(is_donor)
