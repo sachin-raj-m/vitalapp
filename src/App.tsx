@@ -16,6 +16,8 @@ import { RegisterPage } from './pages/RegisterPage';
 import { AuthCallback } from './pages/AuthCallback';
 import { CompleteRegistration } from './pages/CompleteRegistration';
 import { ProfilePage } from './pages/ProfilePage';
+import NearbyDonorsPage from './pages/NearbyDonorsPage';
+
 
 function App() {
   return (
@@ -78,6 +80,14 @@ function App() {
                   </RegistrationGuard>
                 </ProtectedRoute>
               } />
+              <Route path="/nearby-donors" element={
+                 <ProtectedRoute>
+                   <RegistrationGuard>
+                     <NearbyDonorsPage />
+                   </RegistrationGuard>
+                 </ProtectedRoute>
+              } />
+
             </Routes>
           </main>
           <Footer />
