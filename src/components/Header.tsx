@@ -2,7 +2,8 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from './ui/Button';
 import { useAuth } from '../context/AuthContext';
-import { LogIn, User, HeartPulse } from 'lucide-react';
+import { LogIn, User, HeartPulse, MapPin } from 'lucide-react';
+
 
 export function Header() {
   const { user } = useAuth();
@@ -27,6 +28,10 @@ export function Header() {
                 </Link>
                 <Link to="/donations" className="text-gray-600 hover:text-gray-900">
                   Donations
+                </Link>
+                <Link to="/nearby-donors" className="text-gray-600 hover:text-gray-900 flex items-center gap-2">
+                <MapPin className="h-4 w-4" />
+                  Nearby Donors
                 </Link>
                 <Link to="/profile">
                   <Button variant="ghost" className="p-2">
