@@ -234,7 +234,12 @@ export default function RequestsPage() {
                             <BloodRequestCard
                                 key={request.id}
                                 request={request}
-                                onRespond={() => handleDonateClick(request)}
+                                onRespond={
+                                    // Hide "I can donate" if user owns the request
+                                    user?.id === request.user_id
+                                        ? undefined
+                                        : () => handleDonateClick(request)
+                                }
                             />
                         ))
                     ) : (
