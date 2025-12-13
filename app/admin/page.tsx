@@ -5,38 +5,70 @@ import { supabase } from '@/lib/supabase';
 import { Card, CardBody } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Alert } from '@/components/ui/Alert';
-import { Loader2, Check, X, FileText, ExternalLink } from 'lucide-react';
+import { Loader2, Check, X, FileText, ExternalLink, Users, Activity, Shield, Search, Trash2, HeartPulse } from 'lucide-react';
+import { motion } from 'framer-motion';
 
-interface PendingDonor {
+interface Profile {
     id: string;
     full_name: string;
     email: string;
-    blood_group: string;
-    blood_group_proof_url: string;
+    role: string;
+    is_donor: boolean;
+    verification_status: string;
     created_at: string;
+    blood_group?: string;
+    blood_group_proof_url?: string;
+}
+
+interface Request {
+    id: string;
+    hospital_name: string;
+    blood_group: string;
+    units_needed: number;
+    urgency_level: string;
+    status: string;
+    created_at: string;
+    contact_name: string;
 }
 
 export default function AdminDashboard() {
-    const [donors, setDonors] = useState<PendingDonor[]>([]);
+    const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'verifications' | 'requests'>('overview');
+    const [stats, setStats] = useState({ users: 0, donors: 0, pending: 0, requests: 0 });
+    const [users, setUsers] = useState<Profile[]>([]);
+    const [requests, setRequests] = useState<Request[]>([]);
     const [loading, setLoading] = useState(true);
     const [actionLoading, setActionLoading] = useState<string | null>(null);
     const [error, setError] = useState('');
+    const [searchTerm, setSearchTerm] = useState('');
 
     useEffect(() => {
-        fetchPendingDonors();
+        fetchAllData();
     }, []);
 
-    const fetchPendingDonors = async () => {
+    const fetchAllData = async () => {
+        setLoading(true);
         try {
-            const { data, error } = await supabase
-                .from('profiles')
-                .select('*')
-                .eq('verification_status', 'pending')
-                .eq('is_donor', true)
-                .order('created_at', { ascending: false });
+            // Parallel fetches for efficiency
+            const [usersRes, requestsRes] = await Promise.all([
+                supabase.from('profiles').select('*').order('created_at', { ascending: false }),
+                supabase.from('blood_requests').select('*').order('created_at', { ascending: false })
+            ]);
 
-            if (error) throw error;
-            setDonors(data || []);
+            if (usersRes.error) throw usersRes.error;
+            if (requestsRes.error) throw requestsRes.error;
+
+            const allUsers = usersRes.data || [];
+            const allRequests = requestsRes.data || [];
+
+            setUsers(allUsers);
+            setRequests(allRequests);
+
+            setStats({
+                users: allUsers.length,
+                donors: allUsers.filter(u => u.is_donor).length,
+                pending: allUsers.filter(u => u.verification_status === 'pending' && u.is_donor).length,
+                requests: allRequests.filter(r => r.status === 'active').length
+            });
         } catch (err: any) {
             setError(err.message);
         } finally {
@@ -44,18 +76,45 @@ export default function AdminDashboard() {
         }
     };
 
-    const handleVerify = async (userId: string, status: 'verified' | 'rejected') => {
+    const handleVerifyInList = async (userId: string, status: 'verified' | 'rejected') => {
         setActionLoading(userId);
         try {
-            const { error } = await supabase
-                .from('profiles')
-                .update({ verification_status: status })
-                .eq('id', userId);
-
+            const { error } = await supabase.from('profiles').update({ verification_status: status }).eq('id', userId);
             if (error) throw error;
 
-            // Remove from list
-            setDonors(prev => prev.filter(d => d.id !== userId));
+            // Optimistic update
+            setUsers(prev => prev.map(u => u.id === userId ? { ...u, verification_status: status } : u));
+            setStats(prev => ({ ...prev, pending: prev.pending - 1 }));
+        } catch (err: any) {
+            setError(err.message);
+        } finally {
+            setActionLoading(null);
+        }
+    };
+
+    const toggleRole = async (userId: string, currentRole: string) => {
+        if (!confirm(`Are you sure you want to change this user's role?`)) return;
+
+        setActionLoading(userId);
+        const newRole = currentRole === 'admin' ? 'user' : 'admin';
+        try {
+            const { error } = await supabase.from('profiles').update({ role: newRole }).eq('id', userId);
+            if (error) throw error;
+            setUsers(prev => prev.map(u => u.id === userId ? { ...u, role: newRole } : u));
+        } catch (err: any) {
+            setError(err.message);
+        } finally {
+            setActionLoading(null);
+        }
+    };
+
+    const deleteRequest = async (requestId: string) => {
+        if (!confirm("Delete this request permanently?")) return;
+        setActionLoading(requestId);
+        try {
+            const { error } = await supabase.from('blood_requests').delete().eq('id', requestId);
+            if (error) throw error;
+            setRequests(prev => prev.filter(r => r.id !== requestId));
         } catch (err: any) {
             setError(err.message);
         } finally {
@@ -69,81 +128,214 @@ export default function AdminDashboard() {
         return data.publicUrl;
     };
 
-    if (loading) {
-        return (
-            <div className="flex justify-center py-8">
-                <Loader2 className="h-8 w-8 animate-spin text-primary-500" />
-            </div>
-        );
-    }
+    const filteredUsers = users.filter(u =>
+        u.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        u.email?.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+
+    const pendingDonors = users.filter(u => u.verification_status === 'pending' && u.is_donor);
+
+    if (loading) return <div className="flex justify-center p-8"><Loader2 className="animate-spin h-8 w-8 text-red-500" /></div>;
 
     return (
-        <div className="space-y-6">
-            <h2 className="text-xl font-semibold">Pending Verifications ({donors.length})</h2>
+        <div className="space-y-8">
+            {error && <Alert variant="error" onClose={() => setError('')}>{error}</Alert>}
 
-            {error && <Alert variant="error">{error}</Alert>}
-
-            {donors.length === 0 ? (
-                <Card>
-                    <CardBody className="text-center py-8 text-gray-500">
-                        No pending verifications found.
+            {/* Stats Overview */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <Card className="bg-blue-50 border-blue-100">
+                    <CardBody className="p-4 flex items-center space-x-4">
+                        <div className="p-3 bg-blue-100 rounded-full text-blue-600"><Users size={24} /></div>
+                        <div>
+                            <div className="text-2xl font-bold">{stats.users}</div>
+                            <div className="text-sm text-gray-500">Total Users</div>
+                        </div>
                     </CardBody>
                 </Card>
-            ) : (
-                <div className="grid gap-4">
-                    {donors.map(donor => (
-                        <Card key={donor.id}>
-                            <CardBody className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                                <div>
-                                    <h3 className="font-semibold text-lg">{donor.full_name}</h3>
-                                    <p className="text-sm text-gray-600">{donor.email}</p>
-                                    <div className="mt-2 flex items-center space-x-4">
-                                        <span className="bg-primary-100 text-primary-800 text-xs px-2 py-1 rounded-full font-medium">
-                                            {donor.blood_group}
-                                        </span>
-                                        <span className="text-xs text-gray-500">
-                                            Submitted: {new Date(donor.created_at).toLocaleDateString()}
-                                        </span>
-                                    </div>
-                                </div>
+                <Card className="bg-red-50 border-red-100">
+                    <CardBody className="p-4 flex items-center space-x-4">
+                        <div className="p-3 bg-red-100 rounded-full text-red-600"><HeartPulse size={24} /></div>
+                        <div>
+                            <div className="text-2xl font-bold">{stats.donors}</div>
+                            <div className="text-sm text-gray-500">Donors</div>
+                        </div>
+                    </CardBody>
+                </Card>
+                <Card className="bg-orange-50 border-orange-100">
+                    <CardBody className="p-4 flex items-center space-x-4">
+                        <div className="p-3 bg-orange-100 rounded-full text-orange-600"><Shield size={24} /></div>
+                        <div>
+                            <div className="text-2xl font-bold">{stats.pending}</div>
+                            <div className="text-sm text-gray-500">Pending Verify</div>
+                        </div>
+                    </CardBody>
+                </Card>
+                <Card className="bg-green-50 border-green-100">
+                    <CardBody className="p-4 flex items-center space-x-4">
+                        <div className="p-3 bg-green-100 rounded-full text-green-600"><Activity size={24} /></div>
+                        <div>
+                            <div className="text-2xl font-bold">{stats.requests}</div>
+                            <div className="text-sm text-gray-500">Active Requests</div>
+                        </div>
+                    </CardBody>
+                </Card>
+            </div>
 
-                                <div className="flex items-center gap-3 w-full md:w-auto">
-                                    {donor.blood_group_proof_url && (
-                                        <a
-                                            href={getProofUrl(donor.blood_group_proof_url)}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="flex items-center text-blue-600 hover:text-blue-800 text-sm mr-4"
-                                        >
-                                            <FileText className="h-4 w-4 mr-1" />
-                                            View Proof
-                                            <ExternalLink className="h-3 w-3 ml-1" />
-                                        </a>
-                                    )}
+            {/* Tabs */}
+            <div className="flex space-x-1 border-b overflow-x-auto pb-1">
+                {['overview', 'users', 'verifications', 'requests'].map((tab) => (
+                    <button
+                        key={tab}
+                        onClick={() => setActiveTab(tab as any)}
+                        className={`px-4 py-2 capitalize font-medium text-sm transition-colors relative ${activeTab === tab ? 'text-red-600' : 'text-gray-500 hover:text-gray-700'
+                            }`}
+                    >
+                        {tab}
+                        {activeTab === tab && (
+                            <motion.div layoutId="underline" className="absolute left-0 right-0 bottom-[-5px] h-0.5 bg-red-600" />
+                        )}
+                    </button>
+                ))}
+            </div>
 
-                                    <Button
-                                        variant="secondary"
-                                        onClick={() => handleVerify(donor.id, 'rejected')}
-                                        isLoading={actionLoading === donor.id}
-                                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                                        leftIcon={<X className="h-4 w-4" />}
-                                    >
-                                        Reject
-                                    </Button>
-                                    <Button
-                                        variant="primary"
-                                        onClick={() => handleVerify(donor.id, 'verified')}
-                                        isLoading={actionLoading === donor.id}
-                                        leftIcon={<Check className="h-4 w-4" />}
-                                    >
-                                        Approve
-                                    </Button>
-                                </div>
-                            </CardBody>
-                        </Card>
-                    ))}
-                </div>
-            )}
+            {/* Content Area */}
+            <div className="min-h-[400px]">
+                {activeTab === 'overview' && (
+                    <div className="space-y-6">
+                        <h3 className="text-lg font-semibold">Activity Stream</h3>
+                        <p className="text-gray-500">Recent application activity will appear here.</p>
+                        {/* Placeholder for activity log */}
+                        <div className="bg-gray-50 p-4 rounded-lg border border-gray-100 text-center text-sm text-gray-400">
+                            System is running normally. No critical alerts.
+                        </div>
+                    </div>
+                )}
+
+                {activeTab === 'users' && (
+                    <div className="space-y-4">
+                        <div className="flex items-center space-x-2 bg-white border border-gray-300 rounded-md px-3 py-2 w-full max-w-sm">
+                            <Search className="h-4 w-4 text-gray-400" />
+                            <input
+                                type="text"
+                                placeholder="Search users by name or email..."
+                                className="outline-none text-sm w-full"
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                            />
+                        </div>
+                        <div className="overflow-x-auto border rounded-lg">
+                            <table className="min-w-full divide-y divide-gray-200">
+                                <thead className="bg-gray-50">
+                                    <tr>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="bg-white divide-y divide-gray-200">
+                                    {filteredUsers.map(user => (
+                                        <tr key={user.id}>
+                                            <td className="px-6 py-4 whitespace-nowrap">
+                                                <div className="text-sm font-medium text-gray-900">{user.full_name || 'Unknown'}</div>
+                                                <div className="text-sm text-gray-500">{user.email}</div>
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap">
+                                                <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${user.role === 'admin' ? 'bg-purple-100 text-purple-800' : 'bg-gray-100 text-gray-800'}`}>
+                                                    {user.role || 'user'}
+                                                </span>
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap">
+                                                {user.is_donor ? (
+                                                    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${user.verification_status === 'verified' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
+                                                        {user.verification_status === 'verified' ? 'Verified Donor' : 'Pending Verified'}
+                                                    </span>
+                                                ) : <span className="text-gray-400 text-xs">Recipient</span>}
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                                <Button
+                                                    size="sm"
+                                                    variant="ghost"
+                                                    className="text-blue-600 hover:text-blue-900"
+                                                    isLoading={actionLoading === user.id}
+                                                    onClick={() => toggleRole(user.id, user.role || 'user')}
+                                                >
+                                                    {user.role === 'admin' ? 'Demote to User' : 'Promote to Admin'}
+                                                </Button>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                )}
+
+                {activeTab === 'verifications' && (
+                    <div className="space-y-4">
+                        {pendingDonors.length === 0 ? (
+                            <div className="text-center py-10 text-gray-500 bg-gray-50 rounded-lg border border-dashed border-gray-300">
+                                No pending verifications. All caught up!
+                            </div>
+                        ) : (
+                            pendingDonors.map(donor => (
+                                <Card key={donor.id}>
+                                    <CardBody className="flex flex-col md:flex-row justify-between items-center gap-4">
+                                        <div>
+                                            <h4 className="font-bold">{donor.full_name}</h4>
+                                            <p className="text-sm text-gray-500">Blood Group: <span className="font-bold text-red-600">{donor.blood_group}</span></p>
+                                        </div>
+                                        <div className="flex gap-2">
+                                            {donor.blood_group_proof_url && (
+                                                <a href={getProofUrl(donor.blood_group_proof_url)} target="_blank" className="flex items-center text-blue-600 text-sm hover:underline px-3">
+                                                    View Proof <ExternalLink className="ml-1 w-3 h-3" />
+                                                </a>
+                                            )}
+                                            <Button variant="secondary" size="sm" onClick={() => handleVerifyInList(donor.id, 'rejected')} isLoading={actionLoading === donor.id}>Reject</Button>
+                                            <Button variant="success" size="sm" onClick={() => handleVerifyInList(donor.id, 'verified')} isLoading={actionLoading === donor.id}>Approve</Button>
+                                        </div>
+                                    </CardBody>
+                                </Card>
+                            ))
+                        )}
+                    </div>
+                )}
+
+                {activeTab === 'requests' && (
+                    <div className="overflow-x-auto border rounded-lg">
+                        <table className="min-w-full divide-y divide-gray-200">
+                            <thead className="bg-gray-50">
+                                <tr>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Hospital</th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Blood Group</th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody className="bg-white divide-y divide-gray-200">
+                                {requests.map(req => (
+                                    <tr key={req.id}>
+                                        <td className="px-6 py-4 text-sm font-medium text-gray-900">{req.hospital_name}</td>
+                                        <td className="px-6 py-4 text-sm text-gray-900">{req.blood_group} ({req.units_needed} units) <span className="text-xs text-red-500 border border-red-200 px-1 rounded">{req.urgency_level}</span></td>
+                                        <td className="px-6 py-4 text-sm">
+                                            <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${req.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
+                                                {req.status}
+                                            </span>
+                                        </td>
+                                        <td className="px-6 py-4 text-sm text-gray-500">{new Date(req.created_at).toLocaleDateString()}</td>
+                                        <td className="px-6 py-4 text-sm">
+                                            <button onClick={() => deleteRequest(req.id)} className="text-red-500 hover:text-red-700">
+                                                <Trash2 className="w-4 h-4" />
+                                            </button>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
+            </div>
         </div>
     );
 }

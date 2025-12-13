@@ -33,6 +33,11 @@ export function Header() {
                 <Link href="/nearby-donors" className="text-gray-600 hover:text-gray-900">
                   Find Donors
                 </Link>
+                {user.role === 'admin' && (
+                  <Link href="/admin" className="text-red-600 font-medium hover:text-red-700">
+                    Admin Console
+                  </Link>
+                )}
                 <Link href="/profile">
                   <Button variant="ghost" className="p-2">
                     <User className="h-5 w-5" />
