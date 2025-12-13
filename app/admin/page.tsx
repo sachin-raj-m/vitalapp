@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase';
 import { Card, CardBody } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Alert } from '@/components/ui/Alert';
-import { Loader2, Check, X, FileText, ExternalLink, Users, Activity, Shield, Search, Trash2, HeartPulse } from 'lucide-react';
+import { Loader2, Check, X, FileText, ExternalLink, Users, Activity, Shield, Search, Trash2, HeartPulse, User } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 interface Profile {
@@ -203,10 +203,38 @@ export default function AdminDashboard() {
                 {activeTab === 'overview' && (
                     <div className="space-y-6">
                         <h3 className="text-lg font-semibold">Activity Stream</h3>
-                        <p className="text-gray-500">Recent application activity will appear here.</p>
-                        {/* Placeholder for activity log */}
-                        <div className="bg-gray-50 p-4 rounded-lg border border-gray-100 text-center text-sm text-gray-400">
-                            System is running normally. No critical alerts.
+                        <div className="space-y-4">
+                            {[...users, ...requests]
+                                .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+                                .slice(0, 10)
+                                .map((item: any, i) => {
+                                    const isUser = 'full_name' in item;
+                                    return (
+                                        <div key={i} className="flex items-start space-x-3 p-3 bg-white rounded-lg border border-gray-100 hover:shadow-sm transition-shadow">
+                                            <div className={`p-2 rounded-full ${isUser ? 'bg-blue-100 text-blue-600' : 'bg-red-100 text-red-600'}`}>
+                                                {isUser ? <User size={16} /> : <Activity size={16} />}
+                                            </div>
+                                            <div>
+                                                <p className="text-sm text-gray-900">
+                                                    {isUser ? (
+                                                        <span>New user <span className="font-semibold">{item.full_name}</span> joined the platform.</span>
+                                                    ) : (
+                                                        <span>New blood request for <span className="font-semibold">{item.blood_group}</span> at {item.hospital_name}.</span>
+                                                    )}
+                                                </p>
+                                                <p className="text-xs text-gray-500 mt-1">
+                                                    {new Date(item.created_at).toLocaleString()}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+
+                            {users.length === 0 && requests.length === 0 && (
+                                <div className="text-center py-8 text-gray-500">
+                                    No activity recorded yet.
+                                </div>
+                            )}
                         </div>
                     </div>
                 )}
