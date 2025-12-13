@@ -47,6 +47,7 @@ export interface Donation {
   request_id: string;
   donor_id: string;
   status: 'pending' | 'completed' | 'cancelled';
+  otp?: string;
   created_at: string;
 }
 

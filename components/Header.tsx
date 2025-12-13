@@ -27,6 +27,9 @@ export function Header() {
                 <Link href="/requests" className="text-gray-600 hover:text-gray-900">
                   Requests
                 </Link>
+                <Link href="/requests/my-requests" className="text-gray-600 hover:text-gray-900">
+                  My Requests
+                </Link>
                 <Link href="/donations" className="text-gray-600 hover:text-gray-900">
                   Donations
                 </Link>
