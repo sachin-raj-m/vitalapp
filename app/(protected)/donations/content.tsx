@@ -5,7 +5,8 @@ import { Card, CardHeader, CardBody } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
-import { Loader2, Calendar } from 'lucide-react';
+import { Loader2, Calendar, XCircle } from 'lucide-react';
+import { Button } from '@/components/ui/Button';
 import { Alert } from '@/components/ui/Alert';
 
 interface DonationWithRequest {
@@ -22,6 +23,7 @@ export default function DonationsPage() {
     const [donations, setDonations] = useState<DonationWithRequest[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState('');
+    const [withdrawingId, setWithdrawingId] = useState<string | null>(null);
 
     useEffect(() => {
         const fetchDonations = async () => {
@@ -60,6 +62,30 @@ export default function DonationsPage() {
 
         fetchDonations();
     }, [user]);
+
+    const handleWithdraw = async (donationId: string) => {
+        if (!confirm('Are you sure you want to withdraw this donation offer?')) return;
+
+        setWithdrawingId(donationId);
+        try {
+            const { error } = await supabase
+                .from('donations')
+                .update({ status: 'cancelled' })
+                .eq('id', donationId);
+
+            if (error) throw error;
+
+            // Update local state
+            setDonations(prev => prev.map(d =>
+                d.id === donationId ? { ...d, status: 'cancelled' } : d
+            ));
+        } catch (err: any) {
+            console.error('Error withdrawing donation', err);
+            setError('Failed to withdraw donation');
+        } finally {
+            setWithdrawingId(null);
+        }
+    };
 
     const completedDonations = donations.filter(d => d.status === 'completed');
     const totalDonations = completedDonations.length;
@@ -158,9 +184,23 @@ export default function DonationsPage() {
                                             {new Date(donation.created_at).toLocaleDateString()}
                                         </p>
                                     </div>
-                                    <Badge variant={donation.status === 'completed' ? 'success' : 'warning'}>
-                                        {donation.status.charAt(0).toUpperCase() + donation.status.slice(1)}
-                                    </Badge>
+                                    <div className="flex items-center gap-3">
+                                        <Badge variant={donation.status === 'completed' ? 'success' : donation.status === 'cancelled' ? 'neutral' : 'warning'}>
+                                            {donation.status.charAt(0).toUpperCase() + donation.status.slice(1)}
+                                        </Badge>
+
+                                        {donation.status === 'pending' && (
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                className="text-red-600 border-red-200 hover:bg-red-50"
+                                                onClick={() => handleWithdraw(donation.id)}
+                                                isLoading={withdrawingId === donation.id}
+                                            >
+                                                Withdraw
+                                            </Button>
+                                        )}
+                                    </div>
                                 </div>
                             ))}
                         </div>
