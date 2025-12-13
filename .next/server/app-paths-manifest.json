@@ -4,6 +4,7 @@
   "/(protected)/achievements/page": "app/(protected)/achievements/page.js",
   "/(protected)/dashboard/page": "app/(protected)/dashboard/page.js",
   "/(protected)/donations/page": "app/(protected)/donations/page.js",
+  "/(protected)/nearby-donors/page": "app/(protected)/nearby-donors/page.js",
   "/(protected)/profile/page": "app/(protected)/profile/page.js",
   "/(protected)/requests/new/page": "app/(protected)/requests/new/page.js",
   "/(protected)/requests/page": "app/(protected)/requests/page.js",

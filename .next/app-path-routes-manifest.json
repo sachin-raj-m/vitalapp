@@ -4,6 +4,7 @@
   "/(protected)/achievements/page": "/achievements",
   "/(protected)/dashboard/page": "/dashboard",
   "/(protected)/donations/page": "/donations",
+  "/(protected)/nearby-donors/page": "/nearby-donors",
   "/(protected)/profile/page": "/profile",
   "/(protected)/requests/new/page": "/requests/new",
   "/(protected)/requests/page": "/requests",

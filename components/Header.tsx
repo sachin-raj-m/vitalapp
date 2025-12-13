@@ -30,6 +30,9 @@ export function Header() {
                 <Link href="/donations" className="text-gray-600 hover:text-gray-900">
                   Donations
                 </Link>
+                <Link href="/nearby-donors" className="text-gray-600 hover:text-gray-900">
+                  Find Donors
+                </Link>
                 <Link href="/profile">
                   <Button variant="ghost" className="p-2">
                     <User className="h-5 w-5" />

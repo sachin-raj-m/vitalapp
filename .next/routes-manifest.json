@@ -82,6 +82,12 @@
       "namedRegex": "^/login(?:/)?$"
     },
     {
+      "page": "/nearby-donors",
+      "regex": "^/nearby\\-donors(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/nearby\\-donors(?:/)?$"
+    },
+    {
       "page": "/profile",
       "regex": "^/profile(?:/)?$",
       "routeKeys": {},
