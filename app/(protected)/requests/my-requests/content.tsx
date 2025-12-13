@@ -13,7 +13,7 @@ import { Loader2, CheckCircle, Clock } from 'lucide-react';
 import type { BloodRequest, Donation } from '@/types';
 
 interface RequestWithDonations extends BloodRequest {
-    donations: (Donation & { donor: { full_name: string; phone: string } })[];
+    donations: (Donation & { profiles: { full_name: string; phone: string } })[];
 }
 
 export function MyRequestsContent() {
@@ -47,7 +47,7 @@ export function MyRequestsContent() {
                     *,
                     donations:donations(
                         *,
-                        donor:profiles(full_name, phone)
+                        profiles(full_name, phone)
                     )
                 `)
                 .eq('user_id', user.id)
@@ -191,11 +191,11 @@ export function MyRequestsContent() {
                                             >
                                                 <div className="flex items-center gap-3">
                                                     <div className="h-10 w-10 rounded-full bg-primary-100 flex items-center justify-center text-primary-600 font-bold">
-                                                        {donation.donor?.full_name?.charAt(0) || 'D'}
+                                                        {donation.profiles?.full_name?.charAt(0) || 'D'}
                                                     </div>
                                                     <div>
-                                                        <p className="font-medium text-gray-900">{donation.donor?.full_name || 'Anonymous'}</p>
-                                                        <p className="text-sm text-gray-500">{donation.donor?.phone}</p>
+                                                        <p className="font-medium text-gray-900">{donation.profiles?.full_name || 'Anonymous'}</p>
+                                                        <p className="text-sm text-gray-500">{donation.profiles?.phone}</p>
                                                     </div>
                                                 </div>
 
@@ -207,7 +207,7 @@ export function MyRequestsContent() {
                                                                 isOpen: true,
                                                                 donationId: donation.id,
                                                                 requestId: request.id,
-                                                                donorName: donation.donor?.full_name
+                                                                donorName: donation.profiles?.full_name
                                                             })}
                                                         >
                                                             Verify PIN
