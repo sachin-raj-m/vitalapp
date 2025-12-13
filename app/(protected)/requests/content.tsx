@@ -63,23 +63,62 @@ export default function RequestsPage() {
         }
     };
 
-    const [otpModal, setOtpModal] = useState({ isOpen: false, otp: '', hospitalName: '' });
+    const [otpModal, setOtpModal] = useState({ isOpen: false, pin: '', hospitalName: '' });
     const [confirmModal, setConfirmModal] = useState<{ isOpen: boolean; request: BloodRequest | null }>({ isOpen: false, request: null });
+    const [createPinModal, setCreatePinModal] = useState<{ isOpen: boolean; request: BloodRequest | null }>({ isOpen: false, request: null });
+    const [newPin, setNewPin] = useState('');
+    const [creatingPin, setCreatingPin] = useState(false);
+    const { refreshProfile } = useAuth(); // Assuming refreshProfile is available in useAuth
 
-    const handleDonateClick = (request: BloodRequest) => {
+    const handleDonateClick = async (request: BloodRequest) => {
         if (!user) {
             setError('Please login to donate');
             return;
         }
-        setConfirmModal({ isOpen: true, request });
+
+        // Check if user has a PIN
+        if (!user.donor_pin) {
+            setCreatePinModal({ isOpen: true, request });
+        } else {
+            setConfirmModal({ isOpen: true, request });
+        }
+    };
+
+    const handleCreatePin = async () => {
+        if (!user || newPin.length !== 4) return;
+        setCreatingPin(true);
+        try {
+            const { error: updateError } = await supabase
+                .from('profiles')
+                .update({ donor_pin: newPin })
+                .eq('id', user.id);
+
+            if (updateError) throw updateError;
+
+            await refreshProfile(); // Refresh profile to get the new PIN in context
+
+            setCreatePinModal({ isOpen: false, request: null });
+            if (createPinModal.request) {
+                setConfirmModal({ isOpen: true, request: createPinModal.request });
+            }
+        } catch (err: any) {
+            console.error('Error creating PIN');
+            setError(err.message || 'Failed to create PIN');
+        } finally {
+            setCreatingPin(false);
+        }
     };
 
     const handleConfirmDonation = async () => {
         if (!confirmModal.request || !user) return;
 
         try {
-            // Generate 4 digit OTP
-            const otp = Math.floor(1000 + Math.random() * 9000).toString();
+            // Use user's existing PIN
+            const pin = user.donor_pin;
+            if (!pin) {
+                setError("Donor PIN not found. Please refresh and try again.");
+                return;
+            }
 
             const { error: donationError } = await supabase
                 .from('donations')
@@ -87,14 +126,14 @@ export default function RequestsPage() {
                     request_id: confirmModal.request.id,
                     donor_id: user.id,
                     status: 'pending',
-                    otp: otp
+                    otp: pin // Storing PIN in the 'otp' column for now as per plan
                 });
 
             if (donationError) throw donationError;
 
-            // Close confirm modal and open OTP modal
+            // Close confirm modal and open Success modal
             setConfirmModal({ isOpen: false, request: null });
-            setOtpModal({ isOpen: true, otp, hospitalName: confirmModal.request.hospital_name });
+            setOtpModal({ isOpen: true, pin, hospitalName: confirmModal.request.hospital_name });
         } catch (err: any) {
             console.error('Donation error');
             setError(err.message || 'Failed to process donation request');
@@ -217,6 +256,46 @@ export default function RequestsPage() {
                 </div>
             )}
 
+            {/* Create PIN Modal */}
+            <Modal
+                isOpen={createPinModal.isOpen}
+                onClose={() => setCreatePinModal({ isOpen: false, request: null })}
+                title="Create Donor PIN"
+            >
+                <div className="space-y-4">
+                    <p className="text-gray-600">
+                        To ensure security, please create a <strong>4-digit PIN</strong>. You will use this PIN for all future donations to verify your identity.
+                    </p>
+
+                    <div className="bg-yellow-50 p-3 rounded-md text-yellow-800 text-sm">
+                        This PIN is permanent. Please choose one you will remember.
+                    </div>
+
+                    <Input
+                        label="Enter 4-digit PIN"
+                        placeholder="e.g. 1234"
+                        value={newPin}
+                        onChange={(e) => {
+                            const val = e.target.value.replace(/\D/g, '').slice(0, 4);
+                            setNewPin(val);
+                        }}
+                        maxLength={4}
+                        className="text-center text-2xl tracking-widest"
+                    />
+
+                    <div className="pt-2">
+                        <Button
+                            className="w-full"
+                            onClick={handleCreatePin}
+                            disabled={newPin.length !== 4 || creatingPin}
+                            isLoading={creatingPin}
+                        >
+                            Save PIN & Continue
+                        </Button>
+                    </div>
+                </div>
+            </Modal>
+
             {/* Confirmation Details Modal */}
             <Modal
                 isOpen={confirmModal.isOpen}
@@ -275,7 +354,7 @@ export default function RequestsPage() {
                 </div>
             </Modal>
 
-            {/* OTP Success Modal */}
+            {/* PIN Success Modal */}
             <Modal
                 isOpen={otpModal.isOpen}
                 onClose={() => setOtpModal({ ...otpModal, isOpen: false })}
@@ -285,9 +364,9 @@ export default function RequestsPage() {
                     <p>Thank you for offering to donate at <strong>{otpModal.hospitalName}</strong>!</p>
 
                     <div className="bg-primary-50 p-4 rounded-lg text-center">
-                        <p className="text-sm text-primary-700 mb-1">Your Verification OTP</p>
+                        <p className="text-sm text-primary-700 mb-1">Your Verification PIN</p>
                         <p className="text-3xl font-bold text-primary-600 tracking-wider">
-                            {otpModal.otp}
+                            {otpModal.pin}
                         </p>
                     </div>
 
@@ -296,7 +375,7 @@ export default function RequestsPage() {
                         <ol className="list-decimal list-inside space-y-1">
                             <li>Visit the hospital location.</li>
                             <li>Meet the requestor or patient attendant.</li>
-                            <li>Share this 4-digit OTP to complete the request.</li>
+                            <li>Share this <strong>Donor PIN</strong> with them to verify your donation.</li>
                         </ol>
                     </div>
 

@@ -19,6 +19,7 @@ export interface User {
   is_available: boolean;
   government_id?: string;
   role?: 'user' | 'admin' | string;
+  donor_pin?: string;
   created_at: string;
 }
 
