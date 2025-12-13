@@ -1,8 +1,8 @@
 import React from 'react';
 
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: 'primary' | 'secondary' | 'accent' | 'success' | 'warning' | 'error' | 'ghost';
-  size?: 'sm' | 'md' | 'lg';
+  variant?: 'primary' | 'secondary' | 'accent' | 'success' | 'warning' | 'error' | 'ghost' | 'outline';
+  size?: 'sm' | 'md' | 'lg' | 'xl';
   isLoading?: boolean;
   leftIcon?: React.ReactNode;
   rightIcon?: React.ReactNode;
@@ -20,7 +20,7 @@ export const Button: React.FC<ButtonProps> = ({
   ...props
 }) => {
   const baseStyles = 'inline-flex items-center justify-center font-medium rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2';
-  
+
   const variantStyles = {
     primary: 'bg-primary-400 text-white hover:bg-primary-500 focus:ring-primary-500',
     secondary: 'bg-secondary-400 text-white hover:bg-secondary-500 focus:ring-secondary-500',
@@ -29,16 +29,18 @@ export const Button: React.FC<ButtonProps> = ({
     warning: 'bg-warning-500 text-white hover:bg-warning-600 focus:ring-warning-500',
     error: 'bg-error-500 text-white hover:bg-error-600 focus:ring-error-500',
     ghost: 'bg-transparent text-gray-700 hover:bg-gray-100 focus:ring-gray-500',
+    outline: 'bg-transparent border border-gray-300 text-gray-700 hover:bg-gray-50 focus:ring-primary-500',
   };
-  
+
   const sizeStyles = {
     sm: 'px-3 py-1.5 text-sm',
     md: 'px-4 py-2 text-base',
     lg: 'px-6 py-3 text-lg',
+    xl: 'px-8 py-4 text-xl',
   };
-  
+
   const disabledStyles = 'opacity-50 cursor-not-allowed';
-  
+
   const buttonClasses = `
     ${baseStyles}
     ${variantStyles[variant]}
@@ -48,8 +50,8 @@ export const Button: React.FC<ButtonProps> = ({
   `;
 
   return (
-    <button 
-      className={buttonClasses} 
+    <button
+      className={buttonClasses}
       disabled={disabled || isLoading}
       {...props}
     >
