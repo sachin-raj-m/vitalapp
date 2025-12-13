@@ -51,7 +51,7 @@ export default function DonationsPage() {
 
                 setDonations(formattedData);
             } catch (err: any) {
-                console.error('Error fetching donations:', err);
+                console.error('Error fetching donations');
                 setError('Failed to load donation history');
             } finally {
                 setIsLoading(false);

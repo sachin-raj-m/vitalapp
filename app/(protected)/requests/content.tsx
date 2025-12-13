@@ -96,7 +96,7 @@ export default function RequestsPage() {
             setConfirmModal({ isOpen: false, request: null });
             setOtpModal({ isOpen: true, otp, hospitalName: confirmModal.request.hospital_name });
         } catch (err: any) {
-            console.error('Donation error:', err);
+            console.error('Donation error');
             setError(err.message || 'Failed to process donation request');
             setConfirmModal({ isOpen: false, request: null });
         }

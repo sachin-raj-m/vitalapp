@@ -28,7 +28,7 @@ const cacheUserProfile = (profile: User) => {
   try {
     localStorage.setItem('vital_user_profile', JSON.stringify(profile));
   } catch (err) {
-    console.warn('Failed to cache profile in localStorage:', err);
+    console.warn('Failed to cache profile in localStorage');
   }
 };
 
@@ -43,7 +43,7 @@ const getCachedUserProfile = (userId: string): User | null => {
       }
     }
   } catch (err) {
-    console.warn('Failed to read cached profile:', err);
+    console.warn('Failed to read cached profile');
   }
   return null;
 };
@@ -65,12 +65,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Prevent duplicate fetches within 2 seconds
     const now = Date.now();
     if (now - lastProfileFetch.current < 2000) {
-      console.log('Skipping duplicate profile fetch (throttled)');
+
       return state.user;
     }
 
     if (isRefreshing.current) {
-      console.log('Profile fetch already in progress, skipping');
+
       return state.user;
     }
 
@@ -78,7 +78,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     lastProfileFetch.current = now;
 
     try {
-      console.log('Fetching user profile for:', userId);
+
       setState(prev => ({ ...prev, loading: true }));
 
       const { data, error } = await supabase

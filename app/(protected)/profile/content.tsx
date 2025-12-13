@@ -75,7 +75,7 @@ export default function ProfilePage() {
                 address: data.location.address
             });
         } catch (err: any) {
-            console.error('Error loading profile:', err);
+            console.error('Error loading profile');
             setError('Failed to load profile data');
         }
     };
@@ -119,7 +119,7 @@ export default function ProfilePage() {
                 achievements
             });
         } catch (err: any) {
-            console.error('Error loading stats:', err);
+            console.error('Error loading stats');
             setError('Failed to load statistics');
         } finally {
             setIsLoading(false);
@@ -149,7 +149,7 @@ export default function ProfilePage() {
             await loadProfile();
             setIsEditing(false);
         } catch (err: any) {
-            console.error('Error updating profile:', err);
+            console.error('Error updating profile');
             setError('Failed to update profile');
         }
     };
@@ -159,7 +159,7 @@ export default function ProfilePage() {
             await signOut();
             router.push('/login');
         } catch (err) {
-            console.error('Error signing out:', err);
+            console.error('Error signing out');
         }
     };
 
@@ -294,7 +294,7 @@ export default function ProfilePage() {
                                             if (error) throw error;
                                             alert('Verification email sent!');
                                         } catch (err: any) {
-                                            console.error(err);
+                                            console.error('Verification error');
                                             alert('Failed to send verification email');
                                         }
                                     }}

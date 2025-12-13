@@ -163,7 +163,7 @@ export default function AdminDashboard() {
                 window.open(data.signedUrl, '_blank');
             }
         } catch (err: any) {
-            console.error('Error generating signed URL:', err);
+            console.error('Error generating signed URL');
             alert('Could not access document. Please ensure you are an admin.');
         }
     };

@@ -35,7 +35,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 router.push('/dashboard');
             }
         } catch (error) {
-            console.error('Error checking admin status:', error);
+            console.error('Error checking admin status');
             router.push('/dashboard');
         } finally {
             setLoading(false);

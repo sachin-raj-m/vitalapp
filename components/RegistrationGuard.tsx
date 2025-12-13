@@ -18,31 +18,31 @@ export function RegistrationGuard({ children }: RegistrationGuardProps) {
 
     useEffect(() => {
         const checkRegistration = async () => {
-            console.log('RegistrationGuard: Checking registration status');
+
             if (!user) {
-                console.log('RegistrationGuard: No user found, redirecting to login');
+
                 router.push('/login');
                 return;
             }
 
             try {
-                console.log('RegistrationGuard: Checking completion for user:', user.id);
+
                 const isComplete = await isRegistrationComplete(user.id);
-                console.log('RegistrationGuard: Registration complete?', isComplete);
+
 
                 if (!isComplete) {
-                    console.log('RegistrationGuard: Registration incomplete, redirecting to complete registration');
+
                     // Store basic info for registration completion
                     const pendingData = {
                         userId: user.id,
                         email: user.email,
                         phone: user.phone || ''
                     };
-                    console.log('RegistrationGuard: Storing pending data:', pendingData);
+
                     localStorage.setItem('pendingRegistration', JSON.stringify(pendingData));
                     router.push('/complete-registration');
                 } else {
-                    console.log('RegistrationGuard: Registration complete, allowing access');
+
                     setIsChecking(false);
                 }
             } catch (error) {

@@ -50,7 +50,7 @@ export function MyRequestsContent() {
             if (error) throw error;
             setRequests(data as any);
         } catch (err: any) {
-            console.error('Error fetching requests:', err);
+            console.error('Error fetching requests');
             setError('Failed to load your requests');
         } finally {
             setIsLoading(false);
@@ -98,7 +98,7 @@ export function MyRequestsContent() {
                 setVerifyError('Invalid OTP. Please ask the donor for the correct code.');
             }
         } catch (err: any) {
-            console.error('Verification error:', err);
+            console.error('Verification error');
             setVerifyError(err.message || 'Verification failed');
         } finally {
             setVerifying(false);

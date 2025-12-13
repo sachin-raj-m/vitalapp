@@ -11,14 +11,12 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [retryCount, setRetryCount] = useState(0);
 
-  useEffect(() => {
-    console.log('ProtectedRoute state:', { user, loading, session });
-  }, [user, loading, session]);
+
 
   // Handle missing profile data despite active session
   useEffect(() => {
     if (session?.user?.id && !user && !loading && retryCount < 3) {
-      console.log(`Profile missing despite active session, refreshing (attempt ${retryCount + 1})`);
+
       refreshProfile();
       setRetryCount(prevCount => prevCount + 1);
     }
@@ -46,6 +44,6 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
     return null; // Or a loading spinner while redirecting
   }
 
-  console.log('ProtectedRoute: Rendering protected content');
+
   return <>{children}</>;
 }

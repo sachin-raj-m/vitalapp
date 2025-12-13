@@ -65,7 +65,7 @@ export default function DashboardPage() {
                 setRecentRequests(recent as BloodRequest[]);
             }
         } catch (error) {
-            console.error('Error fetching dashboard data:', error);
+            console.error('Error fetching dashboard data');
         } finally {
             setLoading(false);
         }
