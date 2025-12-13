@@ -24,6 +24,13 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
     }
   }, [session, user, loading, refreshProfile, retryCount]);
 
+  // After 3 retries, if still no user profile, redirect to login
+  useEffect(() => {
+    if ((!user || !session) && (!loading || retryCount >= 3)) {
+      router.push(`/login?from=${pathname}`);
+    }
+  }, [user, session, loading, retryCount, router, pathname]);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -34,13 +41,6 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
       </div>
     );
   }
-
-  // After 3 retries, if still no user profile, redirect to login
-  useEffect(() => {
-    if ((!user || !session) && (!loading || retryCount >= 3)) {
-      router.push(`/login?from=${pathname}`);
-    }
-  }, [user, session, loading, retryCount, router, pathname]);
 
   if ((!user || !session) && (!loading || retryCount >= 3)) {
     return null; // Or a loading spinner while redirecting
