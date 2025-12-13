@@ -24,28 +24,28 @@ export default function LoginPage() {
     useEffect(() => {
         const checkUserRegistration = async () => {
             if (user) {
-                console.log('Checking registration for user:', user);
+
                 try {
                     const isComplete = await isRegistrationComplete(user.id);
-                    console.log('Registration check result:', isComplete);
+
 
                     if (!isComplete) {
-                        console.log('Registration incomplete, redirecting to complete registration');
+
                         // Store basic info for registration completion
                         const pendingData = {
                             userId: user.id,
                             email: user.email,
                             phone: user.phone || ''
                         };
-                        console.log('Storing pending registration data:', pendingData);
+
                         localStorage.setItem('pendingRegistration', JSON.stringify(pendingData));
                         router.push('/complete-registration');
                     } else {
-                        console.log('Registration complete, redirecting to dashboard');
+
                         router.push('/dashboard');
                     }
                 } catch (err) {
-                    console.error('Error in registration check:', err);
+                    console.error('Error in registration check');
                     // On error, we'll treat it as incomplete registration
                     const pendingData = {
                         userId: user.id,
@@ -100,7 +100,7 @@ export default function LoginPage() {
                 throw error;
             }
         } catch (err: any) {
-            console.error('Google sign in error:', err);
+            console.error('Google sign in error');
             setError(err.message || 'Failed to sign in with Google');
             setIsGoogleLoading(false);
         }

@@ -65,7 +65,7 @@ export default function NearbyDonorsPageContent() {
 
                 setDonors(parsedDonors as Donor[]);
             } catch (err: any) {
-                console.error("Error fetching donors:", err);
+                console.error("Error fetching donors");
                 setError(err.message);
             } finally {
                 setLoading(false);

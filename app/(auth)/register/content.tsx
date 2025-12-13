@@ -84,7 +84,7 @@ export default function RegisterPage() {
             router.push('/complete-registration');
 
         } catch (err: any) {
-            console.error('Registration error:', err);
+            console.error('Registration error');
             if (err?.message?.includes('User already registered')) {
                 setError('An account with this email already exists');
             } else if (err?.message) {

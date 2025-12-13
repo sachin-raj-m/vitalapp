@@ -33,7 +33,7 @@ serve(async (req) => {
             )
         }
 
-        console.log(`New blood request: ${record.blood_group} at ${record.hospital_name}`)
+
 
         // Find compatible donors
         // For simplicity: Exact blood group match + is_donor + is_available
@@ -46,7 +46,7 @@ serve(async (req) => {
 
         if (donorError) throw donorError
 
-        console.log(`Found ${donors?.length} potential donors`)
+
 
         if (!donors || donors.length === 0) {
             return new Response(
@@ -92,7 +92,7 @@ serve(async (req) => {
                 }
             }
         } else {
-            console.log("RESEND_API_KEY not set. Skipping email sending.")
+
             results.push({ message: "Simulated sending", count: donors.length })
         }
 

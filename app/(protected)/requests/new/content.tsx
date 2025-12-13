@@ -92,7 +92,7 @@ export default function CreateRequestPage() {
                     }));
                 },
                 (error) => {
-                    console.error('Error getting location:', error);
+                    console.error('Error getting location');
                 }
             );
         }

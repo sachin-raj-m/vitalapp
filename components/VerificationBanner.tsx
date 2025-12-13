@@ -43,7 +43,7 @@ export const VerificationBanner = () => {
             if (error) throw error;
             setSent('email');
         } catch (err: any) {
-            console.error('Error sending verification email:', err);
+            console.error('Error sending verification email');
             setError(err.message || 'Failed to send verification email');
         } finally {
             setLoading(null);
