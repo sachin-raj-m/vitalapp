@@ -38,7 +38,7 @@ interface Stats {
 
 export default function ProfilePage() {
     const router = useRouter();
-    const { user, signOut } = useAuth();
+    const { user, signOut, session } = useAuth();
     const [profile, setProfile] = useState<Profile | null>(null);
     const [stats, setStats] = useState<Stats | null>(null);
     const [isLoading, setIsLoading] = useState(true);
@@ -272,13 +272,47 @@ export default function ProfilePage() {
                 </CardHeader>
                 <CardBody>
                     <div className="space-y-4">
-                        <div className="flex items-center">
-                            <Mail className="h-5 w-5 text-gray-400 mr-2" />
-                            <span>{profile?.email}</span>
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center">
+                                <Mail className="h-5 w-5 text-gray-400 mr-2" />
+                                <span>{profile?.email}</span>
+                            </div>
+                            {session?.user && !session.user.email_confirmed_at && (
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="text-xs h-8"
+                                    onClick={async () => {
+                                        try {
+                                            const { error } = await supabase.auth.resend({
+                                                type: 'signup',
+                                                email: session.user.email!,
+                                                options: {
+                                                    emailRedirectTo: `${window.location.origin}/dashboard`
+                                                }
+                                            });
+                                            if (error) throw error;
+                                            alert('Verification email sent!');
+                                        } catch (err: any) {
+                                            console.error(err);
+                                            alert('Failed to send verification email');
+                                        }
+                                    }}
+                                >
+                                    Verify
+                                </Button>
+                            )}
                         </div>
-                        <div className="flex items-center">
-                            <Phone className="h-5 w-5 text-gray-400 mr-2" />
-                            <span>{profile?.phone}</span>
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center">
+                                <Phone className="h-5 w-5 text-gray-400 mr-2" />
+                                <span>{profile?.phone}</span>
+                            </div>
+                            {session?.user && (!session.user.phone_confirmed_at && profile?.phone) && (
+                                <span className="text-xs text-yellow-600 bg-yellow-100 px-2 py-1 rounded">
+                                    Unverified
+                                </span>
+                            )}
                         </div>
                     </div>
                 </CardBody>
