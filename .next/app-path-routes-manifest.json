@@ -9,6 +9,7 @@
   "/(protected)/requests/page": "/requests",
   "/_global-error/page": "/_global-error",
   "/_not-found/page": "/_not-found",
+  "/admin/page": "/admin",
   "/auth/callback/page": "/auth/callback",
   "/complete-registration/page": "/complete-registration",
   "/page": "/"

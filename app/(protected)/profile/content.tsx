@@ -94,9 +94,9 @@ export default function ProfilePage() {
 
             // Load requests count
             const { data: requests, error: requestsError } = await supabase
-                .from('requests')
+                .from('blood_requests')
                 .select('created_at', { count: 'exact' })
-                .eq('requester_id', user.id);
+                .eq('user_id', user.id);
 
             if (requestsError) throw requestsError;
 

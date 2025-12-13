@@ -2,6 +2,7 @@ import React from 'react';
 import { formatDistanceToNow } from 'date-fns';
 import { MapPin, Clock, Activity, Droplet } from 'lucide-react';
 import Link from 'next/link';
+import { motion } from 'framer-motion';
 import { Card, CardBody } from './ui/Card';
 import { Badge } from './ui/Badge';
 import { Button } from './ui/Button';
@@ -71,63 +72,70 @@ export const BloodRequestCard: React.FC<BloodRequestCardProps> = ({ request, onR
   const timeAgo = formatDistanceToNow(new Date(request.created_at), { addSuffix: true });
 
   return (
-    <Card className={`overflow-hidden ${cardBorder} ${animation}`}>
-      <CardBody className="p-0">
-        <div className="p-4">
-          <div className="flex justify-between items-start">
-            <div className="flex items-center">
-              <span className={`inline-flex items-center justify-center w-10 h-10 rounded-full font-bold text-lg ${bloodTypeClass}`}>
-                {request.blood_group}
-              </span>
-              <div className="ml-3">
-                <h3 className="text-lg font-semibold text-gray-900">
-                  {request.units_needed} unit{request.units_needed > 1 ? 's' : ''} needed
-                </h3>
-                <p className="text-sm text-gray-500">
-                  {request.contact_name}
-                </p>
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      whileHover={{ scale: 1.02 }}
+      transition={{ duration: 0.3 }}
+    >
+      <Card className={`overflow-hidden ${cardBorder} ${animation}`}>
+        <CardBody className="p-0">
+          <div className="p-4">
+            <div className="flex justify-between items-start">
+              <div className="flex items-center">
+                <span className={`inline-flex items-center justify-center w-10 h-10 rounded-full font-bold text-lg ${bloodTypeClass}`}>
+                  {request.blood_group}
+                </span>
+                <div className="ml-3">
+                  <h3 className="text-lg font-semibold text-gray-900">
+                    {request.units_needed} unit{request.units_needed > 1 ? 's' : ''} needed
+                  </h3>
+                  <p className="text-sm text-gray-500">
+                    {request.contact_name}
+                  </p>
+                </div>
               </div>
+              <Badge variant={badgeVariant} className="ml-2">
+                {request.urgency_level} Priority
+              </Badge>
             </div>
-            <Badge variant={badgeVariant} className="ml-2">
-              {request.urgency_level} Priority
-            </Badge>
-          </div>
 
-          <div className="mt-4 space-y-2">
-            <div className="flex items-center text-sm text-gray-500">
-              <MapPin className="h-4 w-4 mr-1 text-gray-400" />
-              <span>{request.hospital_name}</span>
+            <div className="mt-4 space-y-2">
+              <div className="flex items-center text-sm text-gray-500">
+                <MapPin className="h-4 w-4 mr-1 text-gray-400" />
+                <span>{request.hospital_name}</span>
+              </div>
+              <div className="flex items-center text-sm text-gray-500">
+                <Clock className="h-4 w-4 mr-1 text-gray-400" />
+                <span>Posted {timeAgo}</span>
+              </div>
+              {request.notes && (
+                <p className="text-sm text-gray-700 mt-2 bg-gray-50 p-2 rounded">
+                  "{request.notes}"
+                </p>
+              )}
             </div>
-            <div className="flex items-center text-sm text-gray-500">
-              <Clock className="h-4 w-4 mr-1 text-gray-400" />
-              <span>Posted {timeAgo}</span>
-            </div>
-            {request.notes && (
-              <p className="text-sm text-gray-700 mt-2 bg-gray-50 p-2 rounded">
-                "{request.notes}"
-              </p>
-            )}
-          </div>
 
-          <div className="mt-4 flex justify-between items-center">
-            <Link
-              href={`/requests/${request.id}`}
-              className="text-secondary-500 hover:text-secondary-600 text-sm font-medium"
-            >
-              View details
-            </Link>
-            {onRespond && (
-              <Button
-                variant="primary"
-                size="sm"
-                onClick={onRespond}
+            <div className="mt-4 flex justify-between items-center">
+              <Link
+                href={`/requests/${request.id}`}
+                className="text-secondary-500 hover:text-secondary-600 text-sm font-medium"
               >
-                I can donate
-              </Button>
-            )}
+                View details
+              </Link>
+              {onRespond && (
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={onRespond}
+                >
+                  I can donate
+                </Button>
+              )}
+            </div>
           </div>
-        </div>
-      </CardBody>
-    </Card>
+        </CardBody>
+      </Card>
+    </motion.div>
   );
 };
