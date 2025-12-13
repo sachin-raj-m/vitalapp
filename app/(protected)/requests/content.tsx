@@ -64,21 +64,27 @@ export default function RequestsPage() {
     };
 
     const [otpModal, setOtpModal] = useState({ isOpen: false, otp: '', hospitalName: '' });
+    const [confirmModal, setConfirmModal] = useState<{ isOpen: boolean; request: BloodRequest | null }>({ isOpen: false, request: null });
 
-    const handleRespond = async (requestId: string, hospitalName: string) => {
+    const handleDonateClick = (request: BloodRequest) => {
         if (!user) {
             setError('Please login to donate');
             return;
         }
+        setConfirmModal({ isOpen: true, request });
+    };
+
+    const handleConfirmDonation = async () => {
+        if (!confirmModal.request || !user) return;
 
         try {
-            // Generate 6 digit OTP
-            const otp = Math.floor(100000 + Math.random() * 900000).toString();
+            // Generate 4 digit OTP
+            const otp = Math.floor(1000 + Math.random() * 9000).toString();
 
             const { error: donationError } = await supabase
                 .from('donations')
                 .insert({
-                    request_id: requestId,
+                    request_id: confirmModal.request.id,
                     donor_id: user.id,
                     status: 'pending',
                     otp: otp
@@ -86,10 +92,13 @@ export default function RequestsPage() {
 
             if (donationError) throw donationError;
 
-            setOtpModal({ isOpen: true, otp, hospitalName });
+            // Close confirm modal and open OTP modal
+            setConfirmModal({ isOpen: false, request: null });
+            setOtpModal({ isOpen: true, otp, hospitalName: confirmModal.request.hospital_name });
         } catch (err: any) {
             console.error('Donation error:', err);
             setError(err.message || 'Failed to process donation request');
+            setConfirmModal({ isOpen: false, request: null });
         }
     };
 
@@ -186,7 +195,7 @@ export default function RequestsPage() {
                             <BloodRequestCard
                                 key={request.id}
                                 request={request}
-                                onRespond={() => handleRespond(request.id, request.hospital_name)}
+                                onRespond={() => handleDonateClick(request)}
                             />
                         ))
                     ) : (
@@ -208,6 +217,65 @@ export default function RequestsPage() {
                 </div>
             )}
 
+            {/* Confirmation Details Modal */}
+            <Modal
+                isOpen={confirmModal.isOpen}
+                onClose={() => setConfirmModal({ isOpen: false, request: null })}
+                title="Confirm Donation Details"
+            >
+                <div className="space-y-4">
+                    <div className="bg-gray-50 p-4 rounded-lg space-y-3">
+                        <div>
+                            <p className="text-sm text-gray-500">Hospital</p>
+                            <p className="font-medium">{confirmModal.request?.hospital_name}</p>
+                            <p className="text-sm text-gray-600">{confirmModal.request?.hospital_address}</p>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <p className="text-sm text-gray-500">Blood Group</p>
+                                <p className="font-bold text-lg text-primary-600">{confirmModal.request?.blood_group}</p>
+                            </div>
+                            <div>
+                                <p className="text-sm text-gray-500">Units Needed</p>
+                                <p className="font-medium">{confirmModal.request?.units_needed} Unit(s)</p>
+                            </div>
+                        </div>
+                        <div>
+                            <p className="text-sm text-gray-500">Contact Person</p>
+                            <p className="font-medium">{confirmModal.request?.contact_name}</p>
+                            <p className="text-sm text-primary-600 font-medium">{confirmModal.request?.contact_phone}</p>
+                        </div>
+                        {confirmModal.request?.notes && (
+                            <div>
+                                <p className="text-sm text-gray-500">Notes</p>
+                                <p className="text-sm italic text-gray-700">{confirmModal.request?.notes}</p>
+                            </div>
+                        )}
+                    </div>
+
+                    <p className="text-sm text-gray-600">
+                        By connecting, you agree to visit the hospital and donate blood for this request.
+                    </p>
+
+                    <div className="flex gap-3 pt-2">
+                        <Button
+                            variant="secondary"
+                            className="flex-1"
+                            onClick={() => setConfirmModal({ isOpen: false, request: null })}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            className="flex-1"
+                            onClick={handleConfirmDonation}
+                        >
+                            Confirm & Donate
+                        </Button>
+                    </div>
+                </div>
+            </Modal>
+
+            {/* OTP Success Modal */}
             <Modal
                 isOpen={otpModal.isOpen}
                 onClose={() => setOtpModal({ ...otpModal, isOpen: false })}
@@ -228,7 +296,7 @@ export default function RequestsPage() {
                         <ol className="list-decimal list-inside space-y-1">
                             <li>Visit the hospital location.</li>
                             <li>Meet the requestor or patient attendant.</li>
-                            <li>Share this OTP with them to verify your donation.</li>
+                            <li>Share this 4-digit OTP to complete the request.</li>
                         </ol>
                     </div>
 
