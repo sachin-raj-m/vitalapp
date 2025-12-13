@@ -116,13 +116,7 @@ export const BloodRequestCard: React.FC<BloodRequestCardProps> = ({ request, onR
               )}
             </div>
 
-            <div className="mt-4 flex justify-between items-center">
-              <Link
-                href={`/requests/${request.id}`}
-                className="text-secondary-500 hover:text-secondary-600 text-sm font-medium"
-              >
-                View details
-              </Link>
+            <div className="mt-4 flex justify-end items-center">
               {onRespond && (
                 <Button
                   variant="primary"
