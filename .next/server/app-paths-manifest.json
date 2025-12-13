@@ -6,6 +6,7 @@
   "/(protected)/donations/page": "app/(protected)/donations/page.js",
   "/(protected)/nearby-donors/page": "app/(protected)/nearby-donors/page.js",
   "/(protected)/profile/page": "app/(protected)/profile/page.js",
+  "/(protected)/requests/my-requests/page": "app/(protected)/requests/my-requests/page.js",
   "/(protected)/requests/new/page": "app/(protected)/requests/new/page.js",
   "/(protected)/requests/page": "app/(protected)/requests/page.js",
   "/_global-error/page": "app/_global-error/page.js",

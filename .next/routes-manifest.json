@@ -106,6 +106,12 @@
       "namedRegex": "^/requests(?:/)?$"
     },
     {
+      "page": "/requests/my-requests",
+      "regex": "^/requests/my\\-requests(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/requests/my\\-requests(?:/)?$"
+    },
+    {
       "page": "/requests/new",
       "regex": "^/requests/new(?:/)?$",
       "routeKeys": {},

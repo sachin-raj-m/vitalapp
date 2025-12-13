@@ -5,6 +5,7 @@ import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { BloodRequestCard } from '@/components/BloodRequestCard';
 import { MapPin, List } from 'lucide-react';
+import { Modal } from '@/components/ui/Modal';
 
 const Map = dynamic(() => import('@/components/Map'), {
     ssr: false,
@@ -62,9 +63,34 @@ export default function RequestsPage() {
         }
     };
 
-    const handleRespond = async (requestId: string) => {
-        // TODO: Implement donation response logic
-        console.log('Responding to request:', requestId);
+    const [otpModal, setOtpModal] = useState({ isOpen: false, otp: '', hospitalName: '' });
+
+    const handleRespond = async (requestId: string, hospitalName: string) => {
+        if (!user) {
+            setError('Please login to donate');
+            return;
+        }
+
+        try {
+            // Generate 6 digit OTP
+            const otp = Math.floor(100000 + Math.random() * 900000).toString();
+
+            const { error: donationError } = await supabase
+                .from('donations')
+                .insert({
+                    request_id: requestId,
+                    donor_id: user.id,
+                    status: 'pending',
+                    otp: otp
+                });
+
+            if (donationError) throw donationError;
+
+            setOtpModal({ isOpen: true, otp, hospitalName });
+        } catch (err: any) {
+            console.error('Donation error:', err);
+            setError(err.message || 'Failed to process donation request');
+        }
     };
 
     return (
@@ -160,7 +186,7 @@ export default function RequestsPage() {
                             <BloodRequestCard
                                 key={request.id}
                                 request={request}
-                                onRespond={() => handleRespond(request.id)}
+                                onRespond={() => handleRespond(request.id, request.hospital_name)}
                             />
                         ))
                     ) : (
@@ -181,6 +207,41 @@ export default function RequestsPage() {
                     )}
                 </div>
             )}
+
+            <Modal
+                isOpen={otpModal.isOpen}
+                onClose={() => setOtpModal({ ...otpModal, isOpen: false })}
+                title="Donation Initiated"
+            >
+                <div className="space-y-4">
+                    <p>Thank you for offering to donate at <strong>{otpModal.hospitalName}</strong>!</p>
+
+                    <div className="bg-primary-50 p-4 rounded-lg text-center">
+                        <p className="text-sm text-primary-700 mb-1">Your Verification OTP</p>
+                        <p className="text-3xl font-bold text-primary-600 tracking-wider">
+                            {otpModal.otp}
+                        </p>
+                    </div>
+
+                    <div className="text-sm text-gray-600">
+                        <p className="mb-2"><strong>Next Steps:</strong></p>
+                        <ol className="list-decimal list-inside space-y-1">
+                            <li>Visit the hospital location.</li>
+                            <li>Meet the requestor or patient attendant.</li>
+                            <li>Share this OTP with them to verify your donation.</li>
+                        </ol>
+                    </div>
+
+                    <div className="pt-2">
+                        <Button
+                            className="w-full"
+                            onClick={() => setOtpModal({ ...otpModal, isOpen: false })}
+                        >
+                            Close
+                        </Button>
+                    </div>
+                </div>
+            </Modal>
         </div>
     );
 }
