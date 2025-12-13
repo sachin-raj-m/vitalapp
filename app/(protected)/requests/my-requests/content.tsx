@@ -21,6 +21,12 @@ export function MyRequestsContent() {
     const [requests, setRequests] = useState<RequestWithDonations[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState('');
+    const [activeTab, setActiveTab] = useState<'active' | 'past'>('active');
+
+    const filteredRequests = requests.filter(req => {
+        if (activeTab === 'active') return req.status === 'active';
+        return req.status === 'fulfilled' || req.status === 'cancelled';
+    });
 
     // Verification State
     const [verifyModal, setVerifyModal] = useState({ isOpen: false, donationId: '', requestId: '', donorName: '' });
@@ -119,13 +125,44 @@ export function MyRequestsContent() {
 
             {error && <Alert variant="error">{error}</Alert>}
 
-            {requests.length === 0 ? (
+            {/* Tabs */}
+            <div className="flex space-x-1 bg-gray-100 p-1 rounded-lg w-fit">
+                <button
+                    onClick={() => setActiveTab('active')}
+                    className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${activeTab === 'active'
+                        ? 'bg-white text-gray-900 shadow-sm'
+                        : 'text-gray-500 hover:text-gray-700'
+                        }`}
+                >
+                    Active Requests
+                </button>
+                <button
+                    onClick={() => setActiveTab('past')}
+                    className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${activeTab === 'past'
+                        ? 'bg-white text-gray-900 shadow-sm'
+                        : 'text-gray-500 hover:text-gray-700'
+                        }`}
+                >
+                    Past Requests
+                </button>
+            </div>
+
+            {filteredRequests.length === 0 ? (
                 <div className="text-center py-12 bg-white rounded-lg shadow">
-                    <p className="text-gray-500 mb-4">You haven't made any blood requests yet.</p>
+                    <p className="text-gray-500 mb-4">
+                        {activeTab === 'active'
+                            ? "You don't have any active blood requests."
+                            : "No past requests found."}
+                    </p>
+                    {activeTab === 'active' && (
+                        <Button onClick={() => window.location.href = '/requests/new'}>
+                            Create Request
+                        </Button>
+                    )}
                 </div>
             ) : (
                 <div className="space-y-6">
-                    {requests.map((request) => (
+                    {filteredRequests.map((request) => (
                         <Card key={request.id}>
                             <CardHeader>
                                 <div className="flex justify-between items-start">
@@ -134,6 +171,9 @@ export function MyRequestsContent() {
                                             {request.blood_group} Blood Needed
                                         </h3>
                                         <p className="text-sm text-gray-500">{request.hospital_name}</p>
+                                        <p className="text-xs text-gray-400 mt-1">
+                                            {new Date(request.created_at).toLocaleDateString()}
+                                        </p>
                                     </div>
                                     <Badge variant={request.status === 'active' ? 'warning' : 'success'}>
                                         {request.status.charAt(0).toUpperCase() + request.status.slice(1)}
@@ -170,7 +210,7 @@ export function MyRequestsContent() {
                                                                 donorName: donation.donor?.full_name
                                                             })}
                                                         >
-                                                            Verify OTP
+                                                            Verify PIN
                                                         </Button>
                                                     ) : (
                                                         <span className="flex items-center text-green-600 text-sm font-medium">
