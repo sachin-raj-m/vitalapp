@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/Button';
 import { Alert } from '@/components/ui/Alert';
 import { Loader2, Check, X, FileText, ExternalLink, Users, Activity, Shield, Search, Trash2, HeartPulse, User } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 
 interface Profile {
     id: string;
@@ -32,7 +33,7 @@ interface Request {
 }
 
 export default function AdminDashboard() {
-    const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'verifications' | 'requests'>('overview');
+    const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'verifications' | 'requests' | 'analytics'>('overview');
     const [stats, setStats] = useState({ users: 0, donors: 0, pending: 0, requests: 0 });
     const [users, setUsers] = useState<Profile[]>([]);
     const [requests, setRequests] = useState<Request[]>([]);
@@ -183,7 +184,7 @@ export default function AdminDashboard() {
 
             {/* Tabs */}
             <div className="flex space-x-1 border-b overflow-x-auto pb-1">
-                {['overview', 'users', 'verifications', 'requests'].map((tab) => (
+                {['overview', 'users', 'verifications', 'requests', 'analytics'].map((tab) => (
                     <button
                         key={tab}
                         onClick={() => setActiveTab(tab as any)}
@@ -361,6 +362,80 @@ export default function AdminDashboard() {
                                 ))}
                             </tbody>
                         </table>
+                    </div>
+                )}
+
+                {activeTab === 'analytics' && (
+                    <div className="grid md:grid-cols-2 gap-8">
+                        <Card>
+                            <CardBody className="p-6">
+                                <h3 className="text-lg font-semibold mb-6 flex items-center">
+                                    <Users className="h-5 w-5 mr-2 text-red-500" />
+                                    Donor Distribution by Blood Group
+                                </h3>
+                                <div className="h-[300px] w-full">
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <PieChart>
+                                            <Pie
+                                                data={Object.entries(users
+                                                    .filter(u => u.is_donor && u.blood_group)
+                                                    .reduce((acc: any, curr) => {
+                                                        const bg = curr.blood_group || 'Unknown';
+                                                        acc[bg] = (acc[bg] || 0) + 1;
+                                                        return acc;
+                                                    }, {}))
+                                                    .map(([name, value]) => ({ name, value }))
+                                                }
+                                                cx="50%"
+                                                cy="50%"
+                                                innerRadius={60}
+                                                outerRadius={100}
+                                                paddingAngle={2}
+                                                dataKey="value"
+                                            >
+                                                {
+                                                    // Generate random colors or use a palette
+                                                    [0, 1, 2, 3, 4, 5, 6, 7].map((entry, index) => (
+                                                        <Cell key={`cell-${index}`} fill={['#EF4444', '#F87171', '#FCA5A5', '#B91C1C', '#991B1B', '#7F1D1D', '#FECACA', '#DC2626'][index % 8]} />
+                                                    ))
+                                                }
+                                            </Pie>
+                                            <Tooltip />
+                                            <Legend verticalAlign="bottom" height={36} />
+                                        </PieChart>
+                                    </ResponsiveContainer>
+                                </div>
+                            </CardBody>
+                        </Card>
+
+                        <Card>
+                            <CardBody className="p-6">
+                                <h3 className="text-lg font-semibold mb-6 flex items-center">
+                                    <Activity className="h-5 w-5 mr-2 text-blue-500" />
+                                    Requests by Urgency
+                                </h3>
+                                <div className="h-[300px] w-full">
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <BarChart
+                                            data={Object.entries(requests
+                                                .reduce((acc: any, curr) => {
+                                                    const level = curr.urgency_level || 'Normal';
+                                                    acc[level] = (acc[level] || 0) + 1;
+                                                    return acc;
+                                                }, {}))
+                                                .map(([name, value]) => ({ name, value }))
+                                            }
+                                        >
+                                            <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                                            <XAxis dataKey="name" />
+                                            <YAxis allowDecimals={false} />
+                                            <Tooltip cursor={{ fill: '#F3F4F6' }} />
+                                            <Bar dataKey="value" fill="#3B82F6" radius={[4, 4, 0, 0]} barSize={50} />
+                                        </BarChart>
+                                    </ResponsiveContainer>
+                                </div>
+                            </CardBody>
+                        </Card>
                     </div>
                 )}
             </div>
