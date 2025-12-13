@@ -19,6 +19,7 @@ interface Profile {
     created_at: string;
     blood_group?: string;
     blood_group_proof_url?: string;
+    phone?: string;
 }
 
 interface Request {
@@ -41,6 +42,7 @@ export default function AdminDashboard() {
     const [actionLoading, setActionLoading] = useState<string | null>(null);
     const [error, setError] = useState('');
     const [searchTerm, setSearchTerm] = useState('');
+    const [selectedUser, setSelectedUser] = useState<Profile | null>(null);
 
     useEffect(() => {
         fetchAllData();
@@ -116,6 +118,35 @@ export default function AdminDashboard() {
             const { error } = await supabase.from('blood_requests').delete().eq('id', requestId);
             if (error) throw error;
             setRequests(prev => prev.filter(r => r.id !== requestId));
+        } catch (err: any) {
+            setError(err.message);
+        } finally {
+            setActionLoading(null);
+        }
+    };
+
+    const handleUpdateUser = async () => {
+        if (!selectedUser) return;
+        setActionLoading('update_user');
+        try {
+            const { error } = await supabase
+                .from('profiles')
+                .update({
+                    full_name: selectedUser.full_name,
+                    phone: selectedUser.phone,
+                    blood_group: selectedUser.blood_group,
+                    is_donor: selectedUser.is_donor,
+                    verification_status: selectedUser.verification_status,
+                    role: selectedUser.role
+                })
+                .eq('id', selectedUser.id);
+
+            if (error) throw error;
+
+            // Update local state
+            setUsers(prev => prev.map(u => u.id === selectedUser.id ? selectedUser : u));
+            setSelectedUser(null);
+            alert('User details updated successfully!');
         } catch (err: any) {
             setError(err.message);
         } finally {
@@ -319,8 +350,16 @@ export default function AdminDashboard() {
                                 <Card key={donor.id}>
                                     <CardBody className="flex flex-col md:flex-row justify-between items-center gap-4">
                                         <div>
-                                            <h4 className="font-bold">{donor.full_name}</h4>
-                                            <p className="text-sm text-gray-500">Blood Group: <span className="font-bold text-red-600">{donor.blood_group}</span></p>
+                                            <button
+                                                onClick={() => setSelectedUser(donor)}
+                                                className="font-bold text-lg hover:text-red-600 transition-colors text-left"
+                                            >
+                                                {donor.full_name}
+                                            </button>
+                                            <div className="text-sm text-gray-500 space-y-1">
+                                                <p>{donor.email}</p>
+                                                <p>Blood Group: <span className="font-bold text-red-600">{donor.blood_group}</span></p>
+                                            </div>
                                         </div>
                                         <div className="flex gap-2">
                                             {donor.blood_group_proof_url && (
@@ -450,6 +489,113 @@ export default function AdminDashboard() {
                     </div>
                 )}
             </div>
+
+            {/* Edit User Modal */}
+            {selectedUser && (
+                <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+                    <motion.div
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        className="bg-white rounded-xl shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto"
+                    >
+                        <div className="p-6 border-b flex justify-between items-center sticky top-0 bg-white z-10">
+                            <h3 className="text-xl font-bold">Edit User Details</h3>
+                            <button onClick={() => setSelectedUser(null)} className="text-gray-400 hover:text-gray-600">
+                                <X size={24} />
+                            </button>
+                        </div>
+                        <div className="p-6 space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
+                                <input
+                                    type="text"
+                                    value={selectedUser.full_name || ''}
+                                    onChange={(e) => setSelectedUser({ ...selectedUser, full_name: e.target.value })}
+                                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-red-500 outline-none"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                                <input
+                                    type="email"
+                                    value={selectedUser.email || ''}
+                                    disabled
+                                    className="w-full px-3 py-2 border rounded-lg bg-gray-50 text-gray-500 cursor-not-allowed"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+                                <input
+                                    type="tel"
+                                    value={selectedUser.phone || ''}
+                                    onChange={(e) => setSelectedUser({ ...selectedUser, phone: e.target.value })}
+                                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-red-500 outline-none"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Blood Group</label>
+                                <select
+                                    value={selectedUser.blood_group || ''}
+                                    onChange={(e) => setSelectedUser({ ...selectedUser, blood_group: e.target.value })}
+                                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-red-500 outline-none"
+                                >
+                                    <option value="">Select Group</option>
+                                    {['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'].map(bg => (
+                                        <option key={bg} value={bg}>{bg}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Verification Status</label>
+                                    <select
+                                        value={selectedUser.verification_status || 'pending'}
+                                        onChange={(e) => setSelectedUser({ ...selectedUser, verification_status: e.target.value })}
+                                        className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-red-500 outline-none"
+                                    >
+                                        <option value="pending">Pending</option>
+                                        <option value="verified">Verified</option>
+                                        <option value="rejected">Rejected</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
+                                    <select
+                                        value={selectedUser.role || 'user'}
+                                        onChange={(e) => setSelectedUser({ ...selectedUser, role: e.target.value })}
+                                        className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-red-500 outline-none"
+                                    >
+                                        <option value="user">User</option>
+                                        <option value="admin">Admin</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div className="flex items-center space-x-2 pt-2">
+                                <input
+                                    type="checkbox"
+                                    id="is_donor"
+                                    checked={selectedUser.is_donor || false}
+                                    onChange={(e) => setSelectedUser({ ...selectedUser, is_donor: e.target.checked })}
+                                    className="rounded text-red-600 focus:ring-red-500"
+                                />
+                                <label htmlFor="is_donor" className="text-sm font-medium text-gray-700">Registered as Donor</label>
+                            </div>
+
+                        </div>
+                        <div className="p-6 border-t bg-gray-50 flex justify-end space-x-3 rounded-b-xl">
+                            <Button variant="ghost" onClick={() => setSelectedUser(null)}>Cancel</Button>
+                            <Button
+                                variant="primary"
+                                onClick={handleUpdateUser}
+                                isLoading={actionLoading === 'update_user'}
+                            >
+                                Save Changes
+                            </Button>
+                        </div>
+                    </motion.div>
+                </div>
+            )}
         </div>
     );
 }
