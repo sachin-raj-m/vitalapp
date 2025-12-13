@@ -23,7 +23,7 @@ export function MyRequestsContent() {
     const [error, setError] = useState('');
 
     // Verification State
-    const [verifyModal, setVerifyModal] = useState({ isOpen: false, donationId: '', donorName: '' });
+    const [verifyModal, setVerifyModal] = useState({ isOpen: false, donationId: '', requestId: '', donorName: '' });
     const [otpInput, setOtpInput] = useState('');
     const [verifying, setVerifying] = useState(false);
     const [verifyError, setVerifyError] = useState('');
@@ -72,7 +72,7 @@ export function MyRequestsContent() {
             if (error) throw error;
 
             if (data.otp === otpInput) {
-                // Success! Update status to completed
+                // Success! Update donation status to completed
                 const { error: updateError } = await supabase
                     .from('donations')
                     .update({ status: 'completed' })
@@ -80,11 +80,20 @@ export function MyRequestsContent() {
 
                 if (updateError) throw updateError;
 
+                // Also mark the BLOOD REQUEST as fulfilled
+                // logic: if donation is verified, the need is met.
+                const { error: requestError } = await supabase
+                    .from('blood_requests')
+                    .update({ status: 'fulfilled' })
+                    .eq('id', verifyModal.requestId);
+
+                if (requestError) throw requestError;
+
                 // Refresh list
                 await fetchMyRequests();
-                setVerifyModal({ isOpen: false, donationId: '', donorName: '' });
+                setVerifyModal({ isOpen: false, donationId: '', requestId: '', donorName: '' });
                 setOtpInput('');
-                alert('Donation verified successfully!');
+                alert('Donation verified and request closed successfully!');
             } else {
                 setVerifyError('Invalid OTP. Please ask the donor for the correct code.');
             }
@@ -157,6 +166,7 @@ export function MyRequestsContent() {
                                                             onClick={() => setVerifyModal({
                                                                 isOpen: true,
                                                                 donationId: donation.id,
+                                                                requestId: request.id,
                                                                 donorName: donation.donor?.full_name
                                                             })}
                                                         >
@@ -188,15 +198,19 @@ export function MyRequestsContent() {
             >
                 <div className="space-y-4">
                     <p className="text-sm text-gray-600">
-                        Ask the donor for the 6-digit OTP shown on their screen and enter it below to confirm the donation.
+                        Ask the donor for the 4-digit OTP shown on their screen and enter it below to confirm the donation.
+                        <br />
+                        <span className="text-xs text-orange-600 font-medium mt-1 block">
+                            Note: verifying this will mark the request as fulfilled.
+                        </span>
                     </p>
 
                     <Input
                         label="Enter OTP"
-                        placeholder="e.g. 123456"
+                        placeholder="e.g. 1234"
                         value={otpInput}
                         onChange={(e) => setOtpInput(e.target.value)}
-                        maxLength={6}
+                        maxLength={4}
                         className="text-center text-2xl tracking-widest"
                     />
 
@@ -214,7 +228,7 @@ export function MyRequestsContent() {
                         <Button
                             onClick={handleVerify}
                             isLoading={verifying}
-                            disabled={otpInput.length !== 6}
+                            disabled={otpInput.length !== 4}
                         >
                             Verify & Complete
                         </Button>
