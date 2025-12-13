@@ -57,8 +57,7 @@ export function MyRequestsContent() {
             setRequests(data as any);
         } catch (err: any) {
             console.error('Error fetching requests');
-            console.error('Supabase Error Details:', err);
-            setError(`Failed to load requests: ${err.message} (${err.details || 'no details'} - ${err.hint || 'no hint'})`);
+            setError('Failed to load your requests');
         } finally {
             setIsLoading(false);
         }
