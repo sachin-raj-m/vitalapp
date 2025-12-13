@@ -95,7 +95,7 @@ export function MyRequestsContent() {
                 setOtpInput('');
                 alert('Donation verified and request closed successfully!');
             } else {
-                setVerifyError('Invalid OTP. Please ask the donor for the correct code.');
+                setVerifyError('Invalid PIN. Please ask the donor for their correct PIN.');
             }
         } catch (err: any) {
             console.error('Verification error');
@@ -198,7 +198,7 @@ export function MyRequestsContent() {
             >
                 <div className="space-y-4">
                     <p className="text-sm text-gray-600">
-                        Ask the donor for the 4-digit OTP shown on their screen and enter it below to confirm the donation.
+                        Ask the donor for their <strong>4-digit Donor PIN</strong> and enter it below to confirm the donation.
                         <br />
                         <span className="text-xs text-orange-600 font-medium mt-1 block">
                             Note: verifying this will mark the request as fulfilled.
@@ -206,7 +206,7 @@ export function MyRequestsContent() {
                     </p>
 
                     <Input
-                        label="Enter OTP"
+                        label="Enter Donor PIN"
                         placeholder="e.g. 1234"
                         value={otpInput}
                         onChange={(e) => setOtpInput(e.target.value)}
