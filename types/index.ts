@@ -18,6 +18,7 @@ export interface User {
   is_donor: boolean;
   is_available: boolean;
   government_id?: string;
+  role?: 'user' | 'admin' | string;
   created_at: string;
 }
 
