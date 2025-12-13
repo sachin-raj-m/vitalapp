@@ -17,11 +17,12 @@ const MAX_FILE_SIZE = 1024 * 1024; // 1MB in bytes
 interface PendingRegistration {
     userId: string;
     email: string;
-    phone: string;
+    phone?: string;
 }
 
 interface CompleteRegistrationForm {
     fullName: string;
+    phone: string;
     bloodGroup: BloodGroup;
     proofType: string;
     proofFile: File | null;
@@ -36,6 +37,7 @@ export default function CompleteRegistration() {
     const [pendingData, setPendingData] = useState<PendingRegistration | null>(null);
     const [formData, setFormData] = useState<CompleteRegistrationForm>({
         fullName: '',
+        phone: '',
         bloodGroup: '' as BloodGroup,
         proofType: '',
         proofFile: null,
@@ -86,6 +88,10 @@ export default function CompleteRegistration() {
                     }
 
                     setPendingData(data);
+                    // Pre-fill phone if available from pending data
+                    if (data.phone) {
+                        setFormData(prev => ({ ...prev, phone: data.phone }));
+                    }
                     setStatus('form');
                 } catch (err) {
                     console.error('Error processing stored data:', err);
@@ -108,6 +114,10 @@ export default function CompleteRegistration() {
 
         if (!formData.fullName.trim()) {
             errors.fullName = 'Full name is required';
+        }
+
+        if (!formData.phone.trim()) {
+            errors.phone = 'Phone number is required';
         }
 
         if (!formData.bloodGroup) {
@@ -174,7 +184,7 @@ export default function CompleteRegistration() {
                         id: session.user.id,
                         email: pendingData.email,
                         full_name: formData.fullName,
-                        phone: pendingData.phone,
+                        phone: formData.phone,
                         blood_group: formData.bloodGroup,
                         blood_group_proof_type: formData.proofType,
                         blood_group_proof_url: filePath,
@@ -200,7 +210,8 @@ export default function CompleteRegistration() {
             // Update user metadata to mark registration as completed
             const { error: updateError } = await supabase.auth.updateUser({
                 data: {
-                    registration_completed: true
+                    registration_completed: true,
+                    phone: formData.phone
                 }
             });
 
@@ -268,6 +279,16 @@ export default function CompleteRegistration() {
                                 autoComplete="name"
                                 placeholder="Enter your full name"
                                 error={fieldErrors.fullName}
+                            />
+                            <Input
+                                label="Phone Number"
+                                type="tel"
+                                value={formData.phone}
+                                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                                required
+                                autoComplete="tel"
+                                placeholder="Enter your phone number"
+                                error={fieldErrors.phone}
                             />
                             <Select
                                 label="Blood Group"

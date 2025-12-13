@@ -17,8 +17,6 @@ export default function RegisterPage() {
     const [formData, setFormData] = useState({
         email: '',
         password: '',
-        confirmPassword: '',
-        phone: '',
     });
     const [error, setError] = useState('');
     const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
@@ -43,18 +41,6 @@ export default function RegisterPage() {
             errors.password = 'Password must be at least 6 characters long';
         }
 
-        // Confirm password
-        if (!formData.confirmPassword) {
-            errors.confirmPassword = 'Please confirm your password';
-        } else if (formData.password !== formData.confirmPassword) {
-            errors.confirmPassword = 'Passwords do not match';
-        }
-
-        // Phone validation
-        if (!formData.phone) {
-            errors.phone = 'Phone number is required';
-        }
-
         setFieldErrors(errors);
         return Object.keys(errors).length === 0;
     };
@@ -76,7 +62,6 @@ export default function RegisterPage() {
                 password: formData.password,
                 options: {
                     data: {
-                        phone: formData.phone,
                         registration_completed: false
                     },
                     emailRedirectTo: `${window.location.origin}/complete-registration`
@@ -92,8 +77,7 @@ export default function RegisterPage() {
             // Store basic registration data
             localStorage.setItem('pendingRegistration', JSON.stringify({
                 userId: authData.user.id,
-                email: formData.email,
-                phone: formData.phone
+                email: formData.email
             }));
 
             setVerificationSent(true);
@@ -165,16 +149,7 @@ export default function RegisterPage() {
                             placeholder="your.email@example.com"
                             error={fieldErrors.email}
                         />
-                        <Input
-                            label="Phone"
-                            type="tel"
-                            value={formData.phone}
-                            onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                            required
-                            autoComplete="tel"
-                            placeholder="Enter your phone number"
-                            error={fieldErrors.phone}
-                        />
+
                         <Input
                             label="Password"
                             type="password"
@@ -184,16 +159,6 @@ export default function RegisterPage() {
                             autoComplete="new-password"
                             placeholder="Minimum 6 characters"
                             error={fieldErrors.password}
-                        />
-                        <Input
-                            label="Confirm Password"
-                            type="password"
-                            value={formData.confirmPassword}
-                            onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
-                            required
-                            autoComplete="new-password"
-                            placeholder="Re-enter your password"
-                            error={fieldErrors.confirmPassword}
                         />
 
                         <Button
