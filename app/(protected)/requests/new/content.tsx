@@ -178,13 +178,11 @@ export default function CreateRequestPage() {
                                     interactive={true}
                                     center={{ lat: 20.5937, lng: 78.9629 }}
                                     zoom={5}
-                                    markers={formData.location.latitude ? [{
-                                        position: {
-                                            lat: formData.location.latitude,
-                                            lng: formData.location.longitude
-                                        },
-                                        title: 'Selected Location'
-                                    }] : []}
+                                    selectedPosition={formData.location.latitude ? {
+                                        lat: formData.location.latitude,
+                                        lng: formData.location.longitude
+                                    } : null}
+                                    markers={[]}
                                     onLocationSelect={(loc) => {
                                         setFormData(prev => ({
                                             ...prev,

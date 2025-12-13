@@ -26,20 +26,39 @@ interface MapProps {
         title?: string;
         description?: string;
     }>;
+    selectedPosition?: Location | null;
     onLocationSelect?: (location: Location) => void;
     interactive?: boolean;
 }
 
-function LocationMarker({ onLocationSelect }: { onLocationSelect?: (loc: Location) => void }) {
-    const [position, setPosition] = useState<Location | null>(null);
+function LocationMarker({
+    onLocationSelect,
+    selectedPosition
+}: {
+    onLocationSelect?: (loc: Location) => void;
+    selectedPosition?: Location | null;
+}) {
+    const [position, setPosition] = useState<Location | null>(selectedPosition || null);
+
     const map = useMapEvents({
         click(e) {
-            setPosition(e.latlng);
+            const newPos = { lat: e.latlng.lat, lng: e.latlng.lng };
+            // If not controlled, update local state
+            if (!selectedPosition) {
+                setPosition(newPos);
+            }
             if (onLocationSelect) {
-                onLocationSelect(e.latlng);
+                onLocationSelect(newPos);
             }
         },
     });
+
+    useEffect(() => {
+        if (selectedPosition) {
+            setPosition(selectedPosition);
+            map.flyTo([selectedPosition.lat, selectedPosition.lng], map.getZoom());
+        }
+    }, [selectedPosition, map]);
 
     return position === null ? null : (
         <Marker position={position}>
@@ -52,12 +71,13 @@ export default function Map({
     center = { lat: 20.5937, lng: 78.9629 }, // Default to India
     zoom = 5,
     markers = [],
+    selectedPosition,
     onLocationSelect,
     interactive = false
 }: MapProps) {
     return (
         <MapContainer
-            center={[center.lat, center.lng]}
+            center={selectedPosition ? [selectedPosition.lat, selectedPosition.lng] : [center.lat, center.lng]}
             zoom={zoom}
             scrollWheelZoom={true}
             style={{ height: '100%', width: '100%', minHeight: '400px', borderRadius: '0.5rem' }}
@@ -78,7 +98,7 @@ export default function Map({
                 </Marker>
             ))}
 
-            {interactive && <LocationMarker onLocationSelect={onLocationSelect} />}
+            {interactive && <LocationMarker onLocationSelect={onLocationSelect} selectedPosition={selectedPosition} />}
         </MapContainer>
     );
 }
