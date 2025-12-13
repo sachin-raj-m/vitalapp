@@ -10,6 +10,16 @@ import { Alert } from '@/components/ui/Alert';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
 import type { BloodGroup, UrgencyLevel } from '@/types';
+import dynamic from 'next/dynamic';
+
+const Map = dynamic(() => import('@/components/Map'), {
+    ssr: false,
+    loading: () => (
+        <div className="h-[400px] w-full bg-gray-100 animate-pulse flex items-center justify-center rounded-lg">
+            <span className="text-gray-400">Loading Map...</span>
+        </div>
+    )
+});
 
 export default function CreateRequestPage() {
     const router = useRouter();
@@ -161,17 +171,48 @@ export default function CreateRequestPage() {
 
                         <div className="space-y-2">
                             <label className="block text-sm font-medium text-gray-700">
-                                Location
+                                Location Selection (Click on map)
                             </label>
-                            <div className="flex gap-2">
+                            <div className="h-[400px] border border-gray-300 rounded-lg overflow-hidden relative z-0">
+                                <Map
+                                    interactive={true}
+                                    center={{ lat: 20.5937, lng: 78.9629 }}
+                                    zoom={5}
+                                    markers={formData.location.latitude ? [{
+                                        position: {
+                                            lat: formData.location.latitude,
+                                            lng: formData.location.longitude
+                                        },
+                                        title: 'Selected Location'
+                                    }] : []}
+                                    onLocationSelect={(loc) => {
+                                        setFormData(prev => ({
+                                            ...prev,
+                                            location: {
+                                                ...prev.location,
+                                                latitude: loc.lat,
+                                                longitude: loc.lng
+                                            }
+                                        }));
+                                    }}
+                                />
+                            </div>
+                            <div className="flex gap-2 mt-2">
                                 <Button
                                     type="button"
                                     variant="secondary"
                                     onClick={handleGetLocation}
                                     leftIcon={<MapPin className="h-5 w-5" />}
                                 >
-                                    Get Current Location
+                                    Use My Current Location
                                 </Button>
+                                {formData.location.latitude !== 0 && (
+                                    <span className="text-sm text-green-600 flex items-center">
+                                        <MapPin className="h-4 w-4 mr-1" />
+                                        Lat: {formData.location.latitude.toFixed(4)},
+                                        Lng: {formData.location.longitude.toFixed(4)}
+                                    </span>
+                                )}
                             </div>
                         </div>
 

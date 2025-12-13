@@ -43,12 +43,9 @@ export interface BloodRequest {
 
 export interface Donation {
   id: string;
-  donor_id: string;
   request_id: string;
-  donation_date: string;
-  units: number;
-  hospital_name: string;
-  status: 'scheduled' | 'completed' | 'cancelled';
+  donor_id: string;
+  status: 'pending' | 'completed' | 'cancelled';
   created_at: string;
 }
 

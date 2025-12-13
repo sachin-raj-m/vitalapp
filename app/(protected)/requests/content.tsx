@@ -2,7 +2,14 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import dynamic from 'next/dynamic';
 import { BloodRequestCard } from '@/components/BloodRequestCard';
+import { MapPin, List } from 'lucide-react';
+
+const Map = dynamic(() => import('@/components/Map'), {
+    ssr: false,
+    loading: () => <div className="h-[400px] bg-gray-100 rounded-lg animate-pulse" />
+});
 import { Button } from '@/components/ui/Button';
 import { Input, Select } from '@/components/ui/Input';
 import { Alert } from '@/components/ui/Alert';
@@ -13,6 +20,7 @@ import type { BloodRequest } from '@/types';
 export default function RequestsPage() {
     const { user } = useAuth();
     const [requests, setRequests] = useState<BloodRequest[]>([]);
+    const [viewMode, setViewMode] = useState<'list' | 'map'>('list');
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
 
@@ -63,13 +71,29 @@ export default function RequestsPage() {
         <div className="space-y-8">
             <div className="flex justify-between items-center">
                 <h1 className="text-3xl font-bold text-gray-900">Blood Requests</h1>
-                {user && (
-                    <Link href="/requests/new">
-                        <Button variant="primary">
-                            Create Request
-                        </Button>
-                    </Link>
-                )}
+                <div className="flex gap-4">
+                    <div className="flex bg-gray-100 p-1 rounded-lg">
+                        <button
+                            onClick={() => setViewMode('list')}
+                            className={`p-2 rounded-md ${viewMode === 'list' ? 'bg-white shadow-sm text-primary-600' : 'text-gray-500'}`}
+                        >
+                            <List className="h-5 w-5" />
+                        </button>
+                        <button
+                            onClick={() => setViewMode('map')}
+                            className={`p-2 rounded-md ${viewMode === 'map' ? 'bg-white shadow-sm text-primary-600' : 'text-gray-500'}`}
+                        >
+                            <MapPin className="h-5 w-5" />
+                        </button>
+                    </div>
+                    {user && (
+                        <Link href="/requests/new">
+                            <Button variant="primary">
+                                Create Request
+                            </Button>
+                        </Link>
+                    )}
+                </div>
             </div>
 
             <div className="grid md:grid-cols-3 gap-4">
@@ -131,13 +155,30 @@ export default function RequestsPage() {
                 </div>
             ) : (
                 <div className="space-y-4">
-                    {requests.map(request => (
-                        <BloodRequestCard
-                            key={request.id}
-                            request={request}
-                            onRespond={() => handleRespond(request.id)}
-                        />
-                    ))}
+                    {viewMode === 'list' ? (
+                        requests.map(request => (
+                            <BloodRequestCard
+                                key={request.id}
+                                request={request}
+                                onRespond={() => handleRespond(request.id)}
+                            />
+                        ))
+                    ) : (
+                        <div className="h-[600px] rounded-xl overflow-hidden border border-gray-200">
+                            <Map
+                                center={{ lat: 20.5937, lng: 78.9629 }}
+                                zoom={5}
+                                markers={requests.map(req => ({
+                                    position: {
+                                        lat: req.location.latitude,
+                                        lng: req.location.longitude
+                                    },
+                                    title: `${req.blood_group} Blood Needed`,
+                                    description: `${req.hospital_name} - ${req.units_needed} Unit(s)`
+                                }))}
+                            />
+                        </div>
+                    )}
                 </div>
             )}
         </div>

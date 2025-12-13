@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { HeartPulse, Users, Award, Search, Activity, Clock, TrendingUp, Star } from 'lucide-react';
+import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/Button';
 import { Card, CardBody } from '@/components/ui/Card';
 import { useAuth } from '@/context/AuthContext';
@@ -73,7 +74,12 @@ export default function HomePage() {
     return (
         <div className="space-y-16">
             {/* Hero Section */}
-            <section className="text-center space-y-8">
+            <motion.section
+                initial={{ opacity: 0, y: 50 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.8 }}
+                className="text-center space-y-8"
+            >
                 <h1 className="text-5xl font-bold text-gray-900">
                     Save Lives Through Blood Donation
                 </h1>
@@ -87,7 +93,7 @@ export default function HomePage() {
                         </Button>
                     </Link>
                 </div>
-            </section>
+            </motion.section>
 
             {/* Statistics Section */}
             <section className="py-12 bg-gray-50">
