@@ -21,7 +21,6 @@ export default function RegisterPage() {
     const [error, setError] = useState('');
     const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
     const [isLoading, setIsLoading] = useState(false);
-    const [verificationSent, setVerificationSent] = useState(false);
 
     const validateForm = () => {
         const errors: Record<string, string> = {};
@@ -80,7 +79,10 @@ export default function RegisterPage() {
                 email: formData.email
             }));
 
-            setVerificationSent(true);
+            // Direct onboarding: auto-login logic (handled by supabase client usually if confirm is off)
+            // Redirect to completion page immediately
+            router.push('/complete-registration');
+
         } catch (err: any) {
             console.error('Registration error:', err);
             if (err?.message?.includes('User already registered')) {
@@ -94,35 +96,6 @@ export default function RegisterPage() {
             setIsLoading(false);
         }
     };
-
-    if (verificationSent) {
-        return (
-            <div className="max-w-md mx-auto">
-                <Card>
-                    <CardBody className="text-center py-8">
-                        <h2 className="text-2xl font-bold text-gray-900 mb-4">
-                            Verify Your Email
-                        </h2>
-                        <p className="text-gray-600 mb-6">
-                            We've sent a verification link to <strong>{formData.email}</strong>
-                        </p>
-                        <p className="text-gray-600 mb-6">
-                            Please check your email and click the verification link to complete your registration.
-                        </p>
-                        <div className="text-sm text-gray-500">
-                            Didn't receive the email?{' '}
-                            <button
-                                onClick={() => setVerificationSent(false)}
-                                className="text-primary-500 hover:text-primary-600"
-                            >
-                                Try again
-                            </button>
-                        </div>
-                    </CardBody>
-                </Card>
-            </div>
-        );
-    }
 
     return (
         <div className="max-w-md mx-auto">
