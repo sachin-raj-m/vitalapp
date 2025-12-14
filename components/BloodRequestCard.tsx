@@ -120,37 +120,29 @@ export const BloodRequestCard: React.FC<BloodRequestCardProps> = ({ request, onR
             </div>
 
             <div className="mt-4 flex justify-end items-center">
-              {onRespond ? (
-                (() => {
-                  const isCompatible = userBloodGroup ? isBloodCompatible(userBloodGroup, request.blood_group) : true;
-
-                  if (hasOffered) {
-                    return (
-                      <Button variant="outline" size="sm" disabled className="text-gray-500 border-gray-200">
+              <div className="mt-4 flex justify-end items-center">
+                {onRespond && (
+                  <>
+                    {hasOffered ? (
+                      <Button variant="outline" size="sm" disabled className="text-gray-500 border-gray-200 bg-gray-50">
                         Offer Sent
                       </Button>
-                    );
-                  }
-
-                  if (userBloodGroup && !isCompatible) {
-                    return (
-                      <Button variant="outline" size="sm" disabled className="text-gray-400 border-gray-200 bg-gray-50 cursor-not-allowed" title="Incompatible Blood Group">
-                        Incompatible
+                    ) : userBloodGroup && !isBloodCompatible(userBloodGroup, request.blood_group) ? (
+                      <Button variant="outline" size="sm" disabled className="text-red-400 border-red-100 bg-red-50 cursor-not-allowed w-full sm:w-auto">
+                        Incompatible ({userBloodGroup})
                       </Button>
-                    );
-                  }
-
-                  return (
-                    <Button
-                      variant="primary"
-                      size="sm"
-                      onClick={onRespond}
-                    >
-                      I can donate
-                    </Button>
-                  );
-                })()
-              ) : null}
+                    ) : (
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        onClick={onRespond}
+                      >
+                        I can donate
+                      </Button>
+                    )}
+                  </>
+                )}
+              </div>
             </div>
           </div>
         </CardBody>
