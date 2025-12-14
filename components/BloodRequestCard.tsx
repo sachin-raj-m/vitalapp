@@ -7,10 +7,13 @@ import { Card, CardBody } from './ui/Card';
 import { Badge } from './ui/Badge';
 import { Button } from './ui/Button';
 import type { BloodRequest, BloodGroup, UrgencyLevel } from '../types';
+import { isBloodCompatible } from '@/lib/blood-compatibility';
 
 interface BloodRequestCardProps {
   request: BloodRequest;
   onRespond?: () => void;
+  userBloodGroup?: BloodGroup;
+  hasOffered?: boolean;
 }
 
 const getUrgencyStyles = (urgency: UrgencyLevel) => {
@@ -66,7 +69,7 @@ const getBloodTypeColor = (bloodType: BloodGroup) => {
   }
 };
 
-export const BloodRequestCard: React.FC<BloodRequestCardProps> = ({ request, onRespond }) => {
+export const BloodRequestCard: React.FC<BloodRequestCardProps> = ({ request, onRespond, userBloodGroup, hasOffered }) => {
   const { badgeVariant, cardBorder, animation } = getUrgencyStyles(request.urgency_level);
   const bloodTypeClass = getBloodTypeColor(request.blood_group);
   const timeAgo = formatDistanceToNow(new Date(request.created_at), { addSuffix: true });
@@ -117,15 +120,37 @@ export const BloodRequestCard: React.FC<BloodRequestCardProps> = ({ request, onR
             </div>
 
             <div className="mt-4 flex justify-end items-center">
-              {onRespond && (
-                <Button
-                  variant="primary"
-                  size="sm"
-                  onClick={onRespond}
-                >
-                  I can donate
-                </Button>
-              )}
+              {onRespond ? (
+                (() => {
+                  const isCompatible = userBloodGroup ? isBloodCompatible(userBloodGroup, request.blood_group) : true;
+
+                  if (hasOffered) {
+                    return (
+                      <Button variant="outline" size="sm" disabled className="text-gray-500 border-gray-200">
+                        Offer Sent
+                      </Button>
+                    );
+                  }
+
+                  if (userBloodGroup && !isCompatible) {
+                    return (
+                      <Button variant="outline" size="sm" disabled className="text-gray-400 border-gray-200 bg-gray-50 cursor-not-allowed" title="Incompatible Blood Group">
+                        Incompatible
+                      </Button>
+                    );
+                  }
+
+                  return (
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      onClick={onRespond}
+                    >
+                      I can donate
+                    </Button>
+                  );
+                })()
+              ) : null}
             </div>
           </div>
         </CardBody>
