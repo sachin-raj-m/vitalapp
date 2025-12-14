@@ -274,6 +274,7 @@ export default function RequestsPage() {
                                 }
                                 userBloodGroup={user?.blood_group}
                                 hasOffered={offeredRequestIds.has(request.id)}
+                                isOwnRequest={user?.id === request.user_id}
                             />
                         ))
                     ) : (
