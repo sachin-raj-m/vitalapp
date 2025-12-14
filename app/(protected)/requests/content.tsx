@@ -22,6 +22,7 @@ import { isBloodCompatible } from '@/lib/blood-compatibility';
 export default function RequestsPage() {
     const { user } = useAuth();
     const [requests, setRequests] = useState<BloodRequest[]>([]);
+    const [offeredRequestIds, setOfferedRequestIds] = useState<Set<string>>(new Set());
     const [viewMode, setViewMode] = useState<'list' | 'map'>('list');
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
@@ -35,6 +36,25 @@ export default function RequestsPage() {
     useEffect(() => {
         fetchRequests();
     }, []);
+
+    useEffect(() => {
+        if (user) {
+            fetchMyDonations();
+        }
+    }, [user]);
+
+    const fetchMyDonations = async () => {
+        if (!user) return;
+        const { data } = await supabase
+            .from('donations')
+            .select('request_id')
+            .eq('donor_id', user.id)
+            .neq('status', 'cancelled'); // Only count active offers
+
+        if (data) {
+            setOfferedRequestIds(new Set(data.map(d => d.request_id)));
+        }
+    };
 
     const fetchRequests = async () => {
         try {
@@ -141,6 +161,10 @@ export default function RequestsPage() {
 
             // Close confirm modal and open Success modal
             setConfirmModal({ isOpen: false, request: null });
+
+            // Update local state to show "Offer Sent" immediately
+            setOfferedRequestIds(prev => new Set(prev).add(confirmModal.request!.id));
+
             setOtpModal({ isOpen: true, pin, hospitalName: confirmModal.request.hospital_name });
         } catch (err: any) {
             console.error('Donation error');
@@ -248,6 +272,8 @@ export default function RequestsPage() {
                                         ? undefined
                                         : () => handleDonateClick(request)
                                 }
+                                userBloodGroup={user?.blood_group}
+                                hasOffered={offeredRequestIds.has(request.id)}
                             />
                         ))
                     ) : (
@@ -386,8 +412,8 @@ export default function RequestsPage() {
                     <div className="text-sm text-gray-600">
                         <p className="mb-2"><strong>Next Steps:</strong></p>
                         <ol className="list-decimal list-inside space-y-1">
+                            <li><strong>Contact the Requestee:</strong> Their phone number will be visible in "My Donations".</li>
                             <li>Visit the hospital location.</li>
-                            <li>Meet the requestor or patient attendant.</li>
                             <li>Share this <strong>Donor PIN</strong> with them to verify your donation.</li>
                         </ol>
                     </div>
