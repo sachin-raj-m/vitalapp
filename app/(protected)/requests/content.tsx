@@ -175,9 +175,9 @@ export default function RequestsPage() {
 
     return (
         <div className="space-y-8">
-            <div className="flex justify-between items-center">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <h1 className="text-3xl font-bold text-gray-900">Blood Requests</h1>
-                <div className="flex gap-4">
+                <div className="flex w-full md:w-auto gap-4">
                     <div className="flex bg-gray-100 p-1 rounded-lg">
                         <button
                             onClick={() => setViewMode('list')}
@@ -193,8 +193,8 @@ export default function RequestsPage() {
                         </button>
                     </div>
                     {user && (
-                        <Link href="/requests/new">
-                            <Button variant="primary">
+                        <Link href="/requests/new" className="flex-1 md:flex-none">
+                            <Button variant="primary" className="w-full md:w-auto">
                                 Create Request
                             </Button>
                         </Link>
@@ -202,7 +202,7 @@ export default function RequestsPage() {
                 </div>
             </div>
 
-            <div className="grid md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <Select
                     label="Blood Group"
                     value={filters.bloodGroup}

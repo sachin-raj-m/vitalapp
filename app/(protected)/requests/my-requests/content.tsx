@@ -165,7 +165,7 @@ export function MyRequestsContent() {
                     {filteredRequests.map((request) => (
                         <Card key={request.id}>
                             <CardHeader>
-                                <div className="flex justify-between items-start">
+                                <div className="flex flex-col md:flex-row justify-between items-start gap-2">
                                     <div>
                                         <h3 className="text-lg font-bold text-gray-900">
                                             {request.blood_group} Blood Needed
@@ -175,9 +175,11 @@ export function MyRequestsContent() {
                                             {new Date(request.created_at).toLocaleDateString()}
                                         </p>
                                     </div>
-                                    <Badge variant={request.status === 'active' ? 'warning' : 'success'}>
-                                        {request.status.charAt(0).toUpperCase() + request.status.slice(1)}
-                                    </Badge>
+                                    <div className="self-end md:self-auto">
+                                        <Badge variant={request.status === 'active' ? 'warning' : 'success'}>
+                                            {request.status.charAt(0).toUpperCase() + request.status.slice(1)}
+                                        </Badge>
+                                    </div>
                                 </div>
                             </CardHeader>
                             <CardBody>
@@ -187,7 +189,7 @@ export function MyRequestsContent() {
                                         {request.donations.map((donation) => (
                                             <div
                                                 key={donation.id}
-                                                className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-100"
+                                                className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-100 gap-3"
                                             >
                                                 <div className="flex items-center gap-3">
                                                     <div className="h-10 w-10 rounded-full bg-primary-100 flex items-center justify-center text-primary-600 font-bold">
