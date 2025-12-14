@@ -81,19 +81,19 @@ export default function DashboardPage() {
 
     return (
         <div className="space-y-8">
-            <div className="flex justify-between items-center">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div>
                     <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
                     <p className="text-gray-600">Welcome back, {user?.full_name}</p>
                 </div>
-                <Link href="/requests/new">
-                    <Button variant="primary" leftIcon={<AlertCircle className="h-5 w-5" />}>
+                <Link href="/requests/new" className="w-full md:w-auto">
+                    <Button variant="primary" leftIcon={<AlertCircle className="h-5 w-5" />} className="w-full md:w-auto">
                         Create Blood Request
                     </Button>
                 </Link>
             </div>
 
-            <div className="grid md:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                 <Card>
                     <CardBody className="flex items-center space-x-4">
                         <div className="p-3 bg-primary-100 rounded-full">

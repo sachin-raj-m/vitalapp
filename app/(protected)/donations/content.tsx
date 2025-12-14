@@ -126,7 +126,7 @@ export default function DonationsPage() {
                 </Alert>
             )}
 
-            <div className="grid md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <Card>
                     <CardHeader>
                         <h3 className="text-lg font-medium text-gray-900">Total Donations</h3>
@@ -174,7 +174,7 @@ export default function DonationsPage() {
                     ) : (
                         <div className="space-y-4">
                             {donations.map((donation) => (
-                                <div key={donation.id} className="flex items-center justify-between p-4 border-b last:border-0">
+                                <div key={donation.id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 border-b last:border-0 gap-3">
                                     <div>
                                         <p className="font-medium">
                                             {donation.request?.hospital_name || 'Unknown Hospital'}
@@ -184,7 +184,7 @@ export default function DonationsPage() {
                                             {new Date(donation.created_at).toLocaleDateString()}
                                         </p>
                                     </div>
-                                    <div className="flex items-center gap-3">
+                                    <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-start">
                                         <Badge variant={donation.status === 'completed' ? 'success' : donation.status === 'cancelled' ? 'neutral' : 'warning'}>
                                             {donation.status.charAt(0).toUpperCase() + donation.status.slice(1)}
                                         </Badge>
