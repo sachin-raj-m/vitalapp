@@ -17,6 +17,7 @@ import { Alert } from '@/components/ui/Alert';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
 import type { BloodRequest } from '@/types';
+import { isBloodCompatible } from '@/lib/blood-compatibility';
 
 export default function RequestsPage() {
     const { user } = useAuth();
@@ -73,6 +74,13 @@ export default function RequestsPage() {
     const handleDonateClick = async (request: BloodRequest) => {
         if (!user) {
             setError('Please login to donate');
+            return;
+        }
+
+        // Check Blood Compatibility
+        if (!isBloodCompatible(user.blood_group, request.blood_group)) {
+            const allowed = [request.blood_group]; // Simplified for message, could use getCompatibleDonors
+            setError(`Medical Safety: Your blood group (${user.blood_group}) is not compatible with the patient (${request.blood_group}).`);
             return;
         }
 
