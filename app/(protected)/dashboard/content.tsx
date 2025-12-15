@@ -14,6 +14,7 @@ import type { BloodRequest } from '@/types';
 import { isBloodCompatible } from '@/lib/blood-compatibility';
 import { formatDistanceToNow, addDays, differenceInDays } from 'date-fns';
 import { DashboardSkeleton } from '@/components/skeletons/DashboardSkeleton';
+import { EmptyState } from '@/components/EmptyState';
 
 import { useRequests } from '@/context/RequestsContext';
 
@@ -249,20 +250,14 @@ export default function DashboardPage() {
                         ))}
                     </div>
                 ) : (
-                    <Card className="bg-gray-50 border-dashed">
-                        <CardBody className="text-center py-8">
-                            <div className="mx-auto w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mb-3">
-                                <CheckCircle className="h-6 w-6 text-gray-400" />
-                            </div>
-                            <h3 className="text-lg font-medium text-gray-900">All Good!</h3>
-                            <p className="text-gray-500 max-w-sm mx-auto">
-                                There are no urgent requests matching your blood group ({user?.blood_group}) right now.
-                            </p>
-                            <Link href="/requests" className="mt-4 inline-block">
-                                <Button variant="outline">Browse All Requests</Button>
-                            </Link>
-                        </CardBody>
-                    </Card>
+                    <EmptyState
+                        icon={CheckCircle}
+                        title="All Good!"
+                        description={`There are no urgent requests matching your blood group (${user?.blood_group}) right now.`}
+                        actionLabel="Browse All Requests"
+                        onAction={() => router.push('/requests')}
+                        className="bg-gray-50 border-dashed"
+                    />
                 )}
             </div>
         </div>

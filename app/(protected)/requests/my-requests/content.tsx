@@ -9,8 +9,9 @@ import { Modal } from '@/components/ui/Modal';
 import { Alert } from '@/components/ui/Alert';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
-import { Loader2, CheckCircle, Clock } from 'lucide-react';
+import { Loader2, CheckCircle, Clock, Heart } from 'lucide-react';
 import type { BloodRequest, Donation } from '@/types';
+import { EmptyState } from '@/components/EmptyState';
 
 interface RequestWithDonations extends BloodRequest {
     donations: (Donation & { profiles: { full_name: string; phone: string }, units_donated: number })[];
@@ -218,18 +219,15 @@ export function MyRequestsContent() {
             </div>
 
             {filteredRequests.length === 0 ? (
-                <div className="text-center py-12 bg-white rounded-lg shadow">
-                    <p className="text-gray-500 mb-4">
-                        {activeTab === 'active'
-                            ? "You don't have any active blood requests."
-                            : "No past requests found."}
-                    </p>
-                    {activeTab === 'active' && (
-                        <Button onClick={() => window.location.href = '/requests/new'}>
-                            Create Request
-                        </Button>
-                    )}
-                </div>
+                <EmptyState
+                    icon={Clock}
+                    title={activeTab === 'active' ? "No Active Requests" : "No Past Requests"}
+                    description={activeTab === 'active'
+                        ? "You don't have any active blood requests. If you or a loved one needs help, create a request now."
+                        : "You haven't made any requests in the past."}
+                    actionLabel={activeTab === 'active' ? "Create Request" : undefined}
+                    onAction={activeTab === 'active' ? () => window.location.href = '/requests/new' : undefined}
+                />
             ) : (
                 <div className="space-y-6">
                     {filteredRequests.map((request) => {
