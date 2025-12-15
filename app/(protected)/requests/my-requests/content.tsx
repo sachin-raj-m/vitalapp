@@ -72,6 +72,8 @@ export function MyRequestsContent() {
         setVerifyError('');
 
         try {
+            console.log('Verifying donation:', verifyModal);
+
             // Check OTP against database
             const { data: donationData, error: otpError } = await supabase
                 .from('donations')
@@ -79,19 +81,34 @@ export function MyRequestsContent() {
                 .eq('id', verifyModal.donationId)
                 .single();
 
-            if (otpError) throw otpError;
+            if (otpError) {
+                console.error('OTP Check Error:', otpError);
+                throw otpError;
+            }
+
+            console.log('OTP DB Data:', donationData);
+            console.log('Input OTP:', otpInput);
 
             if (donationData.otp === otpInput) {
+                console.log('OTP Matches. Updating donation...');
                 // 1. Update donation status and units
+                const updatePayload = {
+                    status: 'completed',
+                    units_donated: unitsDonatedInput
+                };
+                console.log('Update Payload:', updatePayload);
+
                 const { error: updateError } = await supabase
                     .from('donations')
-                    .update({
-                        status: 'completed',
-                        units_donated: unitsDonatedInput
-                    })
+                    .update(updatePayload)
                     .eq('id', verifyModal.donationId);
 
-                if (updateError) throw updateError;
+                if (updateError) {
+                    console.error('Donation Update Error:', updateError);
+                    alert(`Update Failed: ${updateError.message}\nDetails: ${updateError.details || 'N/A'}`);
+                    throw updateError;
+                }
+                console.log('Donation updated successfully.');
 
                 // 2. Check total collected units to see if we should close the request
                 // Fetch all COMPLETED donations for this request (including the one just updated)
@@ -101,25 +118,36 @@ export function MyRequestsContent() {
                     .eq('request_id', verifyModal.requestId)
                     .eq('status', 'completed');
 
-                if (sumError) throw sumError;
+                if (sumError) {
+                    console.error('Sum Calculation Error:', sumError);
+                    throw sumError;
+                }
 
                 const totalCollected = allDonations.reduce((sum, d) => sum + (d.units_donated || 0), 0);
+                console.log('Total Collected after update:', totalCollected);
 
                 // Find the original request to get units_needed
                 const request = requests.find(r => r.id === verifyModal.requestId);
                 const unitsNeeded = request?.units_needed || 0;
+                console.log('Units Needed:', unitsNeeded);
 
                 let message = 'Donation verified successfully!';
 
                 // 3. Auto-fulfill if enough units collected
                 if (totalCollected >= unitsNeeded) {
+                    console.log('Fulfilling request...');
                     const { error: requestError } = await supabase
                         .from('blood_requests')
                         .update({ status: 'fulfilled' })
                         .eq('id', verifyModal.requestId);
 
-                    if (requestError) throw requestError;
+                    if (requestError) {
+                        console.error('Request Fulfillment Error:', requestError);
+                        alert('Warning: Donation verified but failed to close request automatically.');
+                        throw requestError;
+                    }
                     message += ' Request has been fulfilled and closed.';
+                    console.log('Request fulfilled.');
                 } else {
                     message += ` Progress: ${totalCollected}/${unitsNeeded} units.`;
                 }
@@ -129,13 +157,17 @@ export function MyRequestsContent() {
                 setVerifyModal({ isOpen: false, donationId: '', requestId: '', donorName: '', maxUnits: 0 });
                 setOtpInput('');
                 setUnitsDonatedInput(1);
-                alert(message);
+
+                // Small delay to allow UI to paint before alert blocks it
+                setTimeout(() => alert(message), 100);
+
             } else {
                 setVerifyError('Invalid PIN. Please ask the donor for their correct PIN.');
             }
         } catch (err: any) {
             console.error('Verification error', err);
             setVerifyError(err.message || 'Verification failed');
+            alert(`Verification Error: ${err.message}`);
         } finally {
             setVerifying(false);
         }
