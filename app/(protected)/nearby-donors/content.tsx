@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/Button';
 import { Card, CardBody } from '@/components/ui/Card';
 import { MapPin, Navigation, Search } from 'lucide-react';
 import { Alert } from '@/components/ui/Alert';
+import { useAuth } from '@/context/AuthContext';
 
 const Map = dynamic(() => import('@/components/Map'), {
     ssr: false,
@@ -53,6 +54,7 @@ const getBloodGroupColor = (bg: string) => {
 };
 
 export default function NearbyDonorsPageContent() {
+    const { user } = useAuth();
     const [center, setCenter] = useState<{ lat: number; lng: number }>({ lat: 20.5937, lng: 78.9629 });
     const [donors, setDonors] = useState<Donor[]>([]);
     const [nearbyDonors, setNearbyDonors] = useState<Donor[]>([]);
@@ -175,8 +177,9 @@ export default function NearbyDonorsPageContent() {
 
     // Calculate distances when center or donors change
     useEffect(() => {
-        // Filter out donors with invalid location
+        // Filter out donors with invalid location AND the current user
         const validDonors = donors.filter(d =>
+            d.id !== user?.id && // Exclude current user
             d.location &&
             d.location.latitude !== undefined && d.location.latitude !== null &&
             d.location.longitude !== undefined && d.location.longitude !== null
@@ -191,7 +194,7 @@ export default function NearbyDonorsPageContent() {
         const sorted = withDistance.sort((a, b) => (a.distanceKm || 0) - (b.distanceKm || 0));
         setNearbyDonors(sorted.slice(0, 20));
 
-    }, [center, donors]);
+    }, [center, donors, user]);
 
     return (
         <div className="space-y-6 h-[calc(100vh-140px)] flex flex-col">
