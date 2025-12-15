@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { Card, CardHeader, CardBody } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { useAuth } from '@/context/AuthContext';
+import { useRequests } from '@/context/RequestsContext';
 import { supabase } from '@/lib/supabase';
 import { Loader2, Calendar, XCircle } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
@@ -20,6 +21,7 @@ interface DonationWithRequest {
 
 export default function DonationsPage() {
     const { user } = useAuth();
+    const { refreshRequests } = useRequests();
     const [donations, setDonations] = useState<DonationWithRequest[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState('');
@@ -79,6 +81,9 @@ export default function DonationsPage() {
             setDonations(prev => prev.map(d =>
                 d.id === donationId ? { ...d, status: 'cancelled' } : d
             ));
+
+            // Refresh global context to update "Offer Sent" buttons elsewhere
+            await refreshRequests();
         } catch (err: any) {
             console.error('Error withdrawing donation', err);
             setError('Failed to withdraw donation');
