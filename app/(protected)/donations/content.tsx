@@ -6,9 +6,10 @@ import { Badge } from '@/components/ui/Badge';
 import { useAuth } from '@/context/AuthContext';
 import { useRequests } from '@/context/RequestsContext';
 import { supabase } from '@/lib/supabase';
-import { Loader2, Calendar, XCircle } from 'lucide-react';
+import { Loader2, Calendar, XCircle, Heart } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Alert } from '@/components/ui/Alert';
+import { EmptyState } from '@/components/EmptyState';
 
 interface DonationWithRequest {
     id: string;
@@ -173,9 +174,14 @@ export default function DonationsPage() {
                 </CardHeader>
                 <CardBody>
                     {donations.length === 0 ? (
-                        <div className="text-center py-8 text-gray-500">
-                            No donations found. Your journey starts with the first step!
-                        </div>
+                        <EmptyState
+                            icon={Heart}
+                            title="Be a Hero Today"
+                            description="Your donation journey starts with a single step. Find a request and help save a life."
+                            actionLabel="Find Requests"
+                            className="bg-white border-none shadow-none py-8"
+                            onAction={() => window.location.href = '/requests'}
+                        />
                     ) : (
                         <div className="space-y-4">
                             {donations.map((donation) => (
