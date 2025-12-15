@@ -40,8 +40,7 @@ interface Stats {
 
 export default function ProfilePage() {
     const router = useRouter();
-    const { user, signOut, session } = useAuth();
-    const [profile, setProfile] = useState<Profile | null>(null);
+    const { user, signOut, session, updateProfile } = useAuth();
     const [stats, setStats] = useState<Stats | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState('');
@@ -55,34 +54,17 @@ export default function ProfilePage() {
     });
 
     useEffect(() => {
-        loadProfile();
-        loadStats();
-    }, []);
-
-    const loadProfile = async () => {
-        try {
-            if (!user) return;
-
-            const { data, error } = await supabase
-                .from('profiles')
-                .select('*')
-                .eq('id', user.id)
-                .single();
-
-            if (error) throw error;
-            setProfile(data);
+        if (user) {
             setEditForm({
-                full_name: data.full_name || '',
-                phone: data.phone || '',
-                is_available: data.is_available || false,
-                permanent_zip: data.permanent_zip || '',
-                present_zip: data.present_zip || ''
+                full_name: user.full_name || '',
+                phone: user.phone || '',
+                is_available: user.is_available || false,
+                permanent_zip: user.permanent_zip || '',
+                present_zip: user.present_zip || ''
             });
-        } catch (err: any) {
-            console.error('Error loading profile');
-            setError('Failed to load profile data');
+            loadStats();
         }
-    };
+    }, [user]);
 
     const loadStats = async () => {
         try {
@@ -135,20 +117,13 @@ export default function ProfilePage() {
         setError('');
 
         try {
-            const { error } = await supabase
-                .from('profiles')
-                .update({
-                    full_name: editForm.full_name,
-                    phone: editForm.phone,
-                    is_available: editForm.is_available,
-                    permanent_zip: editForm.permanent_zip,
-                    present_zip: editForm.present_zip
-                })
-                .eq('id', user?.id);
-
-            if (error) throw error;
-
-            await loadProfile();
+            await updateProfile({
+                full_name: editForm.full_name,
+                phone: editForm.phone,
+                is_available: editForm.is_available,
+                permanent_zip: editForm.permanent_zip,
+                present_zip: editForm.present_zip
+            });
             setIsEditing(false);
         } catch (err: any) {
             console.error('Error updating profile');
@@ -199,23 +174,23 @@ export default function ProfilePage() {
                         </div>
                         <div>
                             <h1 className="text-2xl font-bold text-gray-900">
-                                {profile?.full_name}
+                                {user?.full_name}
                             </h1>
                         </div>
                         <div className="flex flex-col space-y-1 mt-2 text-gray-600 text-sm">
                             <div className="flex items-center">
                                 <span className="font-semibold text-gray-700 w-28">Permanent Zip:</span>
-                                <span>{profile?.permanent_zip || 'N/A'}</span>
+                                <span>{user?.permanent_zip || 'N/A'}</span>
                             </div>
                             <div className="flex items-center">
                                 <span className="font-semibold text-gray-700 w-28">Present Zip:</span>
-                                <span>{profile?.present_zip || 'N/A'}</span>
+                                <span>{user?.present_zip || 'N/A'}</span>
                             </div>
                         </div>
                         <div className="flex items-center space-x-4 text-gray-600 mt-2">
                             <div className="flex items-center">
                                 <Droplet className="h-4 w-4 mr-1" />
-                                {profile?.blood_group || 'N/A'}
+                                {user?.blood_group || 'N/A'}
                             </div>
                         </div>
                     </div >
@@ -296,7 +271,7 @@ export default function ProfilePage() {
                         <div className="flex items-center justify-between">
                             <div className="flex items-center">
                                 <Mail className="h-5 w-5 text-gray-400 mr-2" />
-                                <span>{profile?.email}</span>
+                                <span>{user?.email}</span>
                             </div>
                             {session?.user && !session.user.email_confirmed_at && (
                                 <Button
@@ -327,9 +302,9 @@ export default function ProfilePage() {
                         <div className="flex items-center justify-between">
                             <div className="flex items-center">
                                 <Phone className="h-5 w-5 text-gray-400 mr-2" />
-                                <span>{profile?.phone}</span>
+                                <span>{user?.phone}</span>
                             </div>
-                            {session?.user && (!session.user.phone_confirmed_at && profile?.phone) && (
+                            {session?.user && (!session.user.phone_confirmed_at && user?.phone) && (
                                 <span className="text-xs text-yellow-600 bg-yellow-100 px-2 py-1 rounded">
                                     Unverified
                                 </span>
