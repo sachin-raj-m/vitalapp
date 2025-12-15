@@ -3,12 +3,7 @@
 import React, { useState } from 'react';
 import { Share2, Copy, Check, Facebook, Twitter, Smartphone } from 'lucide-react';
 import { Button } from './ui/Button';
-import {
-    Dropdown,
-    DropdownTrigger,
-    DropdownMenu,
-    DropdownItem
-} from './ui/Dropdown'; // Assuming we have a Dropdown or similar, if not I'll stick to a simple button for now or built-in browser share
+
 
 // Actually, better to stick to a simple button that triggers the native sheet or a toast
 // Let's keep it simple: One button "Share".
