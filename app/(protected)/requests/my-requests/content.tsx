@@ -263,10 +263,12 @@ export function MyRequestsContent() {
                                                         >
                                                             Verify PIN
                                                         </Button>
-                                                    ) : (
+                                                    ) : donation.status === 'completed' ? (
                                                         <span className="flex items-center text-green-600 text-sm font-medium">
                                                             <CheckCircle className="h-4 w-4 mr-1" /> {donation.units_donated || 1} Unit(s) Verified
                                                         </span>
+                                                    ) : (
+                                                        <Badge variant="neutral">{donation.status}</Badge>
                                                     )}
                                                 </div>
                                             </div>
