@@ -8,6 +8,7 @@ import { Badge } from './ui/Badge';
 import { Button } from './ui/Button';
 import type { BloodRequest, BloodGroup, UrgencyLevel } from '../types';
 import { isBloodCompatible } from '@/lib/blood-compatibility';
+import { ShareButton } from './ShareButton';
 
 interface BloodRequestCardProps {
   request: BloodRequest;
@@ -127,38 +128,44 @@ export const BloodRequestCard: React.FC<BloodRequestCardProps> = ({ request, onR
               )}
             </div>
 
-            <div className="mt-4 flex justify-end items-center">
-              {isOwnRequest ? (
-                <Button variant="outline" size="sm" disabled className="text-primary-600 border-primary-200 bg-primary-50">
-                  Your Request
-                </Button>
-              ) : onRespond && (
-                <>
-                  {hasOffered ? (
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={onPendingClick || onRespond} // Fallback to onRespond if onPendingClick not provided
-                      className="text-white bg-orange-500 hover:bg-orange-600 border-transparent shadow-sm flex items-center gap-1"
-                    >
-                      <Clock className="w-4 h-4" />
-                      Complete Donation
-                    </Button>
-                  ) : userBloodGroup && !isBloodCompatible(userBloodGroup, request.blood_group) ? (
-                    <Button variant="outline" size="sm" disabled className="text-red-400 border-red-100 bg-red-50 cursor-not-allowed w-full sm:w-auto">
-                      Incompatible ({userBloodGroup})
-                    </Button>
-                  ) : (
-                    <Button
-                      variant="primary"
-                      size="sm"
-                      onClick={onRespond}
-                    >
-                      I can donate
-                    </Button>
-                  )}
-                </>
-              )}
+            <div className="mt-4 flex justify-between items-center gap-2">
+              <ShareButton
+                title={`Urgent: ${request.blood_group} Blood Needed`}
+                text={`${request.hospital_name} needs ${request.units_needed} units of ${request.blood_group} blood. Please help!`}
+              />
+              <div className="flex justify-end items-center gap-2">
+                {isOwnRequest ? (
+                  <Button variant="outline" size="sm" disabled className="text-primary-600 border-primary-200 bg-primary-50">
+                    Your Request
+                  </Button>
+                ) : onRespond && (
+                  <>
+                    {hasOffered ? (
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={onPendingClick || onRespond} // Fallback to onRespond if onPendingClick not provided
+                        className="text-white bg-orange-500 hover:bg-orange-600 border-transparent shadow-sm flex items-center gap-1"
+                      >
+                        <Clock className="w-4 h-4" />
+                        Complete Donation
+                      </Button>
+                    ) : userBloodGroup && !isBloodCompatible(userBloodGroup, request.blood_group) ? (
+                      <Button variant="outline" size="sm" disabled className="text-red-400 border-red-100 bg-red-50 cursor-not-allowed w-full sm:w-auto">
+                        Incompatible ({userBloodGroup})
+                      </Button>
+                    ) : (
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        onClick={onRespond}
+                      >
+                        I can donate
+                      </Button>
+                    )}
+                  </>
+                )}
+              </div>
             </div>
           </div>
         </CardBody>
