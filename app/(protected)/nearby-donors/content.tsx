@@ -17,7 +17,6 @@ interface Donor {
     id: string;
     full_name: string;
     blood_group: string;
-    phone: string;
     location: {
         latitude: number;
         longitude: number;
@@ -56,7 +55,7 @@ export default function NearbyDonorsPageContent() {
             try {
                 const { data, error } = await supabase
                     .from('profiles')
-                    .select('id, full_name, blood_group, phone, location, present_zip')
+                    .select('id, full_name, blood_group, location, present_zip')
                     .eq('is_donor', true);
 
                 if (error) throw error;
@@ -211,7 +210,7 @@ export default function NearbyDonorsPageContent() {
                             ...nearbyDonors.map(d => ({
                                 position: { lat: d.location.latitude, lng: d.location.longitude },
                                 title: d.full_name,
-                                description: `${d.blood_group} | ${d.distanceKm?.toFixed(1)} km away`
+                                description: `${d.blood_group} | Zip: ${d.present_zip || 'N/A'} | ${d.distanceKm?.toFixed(1)} km away`
                             }))
                         ]}
                     />
@@ -240,30 +239,15 @@ export default function NearbyDonorsPageContent() {
                                             </span>
                                         </div>
                                         <div className="text-right">
-                                            <p className="text-sm font-medium text-gray-900">
-                                                {donor.distanceKm?.toFixed(1)} km
+                                            <p className="text-lg font-bold text-primary-600">
+                                                {donor.distanceKm?.toFixed(1)} <span className="text-sm font-normal text-gray-500">km</span>
                                             </p>
-                                            <p className="text-xs text-gray-500">away</p>
                                         </div>
                                     </div>
 
-                                    <div className="mt-3 pt-3 border-t border-gray-100 flex justify-between items-center">
-                                        {donor.phone ? (
-                                            <a
-                                                href={`tel:${donor.phone}`}
-                                                className="text-sm text-secondary-600 hover:text-secondary-700 flex items-center font-medium"
-                                            >
-                                                <Phone className="h-3 w-3 mr-1" />
-                                                Call Now
-                                            </a>
-                                        ) : (
-                                            <span className="text-xs text-gray-400 italic">No phone shared</span>
-                                        )}
-
-                                        <div className="flex items-center text-xs text-gray-500">
-                                            <MapPin className="h-3 w-3 mr-1" />
-                                            {donor.location.address?.split(',')[0] || "Unknown Location"}
-                                        </div>
+                                    <div className="mt-3 pt-3 border-t border-gray-100 flex items-center text-sm text-gray-600">
+                                        <MapPin className="h-4 w-4 mr-2 text-gray-400" />
+                                        <span>Zip Code: <strong>{donor.present_zip || "N/A"}</strong></span>
                                     </div>
                                 </CardBody>
                             </Card>
