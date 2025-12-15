@@ -42,6 +42,7 @@ export interface BloodRequest {
   };
   city?: string;
   zipcode?: string;
+  date_needed?: string;
   status: 'active' | 'fulfilled' | 'cancelled';
   created_at: string;
   updated_at: string;
