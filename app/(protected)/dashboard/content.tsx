@@ -211,7 +211,7 @@ export default function DashboardPage() {
                             </p>
                         </div>
                         <Link href="/requests/new" className="mt-4">
-                            <Button variant="secondary" className="w-full bg-white text-primary-700 hover:bg-gray-100 border-0">
+                            <Button variant="ghost" className="w-full bg-white text-primary-700 hover:bg-gray-100">
                                 Request Blood
                             </Button>
                         </Link>
