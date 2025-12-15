@@ -21,7 +21,7 @@ import { useRequests } from '@/context/RequestsContext';
 export default function DashboardPage() {
     const { user } = useAuth();
     const router = useRouter();
-    const { requests, loading: requestsLoading } = useRequests(); // Use global state
+    const { requests, myDonations, loading: requestsLoading } = useRequests(); // Use global state
 
     // Local state for user-specific stats only
     const [stats, setStats] = useState({
@@ -48,13 +48,18 @@ export default function DashboardPage() {
                 // 2. Compatibility Filter
                 if (!user.blood_group || !req.blood_group) return false;
 
-                return isBloodCompatible(user.blood_group, req.blood_group);
+                if (!isBloodCompatible(user.blood_group, req.blood_group)) return false;
+
+                // 3. Already Offered Filter (Don't show in "Recommended" if already acted on)
+                if (myDonations.has(req.id)) return false;
+
+                return true;
             });
             setSmartMatches(matches);
         } else {
             setSmartMatches([]);
         }
-    }, [requests, user]);
+    }, [requests, user, myDonations]);
 
     const fetchUserStats = async () => {
         if (!user) return;

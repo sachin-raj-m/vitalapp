@@ -7,6 +7,7 @@ import { useAuth } from './AuthContext';
 
 interface RequestsContextType {
     requests: BloodRequest[]; // Active requests
+    myDonations: Set<string>; // IDs of requests user has offered to donate to
     loading: boolean;
     error: Error | null;
     refreshRequests: () => Promise<void>;
@@ -17,6 +18,7 @@ const RequestsContext = createContext<RequestsContextType | undefined>(undefined
 export function RequestsProvider({ children }: { children: React.ReactNode }) {
     const { user } = useAuth(); // We might need user for RLS, or generally to trigger fetch on auth change
     const [requests, setRequests] = useState<BloodRequest[]>([]);
+    const [myDonations, setMyDonations] = useState<Set<string>>(new Set());
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<Error | null>(null);
 
@@ -35,13 +37,29 @@ export function RequestsProvider({ children }: { children: React.ReactNode }) {
             if (supabaseError) throw supabaseError;
 
             setRequests(data as BloodRequest[] || []);
+
+            // Also fetch user's donations if logged in
+            if (user) {
+                const { data: donationData, error: donationError } = await supabase
+                    .from('donations')
+                    .select('request_id')
+                    .eq('donor_id', user.id)
+                    .neq('status', 'cancelled'); // Active offers only
+
+                if (!donationError && donationData) {
+                    setMyDonations(new Set(donationData.map(d => d.request_id)));
+                }
+            } else {
+                setMyDonations(new Set());
+            }
+
         } catch (err: any) {
             console.error('Error in RequestsContext:', err);
             setError(err);
         } finally {
             setLoading(false);
         }
-    }, []);
+    }, [user]); // Re-fetch when user changes
 
     // Fetch on mount or when user changes (e.g. login/logout could change RLS visibility)
     useEffect(() => {
@@ -66,6 +84,7 @@ export function RequestsProvider({ children }: { children: React.ReactNode }) {
 
     const value = {
         requests,
+        myDonations,
         loading,
         error,
         refreshRequests: fetchRequests
