@@ -260,9 +260,26 @@ export function MyRequestsContent() {
                                             </div>
 
                                             {!isPast && (
-                                                <p className="text-xs text-gray-400 mt-1">
-                                                    {new Date(request.created_at).toLocaleDateString()}
-                                                </p>
+                                                <div className="mt-3 flex flex-wrap gap-4 text-sm bg-gray-50 p-3 rounded-lg border border-gray-100">
+                                                    <div className="flex flex-col">
+                                                        <span className="text-gray-500 text-xs uppercase font-semibold">Units Required</span>
+                                                        <span className="font-medium text-gray-900">{request.units_needed} Units</span>
+                                                    </div>
+                                                    <div className="flex flex-col">
+                                                        <span className="text-gray-500 text-xs uppercase font-semibold">Collected</span>
+                                                        <span className="font-medium text-success-600">{fulfilledUnits} Units</span>
+                                                    </div>
+                                                    {request.date_needed && (
+                                                        <div className="flex flex-col">
+                                                            <span className="text-gray-500 text-xs uppercase font-semibold">Date Needed</span>
+                                                            <span className="font-medium text-gray-900">{new Date(request.date_needed).toLocaleDateString()}</span>
+                                                        </div>
+                                                    )}
+                                                    <div className="flex flex-col md:hidden">
+                                                        <span className="text-gray-500 text-xs uppercase font-semibold">Date Posted</span>
+                                                        <span className="font-medium text-gray-900">{new Date(request.created_at).toLocaleDateString()}</span>
+                                                    </div>
+                                                </div>
                                             )}
 
                                             {isPast && (
@@ -351,7 +368,7 @@ export function MyRequestsContent() {
                                                                 <CheckCircle className="h-4 w-4 mr-1" /> {donation.units_donated || 1} Unit(s) Verified
                                                             </span>
                                                         ) : (
-                                                            <Badge variant="neutral">{donation.status}</Badge>
+                                                            <Badge variant="neutral">{donation.status === 'cancelled' ? 'Withdrawn' : donation.status}</Badge>
                                                         )}
                                                     </div>
                                                 </div>
