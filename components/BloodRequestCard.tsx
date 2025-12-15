@@ -12,6 +12,7 @@ import { isBloodCompatible } from '@/lib/blood-compatibility';
 interface BloodRequestCardProps {
   request: BloodRequest;
   onRespond?: () => void;
+  onPendingClick?: () => void; // New prop for handling pending state click
   userBloodGroup?: BloodGroup;
   hasOffered?: boolean;
   isOwnRequest?: boolean;
@@ -128,8 +129,14 @@ export const BloodRequestCard: React.FC<BloodRequestCardProps> = ({ request, onR
               ) : onRespond && (
                 <>
                   {hasOffered ? (
-                    <Button variant="outline" size="sm" disabled className="text-gray-500 border-gray-200 bg-gray-50">
-                      Offer Sent
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={onPendingClick || onRespond} // Fallback to onRespond if onPendingClick not provided
+                      className="text-white bg-orange-500 hover:bg-orange-600 border-transparent shadow-sm flex items-center gap-1"
+                    >
+                      <Clock className="w-4 h-4" />
+                      Complete Donation
                     </Button>
                   ) : userBloodGroup && !isBloodCompatible(userBloodGroup, request.blood_group) ? (
                     <Button variant="outline" size="sm" disabled className="text-red-400 border-red-100 bg-red-50 cursor-not-allowed w-full sm:w-auto">

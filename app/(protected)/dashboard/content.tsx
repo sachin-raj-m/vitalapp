@@ -121,6 +121,16 @@ export default function DashboardPage() {
 
     const eligibility = getEligibilityStatus();
 
+    // Helper to show PIN for pending donations
+    const handlePendingClick = (request: BloodRequest) => {
+        // For dashboard, we might not have the PIN modal logic readily available without duplicating code.
+        // Option 1: Redirect to /requests where the modal exists.
+        // Option 2: Simple alert (not great).
+        // Option 3: Lift modal state (too complex for now).
+        // Decision: Redirect to main requests page for "Complete Donation", which feels natural as "Next Step".
+        router.push('/requests');
+    };
+
     if (isLoading) {
         return (
             <div className="flex items-center justify-center min-h-[60vh]">
@@ -230,6 +240,7 @@ export default function DashboardPage() {
                                 // Simple view only, detailed interaction happens on click or reuse existing logic if needed
                                 // Passing props to enable interaction if we want "Quick Donate"
                                 onRespond={() => router.push('/requests')} // Redirect to main page for full flow or keep it simple
+                                onPendingClick={() => handlePendingClick(request)}
                                 userBloodGroup={user?.blood_group}
                                 hasOffered={myDonations.has(request.id)}
                                 isOwnRequest={request.user_id === user?.id} // Defensive: Ensure own requests are marked

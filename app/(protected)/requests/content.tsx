@@ -97,6 +97,16 @@ export default function RequestsPage() {
         }
     };
 
+    const handlePendingClick = (request: BloodRequest) => {
+        // Re-open the PIN/Success modal for this request
+        if (!user || !user.donor_pin) return;
+        setOtpModal({
+            isOpen: true,
+            pin: user.donor_pin,
+            hospitalName: request.hospital_name
+        });
+    };
+
     const handleCreatePin = async () => {
         if (!user || newPin.length !== 4) return;
         setCreatingPin(true);
@@ -255,6 +265,7 @@ export default function RequestsPage() {
                                         ? undefined
                                         : () => handleDonateClick(request)
                                 }
+                                onPendingClick={() => handlePendingClick(request)}
                                 userBloodGroup={user?.blood_group}
                                 hasOffered={myDonations.has(request.id)}
                                 isOwnRequest={user?.id === request.user_id}
