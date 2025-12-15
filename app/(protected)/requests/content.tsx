@@ -35,7 +35,8 @@ export default function RequestsPage() {
     const [filters, setFilters] = useState({
         bloodGroup: 'all',
         urgency: 'all',
-        location: ''
+        city: '',
+        zipcode: ''
     });
 
     // Determine loading state (only for initial load)
@@ -51,11 +52,17 @@ export default function RequestsPage() {
         if (filters.urgency !== 'all') {
             result = result.filter(r => r.urgency_level === filters.urgency);
         }
-        if (filters.location) {
-            const loc = filters.location.toLowerCase();
+        if (filters.city) {
+            const searchCity = filters.city.toLowerCase();
             result = result.filter(r =>
-                r.hospital_name.toLowerCase().includes(loc) ||
-                r.hospital_address.toLowerCase().includes(loc)
+                (r.city && r.city.toLowerCase().includes(searchCity)) ||
+                (r.hospital_address && r.hospital_address.toLowerCase().includes(searchCity))
+            );
+        }
+        if (filters.zipcode) {
+            result = result.filter(r =>
+                (r.zipcode && r.zipcode.includes(filters.zipcode)) ||
+                (r.hospital_address && r.hospital_address.includes(filters.zipcode))
             );
         }
 
@@ -197,7 +204,7 @@ export default function RequestsPage() {
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <Select
                     label="Blood Group"
                     value={filters.bloodGroup}
@@ -230,10 +237,16 @@ export default function RequestsPage() {
                     ]}
                 />
                 <Input
-                    label="Location"
-                    placeholder="Enter city or zip code"
-                    value={filters.location}
-                    onChange={(e) => setFilters(prev => ({ ...prev, location: e.target.value }))}
+                    label="City"
+                    placeholder="Enter city"
+                    value={filters.city}
+                    onChange={(e) => setFilters(prev => ({ ...prev, city: e.target.value }))}
+                />
+                <Input
+                    label="Zip Code"
+                    placeholder="Enter zip code"
+                    value={filters.zipcode}
+                    onChange={(e) => setFilters(prev => ({ ...prev, zipcode: e.target.value }))}
                 />
             </div>
 

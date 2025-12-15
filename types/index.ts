@@ -38,6 +38,8 @@ export interface BloodRequest {
     latitude: number;
     longitude: number;
   };
+  city?: string;
+  zipcode?: string;
   status: 'active' | 'fulfilled' | 'cancelled';
   created_at: string;
   updated_at: string;
