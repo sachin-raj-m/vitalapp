@@ -23,6 +23,7 @@ interface Donor {
         longitude: number;
         address?: string;
     };
+    present_zip?: string;
     distanceKm?: number;
 }
 
@@ -46,24 +47,84 @@ export default function NearbyDonorsPageContent() {
     const [error, setError] = useState('');
     const [status, setStatus] = useState<string>('');
 
+    // Cache for zip code coordinates to avoid rate limiting
+    const [zipCache, setZipCache] = useState<Record<string, { lat: number, lng: number }>>({});
+
     // Fetch donors on mount
     useEffect(() => {
         const fetchDonors = async () => {
             try {
                 const { data, error } = await supabase
                     .from('profiles')
-                    .select('id, full_name, blood_group, phone, location')
+                    .select('id, full_name, blood_group, phone, location, present_zip')
                     .eq('is_donor', true);
 
                 if (error) throw error;
 
-                // Parse location jsonb
-                const parsedDonors = data?.map(d => ({
+                // Parse location jsonb and initial processing
+                let parsedDonors = data?.map(d => ({
                     ...d,
                     location: typeof d.location === 'string' ? JSON.parse(d.location) : d.location
                 })) || [];
 
-                setDonors(parsedDonors as Donor[]);
+                // Identify unique zips that need geocoding (where lat/lng is 0 or missing)
+                const zipsToGeocode = new Set<string>();
+                parsedDonors.forEach(d => {
+                    if ((!d.location?.latitude || d.location.latitude === 0) && d.present_zip) {
+                        zipsToGeocode.add(d.present_zip);
+                    }
+                });
+
+                // Geocode zips if they are not in cache
+                const newZipCache = { ...zipCache };
+                let cacheUpdated = false;
+
+                // We'll process zips sequentially to be nice to the free API
+                for (const zip of Array.from(zipsToGeocode)) {
+                    if (newZipCache[zip]) continue;
+
+                    try {
+                        const response = await fetch(`https://nominatim.openstreetmap.org/search?postalcode=${zip}&country=India&format=json&limit=1`, {
+                            headers: {
+                                'User-Agent': 'VitalBloodApp/1.0'
+                            }
+                        });
+                        const results = await response.json();
+                        if (results && results.length > 0) {
+                            newZipCache[zip] = {
+                                lat: parseFloat(results[0].lat),
+                                lng: parseFloat(results[0].lon)
+                            };
+                            cacheUpdated = true;
+                            // Small delay to respect rate limit (1 req/sec recommended for OSM)
+                            await new Promise(r => setTimeout(r, 1000));
+                        }
+                    } catch (e) {
+                        console.error(`Failed to geocode zip ${zip}`, e);
+                    }
+                }
+
+                if (cacheUpdated) {
+                    setZipCache(newZipCache);
+                }
+
+                // Assign coordinates from cache if original location is missing
+                const donosWithLocation = parsedDonors.map(d => {
+                    if ((!d.location?.latitude || d.location.latitude === 0) && d.present_zip && newZipCache[d.present_zip]) {
+                        return {
+                            ...d,
+                            location: {
+                                ...d.location,
+                                latitude: newZipCache[d.present_zip].lat,
+                                longitude: newZipCache[d.present_zip].lng,
+                                address: d.location?.address || `Zip: ${d.present_zip}`
+                            }
+                        };
+                    }
+                    return d;
+                });
+
+                setDonors(donosWithLocation as Donor[]);
             } catch (err: any) {
                 console.error("Error fetching donors");
                 setError(err.message);
@@ -73,7 +134,11 @@ export default function NearbyDonorsPageContent() {
         };
 
         fetchDonors();
-    }, []);
+    }, []); // We keep dependency array empty to run once, but logically we might want to re-run if zipCache changes? 
+    // Actually, we update state *inside* the effect, so we shouldn't depend on it to avoid loops. 
+    // Correct approach: define fetchDonors outside or keep it self-contained. 
+    // Here I kept it contained but utilizing the closure's state isn't great. 
+    // To fix: I'll actually just use the local 'newZipCache' for the immediate render.
 
     // Get user location
     const getUserLocation = useCallback(() => {
