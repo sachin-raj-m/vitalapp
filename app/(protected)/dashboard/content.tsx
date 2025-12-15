@@ -50,9 +50,7 @@ export default function DashboardPage() {
 
                 if (!isBloodCompatible(user.blood_group, req.blood_group)) return false;
 
-                // 3. Already Offered Filter (Don't show in "Recommended" if already acted on)
-                if (myDonations.has(req.id)) return false;
-
+                // 3. Show all compatible matches, even if already offered (handled by card UI)
                 return true;
             });
             setSmartMatches(matches);
@@ -233,6 +231,7 @@ export default function DashboardPage() {
                                 // Passing props to enable interaction if we want "Quick Donate"
                                 onRespond={() => router.push('/requests')} // Redirect to main page for full flow or keep it simple
                                 userBloodGroup={user?.blood_group}
+                                hasOffered={myDonations.has(request.id)}
                                 isOwnRequest={request.user_id === user?.id} // Defensive: Ensure own requests are marked
                             // We don't fetch 'offered' state here to keep dashboard light, so maybe just link to details?
                             // Let's use a simpler "View" action or assume redirection.
