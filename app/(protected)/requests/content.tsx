@@ -24,11 +24,11 @@ import { useRequests } from '@/context/RequestsContext';
 
 export default function RequestsPage() {
     const { user, refreshProfile } = useAuth();
-    const { requests: allRequests, loading: requestsLoading } = useRequests();
+    const { requests: allRequests, myDonations, refreshRequests, loading: requestsLoading } = useRequests();
 
     // Local state for UI
     const [filteredRequests, setFilteredRequests] = useState<BloodRequest[]>([]);
-    const [offeredRequestIds, setOfferedRequestIds] = useState<Set<string>>(new Set());
+    // Removed local offeredRequestIds, using myDonations from context
     const [viewMode, setViewMode] = useState<'list' | 'map'>('list');
     const [error, setError] = useState('');
 
@@ -62,24 +62,9 @@ export default function RequestsPage() {
         setFilteredRequests(result);
     }, [allRequests, filters]);
 
-    useEffect(() => {
-        if (user) {
-            fetchMyDonations();
-        }
-    }, [user]);
+    // Removed fetchMyDonations effect as it's now in context
 
-    const fetchMyDonations = async () => {
-        if (!user) return;
-        const { data } = await supabase
-            .from('donations')
-            .select('request_id')
-            .eq('donor_id', user.id)
-            .neq('status', 'cancelled'); // Only count active offers
-
-        if (data) {
-            setOfferedRequestIds(new Set(data.map(d => d.request_id)));
-        }
-    };
+    // Removed fetchMyDonations function
 
     // Removed old fetchRequests function
 
@@ -162,8 +147,8 @@ export default function RequestsPage() {
             // Close confirm modal and open Success modal
             setConfirmModal({ isOpen: false, request: null });
 
-            // Update local state to show "Offer Sent" immediately
-            setOfferedRequestIds(prev => new Set(prev).add(confirmModal.request!.id));
+            // Trigger global refresh to update "Offer Sent" and Analytics
+            await refreshRequests();
 
             setOtpModal({ isOpen: true, pin, hospitalName: confirmModal.request.hospital_name });
         } catch (err: any) {
@@ -271,7 +256,7 @@ export default function RequestsPage() {
                                         : () => handleDonateClick(request)
                                 }
                                 userBloodGroup={user?.blood_group}
-                                hasOffered={offeredRequestIds.has(request.id)}
+                                hasOffered={myDonations.has(request.id)}
                                 isOwnRequest={user?.id === request.user_id}
                             />
                         ))
