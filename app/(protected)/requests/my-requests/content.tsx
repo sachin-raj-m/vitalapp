@@ -215,13 +215,13 @@ export function MyRequestsContent() {
                                             <div className="w-32 mt-1">
                                                 <div className="flex justify-between text-xs text-gray-500 mb-1">
                                                     <span>Collected</span>
-                                                    <span>{request.donations.filter(d => d.status === 'completed').reduce((sum, d) => sum + (d.units_donated || 0), 0)} / {request.units_needed}</span>
+                                                    <span>{request.donations.filter(d => d.status === 'completed').reduce((sum, d) => sum + (d.units_donated || 1), 0)} / {request.units_needed}</span>
                                                 </div>
                                                 <div className="h-1.5 w-full bg-gray-100 rounded-full overflow-hidden">
                                                     <div
                                                         className="h-full bg-green-500 rounded-full"
                                                         style={{
-                                                            width: `${Math.min(100, (request.donations.filter(d => d.status === 'completed').reduce((sum, d) => sum + (d.units_donated || 0), 0) / request.units_needed) * 100)}%`
+                                                            width: `${Math.min(100, (request.donations.filter(d => d.status === 'completed').reduce((sum, d) => sum + (d.units_donated || 1), 0) / request.units_needed) * 100)}%`
                                                         }}
                                                     />
                                                 </div>
@@ -258,7 +258,7 @@ export function MyRequestsContent() {
                                                                 donationId: donation.id,
                                                                 requestId: request.id,
                                                                 donorName: donation.profiles?.full_name,
-                                                                maxUnits: request.units_needed - request.donations.filter(d => d.status === 'completed').reduce((sum, d) => sum + (d.units_donated || 0), 0)
+                                                                maxUnits: request.units_needed - request.donations.filter(d => d.status === 'completed').reduce((sum, d) => sum + (d.units_donated || 1), 0)
                                                             })}
                                                         >
                                                             Verify PIN
