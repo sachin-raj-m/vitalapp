@@ -40,7 +40,9 @@ export default function CreateRequestPage() {
             latitude: 0,
             longitude: 0,
             address: ''
-        }
+        },
+        city: '',
+        zipcode: ''
     });
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -64,6 +66,8 @@ export default function CreateRequestPage() {
                     contact_name: formData.contactName,
                     contact_phone: formData.contactPhone,
                     location: formData.location,
+                    city: formData.city,
+                    zipcode: formData.zipcode,
                     status: 'active'
                 });
 
