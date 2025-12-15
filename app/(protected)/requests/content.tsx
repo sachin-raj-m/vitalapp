@@ -35,8 +35,7 @@ export default function RequestsPage() {
     const [filters, setFilters] = useState({
         bloodGroup: 'all',
         urgency: 'all',
-        city: '',
-        zipcode: ''
+        locationSearch: ''
     });
 
     // Determine loading state (only for initial load)
@@ -52,17 +51,12 @@ export default function RequestsPage() {
         if (filters.urgency !== 'all') {
             result = result.filter(r => r.urgency_level === filters.urgency);
         }
-        if (filters.city) {
-            const searchCity = filters.city.toLowerCase();
+        if (filters.locationSearch) {
+            const search = filters.locationSearch.toLowerCase();
             result = result.filter(r =>
-                (r.city && r.city.toLowerCase().includes(searchCity)) ||
-                (r.hospital_address && r.hospital_address.toLowerCase().includes(searchCity))
-            );
-        }
-        if (filters.zipcode) {
-            result = result.filter(r =>
-                (r.zipcode && r.zipcode.includes(filters.zipcode)) ||
-                (r.hospital_address && r.hospital_address.includes(filters.zipcode))
+                (r.city && r.city.toLowerCase().includes(search)) ||
+                (r.zipcode && r.zipcode.includes(search)) ||
+                (r.hospital_address && r.hospital_address.toLowerCase().includes(search))
             );
         }
 
@@ -236,18 +230,14 @@ export default function RequestsPage() {
                         { value: 'Low', label: 'Low' },
                     ]}
                 />
-                <Input
-                    label="City"
-                    placeholder="Enter city"
-                    value={filters.city}
-                    onChange={(e) => setFilters(prev => ({ ...prev, city: e.target.value }))}
-                />
-                <Input
-                    label="Zip Code"
-                    placeholder="Enter zip code"
-                    value={filters.zipcode}
-                    onChange={(e) => setFilters(prev => ({ ...prev, zipcode: e.target.value }))}
-                />
+                <div className="md:col-span-2">
+                    <Input
+                        label="Search Location"
+                        placeholder="Search by City, Zip Code, or Hospital"
+                        value={filters.locationSearch}
+                        onChange={(e) => setFilters(prev => ({ ...prev, locationSearch: e.target.value }))}
+                    />
+                </div>
             </div>
 
             {error && (

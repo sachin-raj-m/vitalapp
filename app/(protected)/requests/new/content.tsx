@@ -160,6 +160,23 @@ export default function CreateRequestPage() {
                             required
                         />
 
+                        <div className="grid md:grid-cols-2 gap-4">
+                            <Input
+                                label="City"
+                                value={formData.city}
+                                onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                                required
+                                placeholder="e.g. Bangalore"
+                            />
+                            <Input
+                                label="Zip Code"
+                                value={formData.zipcode}
+                                onChange={(e) => setFormData({ ...formData, zipcode: e.target.value })}
+                                required
+                                placeholder="e.g. 560001"
+                            />
+                        </div>
+
                         <Select
                             label="Urgency Level"
                             value={formData.urgencyLevel}
