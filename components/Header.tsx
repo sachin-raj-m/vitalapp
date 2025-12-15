@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Button } from './ui/Button';
 import { useAuth } from '../context/AuthContext';
 import { LogIn, User, HeartPulse, Menu, X } from 'lucide-react';
+import { NotificationBell } from './NotificationBell';
 
 export function Header() {
   const { user } = useAuth();
@@ -42,6 +43,7 @@ export function Header() {
                 {user.role === 'admin' && (
                   <Link href="/admin" className="text-red-600 font-medium hover:text-red-700">Admin Console</Link>
                 )}
+                <NotificationBell />
                 <Link href="/profile">
                   <Button variant="ghost" className="p-2">
                     <User className="h-5 w-5" />
