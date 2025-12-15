@@ -1,6 +1,6 @@
 import React from 'react';
 import { formatDistanceToNow } from 'date-fns';
-import { MapPin, Clock, Activity, Droplet } from 'lucide-react';
+import { MapPin, Clock, Activity, Droplet, Calendar } from 'lucide-react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { Card, CardBody } from './ui/Card';
@@ -114,6 +114,12 @@ export const BloodRequestCard: React.FC<BloodRequestCardProps> = ({ request, onR
                 <Clock className="h-4 w-4 mr-1 text-gray-400" />
                 <span>Posted {timeAgo}</span>
               </div>
+              {request.date_needed && (
+                <div className="flex items-center text-sm text-gray-500">
+                  <Calendar className="h-4 w-4 mr-1 text-gray-400" />
+                  <span>Needed by {new Date(request.date_needed).toLocaleDateString()}</span>
+                </div>
+              )}
               {request.notes && (
                 <p className="text-sm text-gray-700 mt-2 bg-gray-50 p-2 rounded">
                   "{request.notes}"
