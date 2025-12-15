@@ -30,6 +30,7 @@ export default function CreateRequestPage() {
     const [formData, setFormData] = useState({
         bloodGroup: '' as BloodGroup,
         unitsNeeded: 1,
+        dateNeeded: '',
         hospitalName: '',
         hospitalAddress: '',
         urgencyLevel: '' as UrgencyLevel,
@@ -59,6 +60,7 @@ export default function CreateRequestPage() {
                     user_id: user.id,
                     blood_group: formData.bloodGroup,
                     units_needed: formData.unitsNeeded,
+                    date_needed: formData.dateNeeded,
                     hospital_name: formData.hospitalName,
                     hospital_address: formData.hospitalAddress,
                     urgency_level: formData.urgencyLevel,
@@ -142,6 +144,15 @@ export default function CreateRequestPage() {
                                 min={1}
                                 value={formData.unitsNeeded}
                                 onChange={(e) => setFormData({ ...formData, unitsNeeded: parseInt(e.target.value) })}
+                                required
+                            />
+
+                            <Input
+                                type="date"
+                                label="Date Needed"
+                                value={formData.dateNeeded}
+                                min={new Date().toISOString().split('T')[0]}
+                                onChange={(e) => setFormData({ ...formData, dateNeeded: e.target.value })}
                                 required
                             />
                         </div>

@@ -275,6 +275,12 @@ export function MyRequestsContent() {
                                                         <span className="text-gray-500 text-xs uppercase font-semibold">Units Received</span>
                                                         <span className="font-medium text-success-600">{fulfilledUnits} Units</span>
                                                     </div>
+                                                    {request.date_needed && (
+                                                        <div className="flex flex-col">
+                                                            <span className="text-gray-500 text-xs uppercase font-semibold">Date Needed</span>
+                                                            <span className="font-medium text-gray-900">{new Date(request.date_needed).toLocaleDateString()}</span>
+                                                        </div>
+                                                    )}
                                                     <div className="flex flex-col md:hidden">
                                                         <span className="text-gray-500 text-xs uppercase font-semibold">Date Posted</span>
                                                         <span className="font-medium text-gray-900">{new Date(request.created_at).toLocaleDateString()}</span>
