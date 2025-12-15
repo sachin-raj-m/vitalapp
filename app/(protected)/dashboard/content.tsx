@@ -13,6 +13,7 @@ import { supabase } from '@/lib/supabase';
 import type { BloodRequest } from '@/types';
 import { isBloodCompatible } from '@/lib/blood-compatibility';
 import { formatDistanceToNow, addDays, differenceInDays } from 'date-fns';
+import { DashboardSkeleton } from '@/components/skeletons/DashboardSkeleton';
 
 import { useRequests } from '@/context/RequestsContext';
 
@@ -132,11 +133,7 @@ export default function DashboardPage() {
     };
 
     if (isLoading) {
-        return (
-            <div className="flex items-center justify-center min-h-[60vh]">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500"></div>
-            </div>
-        );
+        return <DashboardSkeleton />;
     }
 
     return (
