@@ -71,7 +71,7 @@ const getBloodTypeColor = (bloodType: BloodGroup) => {
   }
 };
 
-export const BloodRequestCard: React.FC<BloodRequestCardProps> = ({ request, onRespond, userBloodGroup, hasOffered, isOwnRequest }) => {
+export const BloodRequestCard: React.FC<BloodRequestCardProps> = ({ request, onRespond, onPendingClick, userBloodGroup, hasOffered, isOwnRequest }) => {
   const { badgeVariant, cardBorder, animation } = getUrgencyStyles(request.urgency_level);
   const bloodTypeClass = getBloodTypeColor(request.blood_group);
   const timeAgo = formatDistanceToNow(new Date(request.created_at), { addSuffix: true });
