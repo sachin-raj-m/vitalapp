@@ -111,6 +111,7 @@ export default function NearbyDonorsPageContent() {
                 // Assign coordinates from cache if original location is missing
                 const donosWithLocation = parsedDonors.map(d => {
                     if ((!d.location?.latitude || d.location.latitude === 0) && d.present_zip && newZipCache[d.present_zip]) {
+                        console.log(`Assigning location for ${d.full_name} from zip ${d.present_zip}`);
                         return {
                             ...d,
                             location: {
@@ -124,9 +125,10 @@ export default function NearbyDonorsPageContent() {
                     return d;
                 });
 
+                console.log('Processed Donors:', donosWithLocation);
                 setDonors(donosWithLocation as Donor[]);
             } catch (err: any) {
-                console.error("Error fetching donors");
+                console.error("Error fetching donors", err);
                 setError(err.message);
             } finally {
                 setLoading(false);
@@ -164,7 +166,11 @@ export default function NearbyDonorsPageContent() {
     // Calculate distances when center or donors change
     useEffect(() => {
         // Filter out donors with invalid location
-        const validDonors = donors.filter(d => d.location && d.location.latitude && d.location.longitude);
+        const validDonors = donors.filter(d =>
+            d.location &&
+            d.location.latitude !== undefined && d.location.latitude !== null &&
+            d.location.longitude !== undefined && d.location.longitude !== null
+        );
 
         const withDistance = validDonors.map(d => {
             const dist = haversineDistanceKm(center.lat, center.lng, d.location.latitude, d.location.longitude);
