@@ -76,7 +76,7 @@ export default function DashboardPage() {
 
                     return isBloodCompatible(user.blood_group, req.blood_group);
                 });
-                setSmartMatches(matches.slice(0, 3)); // Show top 3 matches
+                setSmartMatches(matches); // Show all matches
             }
 
         } catch (error) {
@@ -210,7 +210,7 @@ export default function DashboardPage() {
                         Recommended for You
                     </h2>
                     <Link href="/requests" className="text-primary-600 hover:text-primary-700 text-sm font-medium">
-                        View All Requests
+                        See All Requests
                     </Link>
                 </div>
 
@@ -231,11 +231,6 @@ export default function DashboardPage() {
                             // Let's pass a dummy onRespond that navigates to requests page to be safe
                             />
                         ))}
-                        <div className="text-center pt-2">
-                            <Link href="/requests">
-                                <Button variant="ghost" size="sm">See all compatible requests</Button>
-                            </Link>
-                        </div>
                     </div>
                 ) : (
                     <Card className="bg-gray-50 border-dashed">
