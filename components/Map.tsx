@@ -67,6 +67,18 @@ function LocationMarker({
     );
 }
 
+// Component to handle map center updates
+function MapUpdater({ center, zoom }: { center: Location, zoom: number }) {
+    const map = useMapEvents({});
+    useEffect(() => {
+        map.flyTo([center.lat, center.lng], zoom, {
+            animate: true,
+            duration: 1.5
+        });
+    }, [center, zoom, map]);
+    return null;
+}
+
 export default function Map({
     center = { lat: 20.5937, lng: 78.9629 }, // Default to India
     zoom = 5,
@@ -77,7 +89,7 @@ export default function Map({
 }: MapProps) {
     return (
         <MapContainer
-            center={selectedPosition ? [selectedPosition.lat, selectedPosition.lng] : [center.lat, center.lng]}
+            center={[center.lat, center.lng]}
             zoom={zoom}
             scrollWheelZoom={true}
             style={{ height: '100%', width: '100%', minHeight: '400px', borderRadius: '0.5rem' }}
@@ -86,6 +98,8 @@ export default function Map({
                 attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                 url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
             />
+
+            <MapUpdater center={center} zoom={zoom} />
 
             {markers.map((marker, idx) => (
                 <Marker key={idx} position={[marker.position.lat, marker.position.lng]}>
