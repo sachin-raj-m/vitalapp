@@ -256,7 +256,8 @@ export default function NearbyDonorsPageContent() {
                             nearbyDonors.map(donor => (
                                 <div
                                     key={donor.id}
-                                    className="group flex items-center p-3 rounded-xl border border-gray-100 hover:border-primary-100 hover:bg-primary-50/30 transition-all duration-200 cursor-default"
+                                    onClick={() => setCenter({ lat: donor.location.latitude, lng: donor.location.longitude })}
+                                    className="group flex items-center p-3 rounded-xl border border-gray-100 hover:border-primary-100 hover:bg-primary-50/30 transition-all duration-200 cursor-pointer"
                                 >
                                     {/* Avatar */}
                                     <div className="h-12 w-12 rounded-full bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center text-gray-500 font-bold text-lg shadow-inner flex-shrink-0">
