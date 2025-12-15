@@ -66,11 +66,16 @@ export default function DashboardPage() {
 
             // Calculate Smart Matches (Compatible Blood Types)
             if (requests && user.blood_group) {
-                const matches = requests.filter(req =>
-                    // Filter: Compatible AND Not Own Request
-                    isBloodCompatible(user.blood_group, req.blood_group) &&
-                    req.user_id !== user.id
-                );
+                const matches = requests.filter(req => {
+                    // 1. Own Request Filter
+                    if (req.user_id === user.id) return false;
+
+                    // 2. Compatibility Filter
+                    // Ensure valid blood groups before checking
+                    if (!user.blood_group || !req.blood_group) return false;
+
+                    return isBloodCompatible(user.blood_group, req.blood_group);
+                });
                 setSmartMatches(matches.slice(0, 3)); // Show top 3 matches
             }
 
@@ -219,6 +224,7 @@ export default function DashboardPage() {
                                 // Passing props to enable interaction if we want "Quick Donate"
                                 onRespond={() => router.push('/requests')} // Redirect to main page for full flow or keep it simple
                                 userBloodGroup={user?.blood_group}
+                                isOwnRequest={request.user_id === user?.id} // Defensive: Ensure own requests are marked
                             // We don't fetch 'offered' state here to keep dashboard light, so maybe just link to details?
                             // Let's use a simpler "View" action or assume redirection.
                             // Actually better to render it fully but disable complex tailored logic to avoid overhead?
