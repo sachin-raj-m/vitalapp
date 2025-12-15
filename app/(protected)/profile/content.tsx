@@ -69,10 +69,10 @@ export default function ProfilePage() {
             if (error) throw error;
             setProfile(data);
             setEditForm({
-                full_name: data.full_name,
-                phone: data.phone,
-                is_available: data.is_available,
-                address: data.location.address
+                full_name: data.full_name || '',
+                phone: data.phone || '',
+                is_available: data.is_available || false,
+                address: data.location?.address || ''
             });
         } catch (err: any) {
             console.error('Error loading profile');
@@ -202,68 +202,70 @@ export default function ProfilePage() {
                             <div className="flex items-center space-x-4 text-gray-600 mt-2">
                                 <div className="flex items-center">
                                     <Droplet className="h-4 w-4 mr-1" />
-                                    {profile?.blood_group}
+                                    {profile?.blood_group || 'N/A'}
                                 </div>
                                 <div className="flex items-center">
                                     <MapPin className="h-4 w-4 mr-1" />
-                                    {profile?.location.address || 'No address set'}
+                                    {profile?.location?.address || 'No address set'}
                                 </div>
                             </div>
-                        </div>
-                    </div>
-                </CardBody>
-            </Card>
+                        </div >
+                    </div >
+                </CardBody >
+            </Card >
 
             {/* Edit Form */}
-            {isEditing && (
-                <Card>
-                    <CardHeader>
-                        <h2 className="text-xl font-semibold">Edit Profile</h2>
-                    </CardHeader>
-                    <CardBody>
-                        <form onSubmit={handleEdit} className="space-y-4">
-                            <Input
-                                label="Full Name"
-                                value={editForm.full_name}
-                                onChange={(e) => setEditForm({ ...editForm, full_name: e.target.value })}
-                                required
-                            />
-                            <Input
-                                label="Phone"
-                                value={editForm.phone}
-                                onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
-                                required
-                            />
-                            <Input
-                                label="Address"
-                                value={editForm.address}
-                                onChange={(e) => setEditForm({ ...editForm, address: e.target.value })}
-                                required
-                            />
-                            <div className="flex items-center space-x-2">
-                                <input
-                                    type="checkbox"
-                                    id="is_available"
-                                    checked={editForm.is_available}
-                                    onChange={(e) => setEditForm({ ...editForm, is_available: e.target.checked })}
-                                    className="rounded border-gray-300 text-primary-500 focus:ring-primary-500"
+            {
+                isEditing && (
+                    <Card>
+                        <CardHeader>
+                            <h2 className="text-xl font-semibold">Edit Profile</h2>
+                        </CardHeader>
+                        <CardBody>
+                            <form onSubmit={handleEdit} className="space-y-4">
+                                <Input
+                                    label="Full Name"
+                                    value={editForm.full_name}
+                                    onChange={(e) => setEditForm({ ...editForm, full_name: e.target.value })}
+                                    required
                                 />
-                                <label htmlFor="is_available" className="text-sm text-gray-700">
-                                    Available for donation
-                                </label>
-                            </div>
-                            <div className="flex space-x-4">
-                                <Button type="submit" variant="primary">
-                                    Save Changes
-                                </Button>
-                                <Button type="button" variant="secondary" onClick={() => setIsEditing(false)}>
-                                    Cancel
-                                </Button>
-                            </div>
-                        </form>
-                    </CardBody>
-                </Card>
-            )}
+                                <Input
+                                    label="Phone"
+                                    value={editForm.phone}
+                                    onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
+                                    required
+                                />
+                                <Input
+                                    label="Address"
+                                    value={editForm.address}
+                                    onChange={(e) => setEditForm({ ...editForm, address: e.target.value })}
+                                    required
+                                />
+                                <div className="flex items-center space-x-2">
+                                    <input
+                                        type="checkbox"
+                                        id="is_available"
+                                        checked={editForm.is_available}
+                                        onChange={(e) => setEditForm({ ...editForm, is_available: e.target.checked })}
+                                        className="rounded border-gray-300 text-primary-500 focus:ring-primary-500"
+                                    />
+                                    <label htmlFor="is_available" className="text-sm text-gray-700">
+                                        Available for donation
+                                    </label>
+                                </div>
+                                <div className="flex space-x-4">
+                                    <Button type="submit" variant="primary">
+                                        Save Changes
+                                    </Button>
+                                    <Button type="button" variant="secondary" onClick={() => setIsEditing(false)}>
+                                        Cancel
+                                    </Button>
+                                </div>
+                            </form>
+                        </CardBody>
+                    </Card>
+                )
+            }
 
             {/* Contact Information */}
             <Card>
@@ -349,23 +351,25 @@ export default function ProfilePage() {
             </Card>
 
             {/* Achievements */}
-            {stats?.achievements.length ? (
-                <Card>
-                    <CardHeader>
-                        <h2 className="text-xl font-semibold">Achievements</h2>
-                    </CardHeader>
-                    <CardBody>
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                            {stats.achievements.map((achievement, index) => (
-                                <div key={index} className="text-center p-4 bg-gray-50 rounded-lg">
-                                    <Award className="h-6 w-6 text-primary-500 mx-auto mb-2" />
-                                    <div className="text-sm font-medium text-gray-900">{achievement}</div>
-                                </div>
-                            ))}
-                        </div>
-                    </CardBody>
-                </Card>
-            ) : null}
+            {
+                stats?.achievements.length ? (
+                    <Card>
+                        <CardHeader>
+                            <h2 className="text-xl font-semibold">Achievements</h2>
+                        </CardHeader>
+                        <CardBody>
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                {stats.achievements.map((achievement, index) => (
+                                    <div key={index} className="text-center p-4 bg-gray-50 rounded-lg">
+                                        <Award className="h-6 w-6 text-primary-500 mx-auto mb-2" />
+                                        <div className="text-sm font-medium text-gray-900">{achievement}</div>
+                                    </div>
+                                ))}
+                            </div>
+                        </CardBody>
+                    </Card>
+                ) : null
+            }
 
             {/* Sign Out Button */}
             <div className="flex justify-center">
@@ -378,6 +382,6 @@ export default function ProfilePage() {
                     Sign Out
                 </Button>
             </div>
-        </div>
+        </div >
     );
 }
