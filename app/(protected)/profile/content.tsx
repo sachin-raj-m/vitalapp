@@ -21,6 +21,8 @@ interface Profile {
     blood_group_proof_url: string;
     is_donor: boolean;
     is_available: boolean;
+    permanent_zip?: string;
+    present_zip?: string;
     location: {
         latitude: number;
         longitude: number;
@@ -48,7 +50,8 @@ export default function ProfilePage() {
         full_name: '',
         phone: '',
         is_available: false,
-        address: ''
+        permanent_zip: '',
+        present_zip: ''
     });
 
     useEffect(() => {
@@ -72,7 +75,8 @@ export default function ProfilePage() {
                 full_name: data.full_name || '',
                 phone: data.phone || '',
                 is_available: data.is_available || false,
-                address: data.location?.address || ''
+                permanent_zip: data.permanent_zip || '',
+                present_zip: data.present_zip || ''
             });
         } catch (err: any) {
             console.error('Error loading profile');
@@ -137,10 +141,8 @@ export default function ProfilePage() {
                     full_name: editForm.full_name,
                     phone: editForm.phone,
                     is_available: editForm.is_available,
-                    location: {
-                        ...profile?.location,
-                        address: editForm.address
-                    }
+                    permanent_zip: editForm.permanent_zip,
+                    present_zip: editForm.present_zip
                 })
                 .eq('id', user?.id);
 
@@ -199,18 +201,25 @@ export default function ProfilePage() {
                             <h1 className="text-2xl font-bold text-gray-900">
                                 {profile?.full_name}
                             </h1>
-                            <div className="flex items-center space-x-4 text-gray-600 mt-2">
-                                <div className="flex items-center">
-                                    <Droplet className="h-4 w-4 mr-1" />
-                                    {profile?.blood_group || 'N/A'}
-                                </div>
-                                <div className="flex items-center">
-                                    <MapPin className="h-4 w-4 mr-1" />
-                                    {profile?.location?.address || 'No address set'}
-                                </div>
+                        </div>
+                        <div className="flex flex-col space-y-1 mt-2 text-gray-600 text-sm">
+                            <div className="flex items-center">
+                                <span className="font-semibold text-gray-700 w-28">Permanent Zip:</span>
+                                <span>{profile?.permanent_zip || 'N/A'}</span>
                             </div>
-                        </div >
+                            <div className="flex items-center">
+                                <span className="font-semibold text-gray-700 w-28">Present Zip:</span>
+                                <span>{profile?.present_zip || 'N/A'}</span>
+                            </div>
+                        </div>
+                        <div className="flex items-center space-x-4 text-gray-600 mt-2">
+                            <div className="flex items-center">
+                                <Droplet className="h-4 w-4 mr-1" />
+                                {profile?.blood_group || 'N/A'}
+                            </div>
+                        </div>
                     </div >
+
                 </CardBody >
             </Card >
 
@@ -235,12 +244,22 @@ export default function ProfilePage() {
                                     onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
                                     required
                                 />
-                                <Input
-                                    label="Address"
-                                    value={editForm.address}
-                                    onChange={(e) => setEditForm({ ...editForm, address: e.target.value })}
-                                    required
-                                />
+                                <div className="grid grid-cols-2 gap-4">
+                                    <Input
+                                        label="Permanent Zip"
+                                        value={editForm.permanent_zip}
+                                        onChange={(e) => setEditForm({ ...editForm, permanent_zip: e.target.value })}
+                                        required
+                                        placeholder="e.g. 560001"
+                                    />
+                                    <Input
+                                        label="Present Zip"
+                                        value={editForm.present_zip}
+                                        onChange={(e) => setEditForm({ ...editForm, present_zip: e.target.value })}
+                                        required
+                                        placeholder="e.g. 560001"
+                                    />
+                                </div>
                                 <div className="flex items-center space-x-2">
                                     <input
                                         type="checkbox"
