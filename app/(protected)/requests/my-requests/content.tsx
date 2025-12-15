@@ -98,9 +98,9 @@ export function MyRequestsContent() {
                 };
                 console.log('Update Payload:', updatePayload);
 
-                const { error: updateError } = await supabase
+                const { error: updateError, count } = await supabase
                     .from('donations')
-                    .update(updatePayload)
+                    .update(updatePayload, { count: 'exact' })
                     .eq('id', verifyModal.donationId);
 
                 if (updateError) {
@@ -108,7 +108,15 @@ export function MyRequestsContent() {
                     alert(`Update Failed: ${updateError.message}\nDetails: ${updateError.details || 'N/A'}`);
                     throw updateError;
                 }
-                console.log('Donation updated successfully.');
+
+                if (count === 0) {
+                    const msg = 'Permission Error: The system blocked the update. You might not have permission to verify this donation.';
+                    console.error(msg);
+                    alert(msg);
+                    throw new Error(msg);
+                }
+
+                console.log('Donation updated successfully. Rows affected:', count);
 
                 // 2. Check total collected units to see if we should close the request
                 // Fetch all COMPLETED donations for this request (including the one just updated)
@@ -224,94 +232,132 @@ export function MyRequestsContent() {
                 </div>
             ) : (
                 <div className="space-y-6">
-                    {filteredRequests.map((request) => (
-                        <Card key={request.id}>
-                            <CardHeader>
-                                <div className="flex flex-col md:flex-row justify-between items-start gap-2">
-                                    <div>
-                                        <h3 className="text-lg font-bold text-gray-900">
-                                            {request.blood_group} Blood Needed
-                                        </h3>
-                                        <p className="text-sm text-gray-500">{request.hospital_name}</p>
-                                        <p className="text-xs text-gray-400 mt-1">
-                                            {new Date(request.created_at).toLocaleDateString()}
-                                        </p>
-                                    </div>
-                                    <div className="flex flex-col items-end gap-1 self-end md:self-auto">
-                                        <Badge variant={request.status === 'active' ? 'warning' : 'success'}>
-                                            {request.status.charAt(0).toUpperCase() + request.status.slice(1)}
-                                        </Badge>
+                    {filteredRequests.map((request) => {
+                        // Calculate stats helper
+                        const fulfilledUnits = request.donations.filter(d => d.status === 'completed').reduce((sum, d) => sum + (d.units_donated || 1), 0);
+                        const isPast = request.status !== 'active';
 
-                                        {/* Progress Bar for Active Requests */}
-                                        {request.status === 'active' && (
-                                            <div className="w-32 mt-1">
-                                                <div className="flex justify-between text-xs text-gray-500 mb-1">
-                                                    <span>Collected</span>
-                                                    <span>{request.donations.filter(d => d.status === 'completed').reduce((sum, d) => sum + (d.units_donated || 1), 0)} / {request.units_needed}</span>
+                        return (
+                            <Card key={request.id}>
+                                <CardHeader>
+                                    <div className="flex flex-col md:flex-row justify-between items-start gap-2">
+                                        <div className="flex-grow">
+                                            <div className="flex justify-between items-start">
+                                                <div>
+                                                    <h3 className="text-lg font-bold text-gray-900">
+                                                        {request.blood_group} Blood Needed
+                                                    </h3>
+                                                    <p className="text-sm text-gray-500">{request.hospital_name}</p>
                                                 </div>
-                                                <div className="h-1.5 w-full bg-gray-100 rounded-full overflow-hidden">
-                                                    <div
-                                                        className="h-full bg-green-500 rounded-full"
-                                                        style={{
-                                                            width: `${Math.min(100, (request.donations.filter(d => d.status === 'completed').reduce((sum, d) => sum + (d.units_donated || 1), 0) / request.units_needed) * 100)}%`
-                                                        }}
-                                                    />
-                                                </div>
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                            </CardHeader>
-                            <CardBody>
-                                <h4 className="font-medium text-gray-900 mb-3">Donation Offers</h4>
-                                {request.donations && request.donations.length > 0 ? (
-                                    <div className="space-y-3">
-                                        {request.donations.map((donation) => (
-                                            <div
-                                                key={donation.id}
-                                                className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-100 gap-3"
-                                            >
-                                                <div className="flex items-center gap-3">
-                                                    <div className="h-10 w-10 rounded-full bg-primary-100 flex items-center justify-center text-primary-600 font-bold">
-                                                        {donation.profiles?.full_name?.charAt(0) || 'D'}
+                                                {isPast && (
+                                                    <div className="text-right text-sm text-gray-500 hidden md:block">
+                                                        <div>Posted: {new Date(request.created_at).toLocaleDateString()}</div>
+                                                        {request.status === 'fulfilled' && (
+                                                            <div>Fulfilled: {new Date(request.updated_at).toLocaleDateString()}</div>
+                                                        )}
                                                     </div>
-                                                    <div>
-                                                        <p className="font-medium text-gray-900">{donation.profiles?.full_name || 'Anonymous'}</p>
-                                                        <p className="text-sm text-gray-500">{donation.profiles?.phone}</p>
+                                                )}
+                                            </div>
+
+                                            {!isPast && (
+                                                <p className="text-xs text-gray-400 mt-1">
+                                                    {new Date(request.created_at).toLocaleDateString()}
+                                                </p>
+                                            )}
+
+                                            {isPast && (
+                                                <div className="mt-3 flex flex-wrap gap-4 text-sm bg-gray-50 p-3 rounded-lg border border-gray-100">
+                                                    <div className="flex flex-col">
+                                                        <span className="text-gray-500 text-xs uppercase font-semibold">Units Required</span>
+                                                        <span className="font-medium text-gray-900">{request.units_needed} Units</span>
+                                                    </div>
+                                                    <div className="flex flex-col">
+                                                        <span className="text-gray-500 text-xs uppercase font-semibold">Units Received</span>
+                                                        <span className="font-medium text-success-600">{fulfilledUnits} Units</span>
+                                                    </div>
+                                                    <div className="flex flex-col md:hidden">
+                                                        <span className="text-gray-500 text-xs uppercase font-semibold">Date Posted</span>
+                                                        <span className="font-medium text-gray-900">{new Date(request.created_at).toLocaleDateString()}</span>
                                                     </div>
                                                 </div>
+                                            )}
+                                        </div>
+                                        <div className="flex flex-col items-end gap-1 self-end md:self-auto pl-4">
+                                            <Badge variant={request.status === 'active' ? 'warning' : request.status === 'fulfilled' ? 'success' : 'neutral'}>
+                                                {request.status.charAt(0).toUpperCase() + request.status.slice(1)}
+                                            </Badge>
 
-                                                <div className="flex items-center gap-2">
-                                                    {donation.status === 'pending' ? (
-                                                        <Button
-                                                            size="sm"
-                                                            onClick={() => setVerifyModal({
-                                                                isOpen: true,
-                                                                donationId: donation.id,
-                                                                requestId: request.id,
-                                                                donorName: donation.profiles?.full_name,
-                                                                maxUnits: request.units_needed - request.donations.filter(d => d.status === 'completed').reduce((sum, d) => sum + (d.units_donated || 1), 0)
-                                                            })}
-                                                        >
-                                                            Verify PIN
-                                                        </Button>
-                                                    ) : donation.status === 'completed' ? (
-                                                        <span className="flex items-center text-green-600 text-sm font-medium">
-                                                            <CheckCircle className="h-4 w-4 mr-1" /> {donation.units_donated || 1} Unit(s) Verified
-                                                        </span>
-                                                    ) : (
-                                                        <Badge variant="neutral">{donation.status}</Badge>
-                                                    )}
+                                            {/* Progress Bar for Active Requests */}
+                                            {request.status === 'active' && (
+                                                <div className="w-32 mt-1">
+                                                    <div className="flex justify-between text-xs text-gray-500 mb-1">
+                                                        <span>Collected</span>
+                                                        <span>{fulfilledUnits} / {request.units_needed}</span>
+                                                    </div>
+                                                    <div className="h-1.5 w-full bg-gray-100 rounded-full overflow-hidden">
+                                                        <div
+                                                            className="h-full bg-green-500 rounded-full"
+                                                            style={{
+                                                                width: `${Math.min(100, (fulfilledUnits / request.units_needed) * 100)}%`
+                                                            }}
+                                                        />
+                                                    </div>
                                                 </div>
-                                            </div>
-                                        ))}
+                                            )}
+                                        </div>
                                     </div>
-                                ) : (
-                                    <p className="text-gray-500 text-sm italic">No offers yet.</p>
-                                )}
-                            </CardBody>
-                        </Card>
-                    ))}
+                                </CardHeader>
+                                <CardBody>
+                                    <h4 className="font-medium text-gray-900 mb-3">Donation Offers</h4>
+                                    {request.donations && request.donations.length > 0 ? (
+                                        <div className="space-y-3">
+                                            {request.donations.map((donation) => (
+                                                <div
+                                                    key={donation.id}
+                                                    className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-100 gap-3"
+                                                >
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="h-10 w-10 rounded-full bg-primary-100 flex items-center justify-center text-primary-600 font-bold">
+                                                            {donation.profiles?.full_name?.charAt(0) || 'D'}
+                                                        </div>
+                                                        <div>
+                                                            <p className="font-medium text-gray-900">{donation.profiles?.full_name || 'Anonymous'}</p>
+                                                            <p className="text-sm text-gray-500">{donation.profiles?.phone}</p>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="flex items-center gap-2">
+                                                        {donation.status === 'pending' ? (
+                                                            <Button
+                                                                size="sm"
+                                                                onClick={() => setVerifyModal({
+                                                                    isOpen: true,
+                                                                    donationId: donation.id,
+                                                                    requestId: request.id,
+                                                                    donorName: donation.profiles?.full_name,
+                                                                    maxUnits: request.units_needed - fulfilledUnits
+                                                                })}
+                                                            >
+                                                                Verify PIN
+                                                            </Button>
+                                                        ) : donation.status === 'completed' ? (
+                                                            <span className="flex items-center text-green-600 text-sm font-medium">
+                                                                <CheckCircle className="h-4 w-4 mr-1" /> {donation.units_donated || 1} Unit(s) Verified
+                                                            </span>
+                                                        ) : (
+                                                            <Badge variant="neutral">{donation.status}</Badge>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <p className="text-gray-500 text-sm italic">No offers yet.</p>
+                                    )}
+                                </CardBody>
+                            </Card>
+                        );
+                    })}
                 </div>
             )}
 
