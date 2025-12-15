@@ -14,37 +14,54 @@ import type { BloodRequest } from '@/types';
 import { isBloodCompatible } from '@/lib/blood-compatibility';
 import { formatDistanceToNow, addDays, differenceInDays } from 'date-fns';
 
+import { useRequests } from '@/context/RequestsContext';
+
+// ... (other imports remain, remove BloodRequest type import if unused or keep)
+
 export default function DashboardPage() {
     const { user } = useAuth();
     const router = useRouter();
+    const { requests, loading: requestsLoading } = useRequests(); // Use global state
+
+    // Local state for user-specific stats only
     const [stats, setStats] = useState({
-        activeRequests: 0,
         completedDonations: 0,
         livesImpacted: 0
     });
     const [smartMatches, setSmartMatches] = useState<BloodRequest[]>([]);
     const [lastDonationDate, setLastDonationDate] = useState<Date | null>(null);
-    const [loading, setLoading] = useState(true);
+    const [userStatsLoading, setUserStatsLoading] = useState(true);
 
     useEffect(() => {
         if (user) {
-            fetchDashboardData();
+            fetchUserStats();
         }
     }, [user]);
 
-    const fetchDashboardData = async () => {
+    // Recalculate smart matches whenever requests or user changes
+    useEffect(() => {
+        if (requests.length > 0 && user?.blood_group) {
+            const matches = requests.filter(req => {
+                // 1. Own Request Filter
+                if (req.user_id === user.id) return false;
+
+                // 2. Compatibility Filter
+                if (!user.blood_group || !req.blood_group) return false;
+
+                return isBloodCompatible(user.blood_group, req.blood_group);
+            });
+            setSmartMatches(matches);
+        } else {
+            setSmartMatches([]);
+        }
+    }, [requests, user]);
+
+    const fetchUserStats = async () => {
         if (!user) return;
         try {
-            setLoading(true);
+            setUserStatsLoading(true);
 
-            // 1. Fetch Active Requests for Stats & Smart Matching
-            const { data: requests } = await supabase
-                .from('blood_requests')
-                .select('*')
-                .eq('status', 'active')
-                .order('created_at', { ascending: false });
-
-            // 2. Fetch User's Donation History for Eligibility & Gamification
+            // Fetch User's Donation History for Eligibility & Gamification
             const { data: donations } = await supabase
                 .from('donations')
                 .select('*')
@@ -57,34 +74,21 @@ export default function DashboardPage() {
             const lastDonation = donations?.[0] ? new Date(donations[0].created_at) : null;
 
             setStats({
-                activeRequests: requests?.length || 0,
                 completedDonations: completedCount,
-                livesImpacted: completedCount * 3 // Approx 3 lives per donation
+                livesImpacted: completedCount * 3
             });
 
             setLastDonationDate(lastDonation);
 
-            // Calculate Smart Matches (Compatible Blood Types)
-            if (requests && user.blood_group) {
-                const matches = requests.filter(req => {
-                    // 1. Own Request Filter
-                    if (req.user_id === user.id) return false;
-
-                    // 2. Compatibility Filter
-                    // Ensure valid blood groups before checking
-                    if (!user.blood_group || !req.blood_group) return false;
-
-                    return isBloodCompatible(user.blood_group, req.blood_group);
-                });
-                setSmartMatches(matches); // Show all matches
-            }
-
         } catch (error) {
-            console.error('Error fetching dashboard data', error);
+            console.error('Error fetching dashboard user stats', error);
         } finally {
-            setLoading(false);
+            setUserStatsLoading(false);
         }
     };
+
+    const isLoading = requestsLoading || userStatsLoading;
+
 
     // Helper: Determine Donor Level
     const getDonorLevel = (count: number) => {
@@ -114,7 +118,7 @@ export default function DashboardPage() {
 
     const eligibility = getEligibilityStatus();
 
-    if (loading) {
+    if (isLoading) {
         return (
             <div className="flex items-center justify-center min-h-[60vh]">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500"></div>
@@ -186,7 +190,7 @@ export default function DashboardPage() {
                     <CardBody className="flex flex-col h-full justify-between text-white">
                         <div>
                             <h3 className="font-semibold text-primary-100 mb-2">Community Needs</h3>
-                            <p className="text-2xl font-bold mb-1">{stats.activeRequests} Active Requests</p>
+                            <p className="text-2xl font-bold mb-1">{requests.length} Active Requests</p>
                             <p className="text-sm text-primary-100 opacity-90">
                                 {smartMatches.length > 0
                                     ? <span className="font-bold bg-white/20 px-2 py-0.5 rounded text-white">{smartMatches.length} Matches For You</span>

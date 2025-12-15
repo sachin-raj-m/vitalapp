@@ -18,13 +18,18 @@ import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
 import type { BloodRequest } from '@/types';
 import { isBloodCompatible } from '@/lib/blood-compatibility';
+import { useRequests } from '@/context/RequestsContext';
+
+// ...
 
 export default function RequestsPage() {
-    const { user } = useAuth();
-    const [requests, setRequests] = useState<BloodRequest[]>([]);
+    const { user, refreshProfile } = useAuth();
+    const { requests: allRequests, loading: requestsLoading } = useRequests();
+
+    // Local state for UI
+    const [filteredRequests, setFilteredRequests] = useState<BloodRequest[]>([]);
     const [offeredRequestIds, setOfferedRequestIds] = useState<Set<string>>(new Set());
     const [viewMode, setViewMode] = useState<'list' | 'map'>('list');
-    const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
 
     const [filters, setFilters] = useState({
@@ -33,9 +38,29 @@ export default function RequestsPage() {
         location: ''
     });
 
+    // Determine loading state (only for initial load)
+    const loading = requestsLoading;
+
+    // Filter Logic (Client-Side)
     useEffect(() => {
-        fetchRequests();
-    }, []);
+        let result = allRequests;
+
+        if (filters.bloodGroup !== 'all') {
+            result = result.filter(r => r.blood_group === filters.bloodGroup);
+        }
+        if (filters.urgency !== 'all') {
+            result = result.filter(r => r.urgency_level === filters.urgency);
+        }
+        if (filters.location) {
+            const loc = filters.location.toLowerCase();
+            result = result.filter(r =>
+                r.hospital_name.toLowerCase().includes(loc) ||
+                r.hospital_address.toLowerCase().includes(loc)
+            );
+        }
+
+        setFilteredRequests(result);
+    }, [allRequests, filters]);
 
     useEffect(() => {
         if (user) {
@@ -56,40 +81,15 @@ export default function RequestsPage() {
         }
     };
 
-    const fetchRequests = async () => {
-        try {
-            setLoading(true);
-            let query = supabase
-                .from('blood_requests')
-                .select('*')
-                .eq('status', 'active')
-                .order('created_at', { ascending: false });
+    // Removed old fetchRequests function
 
-            if (filters.bloodGroup !== 'all') {
-                query = query.eq('blood_group', filters.bloodGroup);
-            }
-            if (filters.urgency !== 'all') {
-                query = query.eq('urgency_level', filters.urgency);
-            }
-            // TODO: Implement location filtering
-
-            const { data, error: requestError } = await query;
-
-            if (requestError) throw requestError;
-            setRequests(data as BloodRequest[]);
-        } catch (err: any) {
-            setError(err.message);
-        } finally {
-            setLoading(false);
-        }
-    };
 
     const [otpModal, setOtpModal] = useState({ isOpen: false, pin: '', hospitalName: '' });
     const [confirmModal, setConfirmModal] = useState<{ isOpen: boolean; request: BloodRequest | null }>({ isOpen: false, request: null });
     const [createPinModal, setCreatePinModal] = useState<{ isOpen: boolean; request: BloodRequest | null }>({ isOpen: false, request: null });
     const [newPin, setNewPin] = useState('');
     const [creatingPin, setCreatingPin] = useState(false);
-    const { refreshProfile } = useAuth(); // Assuming refreshProfile is available in useAuth
+    // Removed redundant refreshProfile declaration
 
     const handleDonateClick = async (request: BloodRequest) => {
         if (!user) {
@@ -208,7 +208,6 @@ export default function RequestsPage() {
                     value={filters.bloodGroup}
                     onChange={(e) => {
                         setFilters(prev => ({ ...prev, bloodGroup: e.target.value }));
-                        fetchRequests();
                     }}
                     options={[
                         { value: 'all', label: 'All Blood Groups' },
@@ -227,7 +226,6 @@ export default function RequestsPage() {
                     value={filters.urgency}
                     onChange={(e) => {
                         setFilters(prev => ({ ...prev, urgency: e.target.value }));
-                        fetchRequests();
                     }}
                     options={[
                         { value: 'all', label: 'All Urgency Levels' },
@@ -255,14 +253,14 @@ export default function RequestsPage() {
                     <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500 mx-auto"></div>
                     <p className="mt-4 text-gray-600">Loading requests...</p>
                 </div>
-            ) : requests.length === 0 ? (
+            ) : filteredRequests.length === 0 ? (
                 <div className="text-center py-8">
-                    <p className="text-gray-600">No blood requests found</p>
+                    <p className="text-gray-600">No blood requests found matching your filters</p>
                 </div>
             ) : (
                 <div className="space-y-4">
                     {viewMode === 'list' ? (
-                        requests.map(request => (
+                        filteredRequests.map(request => (
                             <BloodRequestCard
                                 key={request.id}
                                 request={request}
@@ -282,7 +280,7 @@ export default function RequestsPage() {
                             <Map
                                 center={{ lat: 20.5937, lng: 78.9629 }}
                                 zoom={5}
-                                markers={requests.map(req => ({
+                                markers={filteredRequests.map(req => ({
                                     position: {
                                         lat: req.location.latitude,
                                         lng: req.location.longitude
