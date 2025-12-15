@@ -13,7 +13,7 @@ import { Loader2, CheckCircle, Clock } from 'lucide-react';
 import type { BloodRequest, Donation } from '@/types';
 
 interface RequestWithDonations extends BloodRequest {
-    donations: (Donation & { profiles: { full_name: string; phone: string } })[];
+    donations: (Donation & { profiles: { full_name: string; phone: string }, units_donated: number })[];
 }
 
 export function MyRequestsContent() {
@@ -29,8 +29,9 @@ export function MyRequestsContent() {
     });
 
     // Verification State
-    const [verifyModal, setVerifyModal] = useState({ isOpen: false, donationId: '', requestId: '', donorName: '' });
+    const [verifyModal, setVerifyModal] = useState({ isOpen: false, donationId: '', requestId: '', donorName: '', maxUnits: 0 });
     const [otpInput, setOtpInput] = useState('');
+    const [unitsDonatedInput, setUnitsDonatedInput] = useState(1);
     const [verifying, setVerifying] = useState(false);
     const [verifyError, setVerifyError] = useState('');
 
@@ -54,6 +55,9 @@ export function MyRequestsContent() {
                 .order('created_at', { ascending: false });
 
             if (error) throw error;
+
+            // Calculate progress for each request locally if needed, or rely on DB
+            // We'll calculate 'collected' dynamically
             setRequests(data as any);
         } catch (err: any) {
             console.error('Error fetching requests');
@@ -69,42 +73,68 @@ export function MyRequestsContent() {
 
         try {
             // Check OTP against database
-            const { data, error } = await supabase
+            const { data: donationData, error: otpError } = await supabase
                 .from('donations')
-                .select('otp')
+                .select('otp, request_id')
                 .eq('id', verifyModal.donationId)
                 .single();
 
-            if (error) throw error;
+            if (otpError) throw otpError;
 
-            if (data.otp === otpInput) {
-                // Success! Update donation status to completed
+            if (donationData.otp === otpInput) {
+                // 1. Update donation status and units
                 const { error: updateError } = await supabase
                     .from('donations')
-                    .update({ status: 'completed' })
+                    .update({
+                        status: 'completed',
+                        units_donated: unitsDonatedInput
+                    })
                     .eq('id', verifyModal.donationId);
 
                 if (updateError) throw updateError;
 
-                // Also mark the BLOOD REQUEST as fulfilled
-                // logic: if donation is verified, the need is met.
-                const { error: requestError } = await supabase
-                    .from('blood_requests')
-                    .update({ status: 'fulfilled' })
-                    .eq('id', verifyModal.requestId);
+                // 2. Check total collected units to see if we should close the request
+                // Fetch all COMPLETED donations for this request (including the one just updated)
+                const { data: allDonations, error: sumError } = await supabase
+                    .from('donations')
+                    .select('units_donated')
+                    .eq('request_id', verifyModal.requestId)
+                    .eq('status', 'completed');
 
-                if (requestError) throw requestError;
+                if (sumError) throw sumError;
+
+                const totalCollected = allDonations.reduce((sum, d) => sum + (d.units_donated || 0), 0);
+
+                // Find the original request to get units_needed
+                const request = requests.find(r => r.id === verifyModal.requestId);
+                const unitsNeeded = request?.units_needed || 0;
+
+                let message = 'Donation verified successfully!';
+
+                // 3. Auto-fulfill if enough units collected
+                if (totalCollected >= unitsNeeded) {
+                    const { error: requestError } = await supabase
+                        .from('blood_requests')
+                        .update({ status: 'fulfilled' })
+                        .eq('id', verifyModal.requestId);
+
+                    if (requestError) throw requestError;
+                    message += ' Request has been fulfilled and closed.';
+                } else {
+                    message += ` Progress: ${totalCollected}/${unitsNeeded} units.`;
+                }
 
                 // Refresh list
                 await fetchMyRequests();
-                setVerifyModal({ isOpen: false, donationId: '', requestId: '', donorName: '' });
+                setVerifyModal({ isOpen: false, donationId: '', requestId: '', donorName: '', maxUnits: 0 });
                 setOtpInput('');
-                alert('Donation verified and request closed successfully!');
+                setUnitsDonatedInput(1);
+                alert(message);
             } else {
                 setVerifyError('Invalid PIN. Please ask the donor for their correct PIN.');
             }
         } catch (err: any) {
-            console.error('Verification error');
+            console.error('Verification error', err);
             setVerifyError(err.message || 'Verification failed');
         } finally {
             setVerifying(false);
@@ -175,10 +205,28 @@ export function MyRequestsContent() {
                                             {new Date(request.created_at).toLocaleDateString()}
                                         </p>
                                     </div>
-                                    <div className="self-end md:self-auto">
+                                    <div className="flex flex-col items-end gap-1 self-end md:self-auto">
                                         <Badge variant={request.status === 'active' ? 'warning' : 'success'}>
                                             {request.status.charAt(0).toUpperCase() + request.status.slice(1)}
                                         </Badge>
+
+                                        {/* Progress Bar for Active Requests */}
+                                        {request.status === 'active' && (
+                                            <div className="w-32 mt-1">
+                                                <div className="flex justify-between text-xs text-gray-500 mb-1">
+                                                    <span>Collected</span>
+                                                    <span>{request.donations.filter(d => d.status === 'completed').reduce((sum, d) => sum + (d.units_donated || 0), 0)} / {request.units_needed}</span>
+                                                </div>
+                                                <div className="h-1.5 w-full bg-gray-100 rounded-full overflow-hidden">
+                                                    <div
+                                                        className="h-full bg-green-500 rounded-full"
+                                                        style={{
+                                                            width: `${Math.min(100, (request.donations.filter(d => d.status === 'completed').reduce((sum, d) => sum + (d.units_donated || 0), 0) / request.units_needed) * 100)}%`
+                                                        }}
+                                                    />
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             </CardHeader>
@@ -209,14 +257,15 @@ export function MyRequestsContent() {
                                                                 isOpen: true,
                                                                 donationId: donation.id,
                                                                 requestId: request.id,
-                                                                donorName: donation.profiles?.full_name
+                                                                donorName: donation.profiles?.full_name,
+                                                                maxUnits: request.units_needed - request.donations.filter(d => d.status === 'completed').reduce((sum, d) => sum + (d.units_donated || 0), 0)
                                                             })}
                                                         >
                                                             Verify PIN
                                                         </Button>
                                                     ) : (
                                                         <span className="flex items-center text-green-600 text-sm font-medium">
-                                                            <CheckCircle className="h-4 w-4 mr-1" /> Verified
+                                                            <CheckCircle className="h-4 w-4 mr-1" /> {donation.units_donated || 1} Unit(s) Verified
                                                         </span>
                                                     )}
                                                 </div>
@@ -255,6 +304,30 @@ export function MyRequestsContent() {
                         maxLength={4}
                         className="text-center text-2xl tracking-widest"
                     />
+
+                    <div className="bg-blue-50 p-4 rounded-lg">
+                        <label className="block text-sm font-medium text-blue-900 mb-2">
+                            Units Donated
+                        </label>
+                        <div className="flex items-center gap-3">
+                            <button
+                                className="w-10 h-10 rounded-md bg-white border border-blue-200 text-blue-600 font-bold hover:bg-blue-100"
+                                onClick={() => setUnitsDonatedInput(Math.max(1, unitsDonatedInput - 1))}
+                            >
+                                -
+                            </button>
+                            <span className="text-xl font-bold text-gray-800 w-8 text-center">{unitsDonatedInput}</span>
+                            <button
+                                className="w-10 h-10 rounded-md bg-white border border-blue-200 text-blue-600 font-bold hover:bg-blue-100"
+                                onClick={() => setUnitsDonatedInput(unitsDonatedInput + 1)}
+                            >
+                                +
+                            </button>
+                        </div>
+                        <p className="text-xs text-blue-600 mt-2">
+                            Confirm the number of blood units collected from this donor.
+                        </p>
+                    </div>
 
                     {verifyError && (
                         <p className="text-red-500 text-sm">{verifyError}</p>
