@@ -4,8 +4,8 @@ import { Mail } from 'lucide-react';
 
 export const Footer: React.FC = () => {
   return (
-    <footer className="bg-white border-t border-gray-100 py-12">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col items-center">
+    <footer className="bg-white border-t border-gray-100 py-12 pb-24 md:pb-12 mt-auto">
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 flex flex-col items-center">
 
         <div className="flex items-center space-x-2 mb-4">
           <span className="text-2xl font-bold text-gray-900">Vital</span>
