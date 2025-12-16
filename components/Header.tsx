@@ -36,7 +36,6 @@ export function Header() {
             {user ? (
               <div className="flex items-center space-x-6">
                 <Link href="/dashboard" className="text-gray-600 hover:text-gray-900">Dashboard</Link>
-                <Link href="/requests" className="text-gray-600 hover:text-gray-900">Requests</Link>
                 <Link href="/requests/my-requests" className="text-gray-600 hover:text-gray-900">My Requests</Link>
                 <Link href="/donations" className="text-gray-600 hover:text-gray-900">Donations</Link>
                 <Link href="/nearby-donors" className="text-gray-600 hover:text-gray-900">Find Donors</Link>
@@ -51,12 +50,16 @@ export function Header() {
                 </Link>
               </div>
             ) : (
-              <Link href="/login">
-                <Button variant="ghost" className="flex items-center space-x-2">
-                  <LogIn className="h-5 w-5" />
-                  <span>Login</span>
-                </Button>
-              </Link>
+              <div className="flex items-center space-x-6">
+                <Link href="/requests" className="text-gray-600 hover:text-gray-900">Requests</Link>
+                <Link href="/nearby-donors" className="text-gray-600 hover:text-gray-900">Find Donors</Link>
+                <Link href="/login">
+                  <Button variant="ghost" className="flex items-center space-x-2">
+                    <LogIn className="h-5 w-5" />
+                    <span>Login</span>
+                  </Button>
+                </Link>
+              </div>
             )}
           </nav>
         </div>
