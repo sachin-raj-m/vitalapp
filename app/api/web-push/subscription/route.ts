@@ -41,16 +41,26 @@ export async function POST(request: Request) {
         const authHeader = request.headers.get('Authorization')
         if (authHeader) {
             const token = authHeader.replace('Bearer ', '')
+            // Verify token validity
             const { data: { user: headerUser }, error: headerError } = await supabase.auth.getUser(token)
 
             if (headerUser && !headerError) {
-                // Recovered user from header
-                // proceed with headerUser logic by re-assigning or just using it below?
-                // Better to just let the upsert use headerUser.id if user is null
+                // RLS Fix: Create a new client authenticated with this token
+                // The original 'supabase' client is anonymous because cookies failed.
+                const { createClient } = await import('@supabase/supabase-js')
+                const authenticatedSupabase = createClient(
+                    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+                    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+                    {
+                        global: {
+                            headers: {
+                                Authorization: `Bearer ${token}`
+                            }
+                        }
+                    }
+                )
 
-                // We need to re-assign or use a new variable. 
-                // Let's refactor slightly to handle both standard variable.
-                await upsertSubscription(supabase, headerUser.id, subscription);
+                await upsertSubscription(authenticatedSupabase, headerUser.id, subscription);
                 return NextResponse.json({ success: true })
             }
         }
