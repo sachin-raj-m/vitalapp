@@ -22,13 +22,20 @@ export default function ForgotPasswordContent() {
         setError('');
 
         try {
-            const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
-                redirectTo: `${window.location.origin}/auth/callback?next=/dashboard/profile`,
+            // Using Custom Recovery API to send Resend template
+            const response = await fetch('/api/auth/recovery', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email })
             });
 
-            if (resetError) {
-                throw resetError;
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.error || 'Failed to send reset email');
             }
+
+
 
             setIsSuccess(true);
             toast.success("Password reset email sent!");

@@ -79,6 +79,16 @@ export default function RegisterPage() {
                 email: formData.email
             }));
 
+            // Trigger Welcome Email in background
+            fetch('/api/notify/welcome', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    email: formData.email,
+                    name: formData.email.split('@')[0] // Use email prefix as temp name until profile is completed
+                })
+            }).catch(e => console.error('Welcome email failed', e));
+
             // Direct onboarding: auto-login logic (handled by supabase client usually if confirm is off)
             // Redirect to completion page immediately
             router.push('/complete-registration');
