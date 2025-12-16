@@ -66,15 +66,18 @@ export async function POST(request: Request) {
         }
 
         console.error('Push Subscription 401: User not found. Cookies present:', cookieStore.getAll().map(c => c.name).join(', '));
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        return NextResponse.json({ error: 'Unauthorized', details: 'User not found' }, { status: 401 })
     }
 
     try {
         await upsertSubscription(supabase, user.id, subscription);
         return NextResponse.json({ success: true })
-    } catch (error) {
+    } catch (error: any) {
         console.error('Error in subscription route:', error)
-        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
+        return NextResponse.json({
+            error: error.message || 'Internal Server Error',
+            details: error.details || error.hint || 'No details'
+        }, { status: 500 })
     }
 }
 
@@ -87,8 +90,8 @@ async function upsertSubscription(supabase: any, userId: string, subscription: a
         }, { onConflict: 'user_id, subscription' })
 
     if (error) {
-        console.error('Error saving subscription:', error)
-        throw error
+        console.error('Error saving subscription:', error) // Keep this
+        throw error // Throw the Supabase error object directly
     }
 }
 
