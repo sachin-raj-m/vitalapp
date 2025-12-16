@@ -50,33 +50,28 @@ export default function CompleteRegistration() {
 
     useEffect(() => {
         const init = async () => {
-            console.log('Initializing CompleteRegistration page');
+
             try {
                 // First check if we have a user
                 if (!user) {
-                    console.log('No user found, redirecting to login');
                     router.push('/login');
                     return;
                 }
 
-                console.log('Current user:', user);
+
 
                 // Check if registration is already complete
                 const isComplete = await isRegistrationComplete(user.id);
-                console.log('Registration status:', isComplete);
 
                 if (isComplete) {
-                    console.log('Registration already complete, redirecting to dashboard');
                     router.push('/dashboard');
                     return;
                 }
 
                 // Get stored registration data
                 const storedData = localStorage.getItem('pendingRegistration');
-                console.log('Stored registration data:', storedData);
 
                 if (!storedData) {
-                    console.log('No pending registration data found');
                     setError('Registration data not found. Please register again.');
                     router.push('/register');
                     return;
@@ -84,10 +79,8 @@ export default function CompleteRegistration() {
 
                 try {
                     const data = JSON.parse(storedData);
-                    console.log('Parsed registration data:', data);
 
                     if (data.userId !== user.id) {
-                        console.log('User ID mismatch:', { stored: data.userId, current: user.id });
                         throw new Error('User ID mismatch');
                     }
 

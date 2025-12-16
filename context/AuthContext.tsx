@@ -94,7 +94,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       if (data) {
-        console.log('User profile fetched successfully:', data);
+
 
         // Cache the profile in localStorage
         cacheUserProfile(data as User);
@@ -109,7 +109,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         return data as User;
       } else {
-        console.log('No profile found, creating new profile');
+
 
         // Get user data from auth
         const { data: { user: authUser } } = await supabase.auth.getUser();
@@ -118,7 +118,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           throw new Error('No auth user found');
         }
 
-        console.log('Creating profile with auth data:', authUser);
+
 
         // Create a new profile
         const { data: newProfile, error: createError } = await supabase
@@ -138,7 +138,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
           // Check for duplicate key error (profile might have been created in another tab/request)
           if (createError.code === '23505') {
-            console.log('Profile already exists, fetching it instead');
+
             const { data: existingProfile } = await supabase
               .from('profiles')
               .select('*')
@@ -161,7 +161,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           throw createError;
         }
 
-        console.log('New profile created:', newProfile);
+
         cacheUserProfile(newProfile as User);
         setState(prev => ({
           ...prev,
@@ -227,11 +227,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const cachedProfile = getCachedUserProfile(userId);
 
       if (cachedProfile) {
-        console.log('Recovered profile from cache:', cachedProfile);
+
         setState(prev => ({ ...prev, user: cachedProfile }));
       } else {
         // Only refresh if not already refreshing
-        console.log('No cached profile, refreshing from DB');
+
         refreshProfile().catch(err => {
           console.error('Recovery attempt failed:', err);
         });
@@ -243,20 +243,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Initialize auth
     const initializeAuth = async () => {
       try {
-        console.log('Initializing auth...');
         const { data: { session } } = await supabase.auth.getSession();
-        console.log('Initial session check:', session);
 
         // Set session immediately
         setState(prev => ({ ...prev, session }));
 
         if (session?.user?.id) {
-          console.log('Found session user, fetching profile:', session.user.id);
+
 
           // Try cached profile first for immediate display
           const cachedProfile = getCachedUserProfile(session.user.id);
           if (cachedProfile) {
-            console.log('Using cached profile:', cachedProfile);
+
             setState(prev => ({
               ...prev,
               user: cachedProfile,
@@ -275,7 +273,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             }
           }
         } else {
-          console.log('No session found');
+
           setState(prev => ({ ...prev, loading: false }));
         }
 
@@ -299,18 +297,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         try {
-          console.log('Auth state changed:', event, session);
+
 
           // Update session state immediately
           setState(prev => ({ ...prev, session }));
 
           if (event === 'SIGNED_IN' && session?.user?.id) {
-            console.log('User signed in:', session.user);
+
 
             // Try cached profile first for immediate display
             const cachedProfile = getCachedUserProfile(session.user.id);
             if (cachedProfile) {
-              console.log('Using cached profile after sign in:', cachedProfile);
+
               setState(prev => ({
                 ...prev,
                 user: cachedProfile
@@ -327,11 +325,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               }
             }, 500);
           } else if (event === 'SIGNED_OUT') {
-            console.log('User signed out');
+
             localStorage.removeItem('vital_user_profile');
             setState(prev => ({ ...prev, user: null, loading: false }));
           } else if (event === 'TOKEN_REFRESHED' && session?.user?.id) {
-            console.log('Token refreshed');
             // Only fetch profile if we don't have one and not already loading
             if (!state.user && !state.loading && !isRefreshing.current) {
               try {
@@ -356,10 +353,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signIn = async (email: string, password: string) => {
     try {
-      console.log('Starting sign in...');
       setState(prev => ({ ...prev, loading: true, error: null }));
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-      console.log('Sign in response:', { data, error });
       if (error) throw error;
     } catch (error) {
       console.error('Sign in error:', error);
@@ -370,9 +365,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signInWithGoogle = async () => {
     try {
-      console.log('Starting Google sign in...');
-      setState(prev => ({ ...prev, loading: true, error: null }));
-
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
@@ -380,7 +372,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         },
       });
 
-      console.log('Google sign in response:', { data, error });
       if (error) throw error;
     } catch (error) {
       console.error('Google sign in error:', error);
@@ -465,12 +456,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const refreshProfile = async () => {
     try {
       // If already refreshing, exit early
+      // If already refreshing, exit early
       if (isRefreshing.current) {
-        console.log('Profile refresh already in progress, skipping');
         return;
       }
 
-      console.log('Manually refreshing profile...');
       setState(prev => ({ ...prev, loading: true, error: null }));
 
       // Get current user from session

@@ -426,7 +426,7 @@ export default function RequestsPage() {
                         // Just closing is fine, they are now logged in.
                         // Actually, let's keep it simple: Just close. The user sees they are logged in.
                         // toast.success("Welcome back! You can now proceed to donate.");
-                        console.log("User logged in via modal");
+
                     }
                 }}
                 message="Login to Donate"
