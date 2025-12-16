@@ -10,13 +10,15 @@ export interface User {
   blood_group: BloodGroup;
   blood_group_proof_type?: string;
   blood_group_proof_url?: string;
+  permanent_zip?: string;
+  present_zip?: string;
+  is_donor: boolean;
+  is_available: boolean;
   location: {
     latitude: number;
     longitude: number;
     address: string;
   };
-  is_donor: boolean;
-  is_available: boolean;
   government_id?: string;
   role?: 'user' | 'admin' | string;
   donor_pin?: string;
@@ -38,6 +40,9 @@ export interface BloodRequest {
     latitude: number;
     longitude: number;
   };
+  city?: string;
+  zipcode?: string;
+  date_needed?: string;
   status: 'active' | 'fulfilled' | 'cancelled';
   created_at: string;
   updated_at: string;

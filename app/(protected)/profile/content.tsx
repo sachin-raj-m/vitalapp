@@ -21,6 +21,8 @@ interface Profile {
     blood_group_proof_url: string;
     is_donor: boolean;
     is_available: boolean;
+    permanent_zip?: string;
+    present_zip?: string;
     location: {
         latitude: number;
         longitude: number;
@@ -38,8 +40,7 @@ interface Stats {
 
 export default function ProfilePage() {
     const router = useRouter();
-    const { user, signOut, session } = useAuth();
-    const [profile, setProfile] = useState<Profile | null>(null);
+    const { user, signOut, session, updateProfile } = useAuth();
     const [stats, setStats] = useState<Stats | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState('');
@@ -48,37 +49,22 @@ export default function ProfilePage() {
         full_name: '',
         phone: '',
         is_available: false,
-        address: ''
+        permanent_zip: '',
+        present_zip: ''
     });
 
     useEffect(() => {
-        loadProfile();
-        loadStats();
-    }, []);
-
-    const loadProfile = async () => {
-        try {
-            if (!user) return;
-
-            const { data, error } = await supabase
-                .from('profiles')
-                .select('*')
-                .eq('id', user.id)
-                .single();
-
-            if (error) throw error;
-            setProfile(data);
+        if (user) {
             setEditForm({
-                full_name: data.full_name,
-                phone: data.phone,
-                is_available: data.is_available,
-                address: data.location.address
+                full_name: user.full_name || '',
+                phone: user.phone || '',
+                is_available: user.is_available || false,
+                permanent_zip: user.permanent_zip || '',
+                present_zip: user.present_zip || ''
             });
-        } catch (err: any) {
-            console.error('Error loading profile');
-            setError('Failed to load profile data');
+            loadStats();
         }
-    };
+    }, [user]);
 
     const loadStats = async () => {
         try {
@@ -131,22 +117,13 @@ export default function ProfilePage() {
         setError('');
 
         try {
-            const { error } = await supabase
-                .from('profiles')
-                .update({
-                    full_name: editForm.full_name,
-                    phone: editForm.phone,
-                    is_available: editForm.is_available,
-                    location: {
-                        ...profile?.location,
-                        address: editForm.address
-                    }
-                })
-                .eq('id', user?.id);
-
-            if (error) throw error;
-
-            await loadProfile();
+            await updateProfile({
+                full_name: editForm.full_name,
+                phone: editForm.phone,
+                is_available: editForm.is_available,
+                permanent_zip: editForm.permanent_zip,
+                present_zip: editForm.present_zip
+            });
             setIsEditing(false);
         } catch (err: any) {
             console.error('Error updating profile');
@@ -197,73 +174,92 @@ export default function ProfilePage() {
                         </div>
                         <div>
                             <h1 className="text-2xl font-bold text-gray-900">
-                                {profile?.full_name}
+                                {user?.full_name}
                             </h1>
-                            <div className="flex items-center space-x-4 text-gray-600 mt-2">
-                                <div className="flex items-center">
-                                    <Droplet className="h-4 w-4 mr-1" />
-                                    {profile?.blood_group}
-                                </div>
-                                <div className="flex items-center">
-                                    <MapPin className="h-4 w-4 mr-1" />
-                                    {profile?.location.address || 'No address set'}
-                                </div>
+                        </div>
+                        <div className="flex flex-col space-y-1 mt-2 text-gray-600 text-sm">
+                            <div className="flex items-center">
+                                <span className="font-semibold text-gray-700 w-28">Permanent Zip:</span>
+                                <span>{user?.permanent_zip || 'N/A'}</span>
+                            </div>
+                            <div className="flex items-center">
+                                <span className="font-semibold text-gray-700 w-28">Present Zip:</span>
+                                <span>{user?.present_zip || 'N/A'}</span>
                             </div>
                         </div>
-                    </div>
-                </CardBody>
-            </Card>
+                        <div className="flex items-center space-x-4 text-gray-600 mt-2">
+                            <div className="flex items-center">
+                                <Droplet className="h-4 w-4 mr-1" />
+                                {user?.blood_group || 'N/A'}
+                            </div>
+                        </div>
+                    </div >
+
+                </CardBody >
+            </Card >
 
             {/* Edit Form */}
-            {isEditing && (
-                <Card>
-                    <CardHeader>
-                        <h2 className="text-xl font-semibold">Edit Profile</h2>
-                    </CardHeader>
-                    <CardBody>
-                        <form onSubmit={handleEdit} className="space-y-4">
-                            <Input
-                                label="Full Name"
-                                value={editForm.full_name}
-                                onChange={(e) => setEditForm({ ...editForm, full_name: e.target.value })}
-                                required
-                            />
-                            <Input
-                                label="Phone"
-                                value={editForm.phone}
-                                onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
-                                required
-                            />
-                            <Input
-                                label="Address"
-                                value={editForm.address}
-                                onChange={(e) => setEditForm({ ...editForm, address: e.target.value })}
-                                required
-                            />
-                            <div className="flex items-center space-x-2">
-                                <input
-                                    type="checkbox"
-                                    id="is_available"
-                                    checked={editForm.is_available}
-                                    onChange={(e) => setEditForm({ ...editForm, is_available: e.target.checked })}
-                                    className="rounded border-gray-300 text-primary-500 focus:ring-primary-500"
+            {
+                isEditing && (
+                    <Card>
+                        <CardHeader>
+                            <h2 className="text-xl font-semibold">Edit Profile</h2>
+                        </CardHeader>
+                        <CardBody>
+                            <form onSubmit={handleEdit} className="space-y-4">
+                                <Input
+                                    label="Full Name"
+                                    value={editForm.full_name}
+                                    onChange={(e) => setEditForm({ ...editForm, full_name: e.target.value })}
+                                    required
                                 />
-                                <label htmlFor="is_available" className="text-sm text-gray-700">
-                                    Available for donation
-                                </label>
-                            </div>
-                            <div className="flex space-x-4">
-                                <Button type="submit" variant="primary">
-                                    Save Changes
-                                </Button>
-                                <Button type="button" variant="secondary" onClick={() => setIsEditing(false)}>
-                                    Cancel
-                                </Button>
-                            </div>
-                        </form>
-                    </CardBody>
-                </Card>
-            )}
+                                <Input
+                                    label="Phone"
+                                    value={editForm.phone}
+                                    onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
+                                    required
+                                />
+                                <div className="grid grid-cols-2 gap-4">
+                                    <Input
+                                        label="Permanent Zip"
+                                        value={editForm.permanent_zip}
+                                        onChange={(e) => setEditForm({ ...editForm, permanent_zip: e.target.value })}
+                                        required
+                                        placeholder="e.g. 560001"
+                                    />
+                                    <Input
+                                        label="Present Zip"
+                                        value={editForm.present_zip}
+                                        onChange={(e) => setEditForm({ ...editForm, present_zip: e.target.value })}
+                                        required
+                                        placeholder="e.g. 560001"
+                                    />
+                                </div>
+                                <div className="flex items-center space-x-2">
+                                    <input
+                                        type="checkbox"
+                                        id="is_available"
+                                        checked={editForm.is_available}
+                                        onChange={(e) => setEditForm({ ...editForm, is_available: e.target.checked })}
+                                        className="rounded border-gray-300 text-primary-500 focus:ring-primary-500"
+                                    />
+                                    <label htmlFor="is_available" className="text-sm text-gray-700">
+                                        Available for donation
+                                    </label>
+                                </div>
+                                <div className="flex space-x-4">
+                                    <Button type="submit" variant="primary">
+                                        Save Changes
+                                    </Button>
+                                    <Button type="button" variant="secondary" onClick={() => setIsEditing(false)}>
+                                        Cancel
+                                    </Button>
+                                </div>
+                            </form>
+                        </CardBody>
+                    </Card>
+                )
+            }
 
             {/* Contact Information */}
             <Card>
@@ -275,7 +271,7 @@ export default function ProfilePage() {
                         <div className="flex items-center justify-between">
                             <div className="flex items-center">
                                 <Mail className="h-5 w-5 text-gray-400 mr-2" />
-                                <span>{profile?.email}</span>
+                                <span>{user?.email}</span>
                             </div>
                             {session?.user && !session.user.email_confirmed_at && (
                                 <Button
@@ -306,9 +302,9 @@ export default function ProfilePage() {
                         <div className="flex items-center justify-between">
                             <div className="flex items-center">
                                 <Phone className="h-5 w-5 text-gray-400 mr-2" />
-                                <span>{profile?.phone}</span>
+                                <span>{user?.phone}</span>
                             </div>
-                            {session?.user && (!session.user.phone_confirmed_at && profile?.phone) && (
+                            {session?.user && (!session.user.phone_confirmed_at && user?.phone) && (
                                 <span className="text-xs text-yellow-600 bg-yellow-100 px-2 py-1 rounded">
                                     Unverified
                                 </span>
@@ -349,23 +345,25 @@ export default function ProfilePage() {
             </Card>
 
             {/* Achievements */}
-            {stats?.achievements.length ? (
-                <Card>
-                    <CardHeader>
-                        <h2 className="text-xl font-semibold">Achievements</h2>
-                    </CardHeader>
-                    <CardBody>
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                            {stats.achievements.map((achievement, index) => (
-                                <div key={index} className="text-center p-4 bg-gray-50 rounded-lg">
-                                    <Award className="h-6 w-6 text-primary-500 mx-auto mb-2" />
-                                    <div className="text-sm font-medium text-gray-900">{achievement}</div>
-                                </div>
-                            ))}
-                        </div>
-                    </CardBody>
-                </Card>
-            ) : null}
+            {
+                stats?.achievements.length ? (
+                    <Card>
+                        <CardHeader>
+                            <h2 className="text-xl font-semibold">Achievements</h2>
+                        </CardHeader>
+                        <CardBody>
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                {stats.achievements.map((achievement, index) => (
+                                    <div key={index} className="text-center p-4 bg-gray-50 rounded-lg">
+                                        <Award className="h-6 w-6 text-primary-500 mx-auto mb-2" />
+                                        <div className="text-sm font-medium text-gray-900">{achievement}</div>
+                                    </div>
+                                ))}
+                            </div>
+                        </CardBody>
+                    </Card>
+                ) : null
+            }
 
             {/* Sign Out Button */}
             <div className="flex justify-center">
@@ -378,6 +376,6 @@ export default function ProfilePage() {
                     Sign Out
                 </Button>
             </div>
-        </div>
+        </div >
     );
 }

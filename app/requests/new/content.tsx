@@ -30,6 +30,7 @@ export default function CreateRequestPage() {
     const [formData, setFormData] = useState({
         bloodGroup: '' as BloodGroup,
         unitsNeeded: 1,
+        dateNeeded: '',
         hospitalName: '',
         hospitalAddress: '',
         urgencyLevel: '' as UrgencyLevel,
@@ -40,7 +41,9 @@ export default function CreateRequestPage() {
             latitude: 0,
             longitude: 0,
             address: ''
-        }
+        },
+        city: '',
+        zipcode: ''
     });
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -57,6 +60,7 @@ export default function CreateRequestPage() {
                     user_id: user.id,
                     blood_group: formData.bloodGroup,
                     units_needed: formData.unitsNeeded,
+                    date_needed: formData.dateNeeded,
                     hospital_name: formData.hospitalName,
                     hospital_address: formData.hospitalAddress,
                     urgency_level: formData.urgencyLevel,
@@ -64,6 +68,8 @@ export default function CreateRequestPage() {
                     contact_name: formData.contactName,
                     contact_phone: formData.contactPhone,
                     location: formData.location,
+                    city: formData.city,
+                    zipcode: formData.zipcode,
                     status: 'active'
                 });
 
@@ -140,6 +146,15 @@ export default function CreateRequestPage() {
                                 onChange={(e) => setFormData({ ...formData, unitsNeeded: parseInt(e.target.value) })}
                                 required
                             />
+
+                            <Input
+                                type="date"
+                                label="Date Needed"
+                                value={formData.dateNeeded}
+                                min={new Date().toISOString().split('T')[0]}
+                                onChange={(e) => setFormData({ ...formData, dateNeeded: e.target.value })}
+                                required
+                            />
                         </div>
 
                         <Input
@@ -155,6 +170,23 @@ export default function CreateRequestPage() {
                             onChange={(e) => setFormData({ ...formData, hospitalAddress: e.target.value })}
                             required
                         />
+
+                        <div className="grid md:grid-cols-2 gap-4">
+                            <Input
+                                label="City"
+                                value={formData.city}
+                                onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                                required
+                                placeholder="e.g. Bangalore"
+                            />
+                            <Input
+                                label="Zip Code"
+                                value={formData.zipcode}
+                                onChange={(e) => setFormData({ ...formData, zipcode: e.target.value })}
+                                required
+                                placeholder="e.g. 560001"
+                            />
+                        </div>
 
                         <Select
                             label="Urgency Level"

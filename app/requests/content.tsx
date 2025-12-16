@@ -17,62 +17,78 @@ import { Alert } from '@/components/ui/Alert';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
 import type { BloodRequest } from '@/types';
+import { isBloodCompatible } from '@/lib/blood-compatibility';
+import { useRequests } from '@/context/RequestsContext';
+import { RequestCardSkeleton } from '@/components/skeletons/RequestCardSkeleton';
+import type { BloodGroup } from '@/types';
+
+// ...
 
 export default function RequestsPage() {
-    const { user } = useAuth();
-    const [requests, setRequests] = useState<BloodRequest[]>([]);
+    const { user, refreshProfile } = useAuth();
+    const { requests: allRequests, myDonations, refreshRequests, loading: requestsLoading } = useRequests();
+
+    // Local state for UI
+    const [filteredRequests, setFilteredRequests] = useState<BloodRequest[]>([]);
+    // Removed local offeredRequestIds, using myDonations from context
     const [viewMode, setViewMode] = useState<'list' | 'map'>('list');
-    const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
 
     const [filters, setFilters] = useState({
         bloodGroup: 'all',
         urgency: 'all',
-        location: ''
+        locationSearch: ''
     });
 
+    // Determine loading state (only for initial load)
+    const loading = requestsLoading;
+
+    // Filter Logic (Client-Side)
     useEffect(() => {
-        fetchRequests();
-    }, []);
+        let result = allRequests;
 
-    const fetchRequests = async () => {
-        try {
-            setLoading(true);
-            let query = supabase
-                .from('blood_requests')
-                .select('*')
-                .eq('status', 'active')
-                .order('created_at', { ascending: false });
-
-            if (filters.bloodGroup !== 'all') {
-                query = query.eq('blood_group', filters.bloodGroup);
-            }
-            if (filters.urgency !== 'all') {
-                query = query.eq('urgency_level', filters.urgency);
-            }
-            // TODO: Implement location filtering
-
-            const { data, error: requestError } = await query;
-
-            if (requestError) throw requestError;
-            setRequests(data as BloodRequest[]);
-        } catch (err: any) {
-            setError(err.message);
-        } finally {
-            setLoading(false);
+        if (filters.bloodGroup !== 'all') {
+            result = result.filter(r => r.blood_group === filters.bloodGroup);
         }
-    };
+        if (filters.urgency !== 'all') {
+            result = result.filter(r => r.urgency_level === filters.urgency);
+        }
+        if (filters.locationSearch) {
+            const search = filters.locationSearch.toLowerCase();
+            result = result.filter(r =>
+                (r.city && r.city.toLowerCase().includes(search)) ||
+                (r.zipcode && r.zipcode.includes(search)) ||
+                (r.hospital_address && r.hospital_address.toLowerCase().includes(search))
+            );
+        }
+
+        setFilteredRequests(result);
+    }, [allRequests, filters]);
+
+    // Removed fetchMyDonations effect as it's now in context
+
+    // Removed fetchMyDonations function
+
+    // Removed old fetchRequests function
+
 
     const [otpModal, setOtpModal] = useState({ isOpen: false, pin: '', hospitalName: '' });
     const [confirmModal, setConfirmModal] = useState<{ isOpen: boolean; request: BloodRequest | null }>({ isOpen: false, request: null });
     const [createPinModal, setCreatePinModal] = useState<{ isOpen: boolean; request: BloodRequest | null }>({ isOpen: false, request: null });
     const [newPin, setNewPin] = useState('');
     const [creatingPin, setCreatingPin] = useState(false);
-    const { refreshProfile } = useAuth(); // Assuming refreshProfile is available in useAuth
+    // Removed redundant refreshProfile declaration
 
     const handleDonateClick = async (request: BloodRequest) => {
         if (!user) {
             setError('Please login to donate');
+            return;
+        }
+
+        // Check Blood Compatibility
+        if (!isBloodCompatible(user.blood_group, request.blood_group)) {
+            const allowed = [request.blood_group]; // Simplified for message, could use getCompatibleDonors
+            setError(`Medical Safety: Your blood group (${user.blood_group}) is not compatible with the patient (${request.blood_group}).`);
             return;
         }
 
@@ -82,6 +98,16 @@ export default function RequestsPage() {
         } else {
             setConfirmModal({ isOpen: true, request });
         }
+    };
+
+    const handlePendingClick = (request: BloodRequest) => {
+        // Re-open the PIN/Success modal for this request
+        if (!user || !user.donor_pin) return;
+        setOtpModal({
+            isOpen: true,
+            pin: user.donor_pin,
+            hospitalName: request.hospital_name
+        });
     };
 
     const handleCreatePin = async () => {
@@ -133,6 +159,10 @@ export default function RequestsPage() {
 
             // Close confirm modal and open Success modal
             setConfirmModal({ isOpen: false, request: null });
+
+            // Trigger global refresh to update "Offer Sent" and Analytics
+            await refreshRequests();
+
             setOtpModal({ isOpen: true, pin, hospitalName: confirmModal.request.hospital_name });
         } catch (err: any) {
             console.error('Donation error');
@@ -143,9 +173,9 @@ export default function RequestsPage() {
 
     return (
         <div className="space-y-8">
-            <div className="flex justify-between items-center">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <h1 className="text-3xl font-bold text-gray-900">Blood Requests</h1>
-                <div className="flex gap-4">
+                <div className="flex w-full md:w-auto gap-4">
                     <div className="flex bg-gray-100 p-1 rounded-lg">
                         <button
                             onClick={() => setViewMode('list')}
@@ -161,8 +191,8 @@ export default function RequestsPage() {
                         </button>
                     </div>
                     {user && (
-                        <Link href="/requests/new">
-                            <Button variant="primary">
+                        <Link href="/requests/new" className="flex-1 md:flex-none">
+                            <Button variant="primary" className="w-full md:w-auto">
                                 Create Request
                             </Button>
                         </Link>
@@ -170,13 +200,12 @@ export default function RequestsPage() {
                 </div>
             </div>
 
-            <div className="grid md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <Select
                     label="Blood Group"
                     value={filters.bloodGroup}
                     onChange={(e) => {
                         setFilters(prev => ({ ...prev, bloodGroup: e.target.value }));
-                        fetchRequests();
                     }}
                     options={[
                         { value: 'all', label: 'All Blood Groups' },
@@ -195,7 +224,6 @@ export default function RequestsPage() {
                     value={filters.urgency}
                     onChange={(e) => {
                         setFilters(prev => ({ ...prev, urgency: e.target.value }));
-                        fetchRequests();
                     }}
                     options={[
                         { value: 'all', label: 'All Urgency Levels' },
@@ -204,12 +232,14 @@ export default function RequestsPage() {
                         { value: 'Low', label: 'Low' },
                     ]}
                 />
-                <Input
-                    label="Location"
-                    placeholder="Enter city or zip code"
-                    value={filters.location}
-                    onChange={(e) => setFilters(prev => ({ ...prev, location: e.target.value }))}
-                />
+                <div className="md:col-span-2">
+                    <Input
+                        label="Search Location"
+                        placeholder="Search by City, Zip Code, or Hospital"
+                        value={filters.locationSearch}
+                        onChange={(e) => setFilters(prev => ({ ...prev, locationSearch: e.target.value }))}
+                    />
+                </div>
             </div>
 
             {error && (
@@ -219,22 +249,36 @@ export default function RequestsPage() {
             )}
 
             {loading ? (
-                <div className="text-center py-8">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500 mx-auto"></div>
-                    <p className="mt-4 text-gray-600">Loading requests...</p>
-                </div>
-            ) : requests.length === 0 ? (
-                <div className="text-center py-8">
-                    <p className="text-gray-600">No blood requests found</p>
+                // Show Skeletons while loading
+                [1, 2, 3].map((i) => <RequestCardSkeleton key={i} />)
+            ) : filteredRequests.length === 0 ? (
+                <div className="text-center py-12 bg-white rounded-lg shadow-sm border border-gray-100 flex flex-col items-center">
+                    <div className="bg-gray-50 p-4 rounded-full mb-4">
+                        <List className="h-8 w-8 text-gray-400" />
+                    </div>
+                    <h3 className="text-lg font-medium text-gray-900 mb-1">No requests found</h3>
+                    <p className="text-gray-500 mb-4 text-sm max-w-sm">
+                        There are currently no blood requests matching your filter.
+                        Check back later or adjust your filters.
+                    </p>
                 </div>
             ) : (
                 <div className="space-y-4">
                     {viewMode === 'list' ? (
-                        requests.map(request => (
+                        filteredRequests.map(request => (
                             <BloodRequestCard
                                 key={request.id}
                                 request={request}
-                                onRespond={() => handleDonateClick(request)}
+                                onRespond={
+                                    // Hide "I can donate" if user owns the request
+                                    user?.id === request.user_id
+                                        ? undefined
+                                        : () => handleDonateClick(request)
+                                }
+                                onPendingClick={() => handlePendingClick(request)}
+                                userBloodGroup={user?.blood_group}
+                                hasOffered={myDonations.has(request.id)}
+                                isOwnRequest={user?.id === request.user_id}
                             />
                         ))
                     ) : (
@@ -242,7 +286,7 @@ export default function RequestsPage() {
                             <Map
                                 center={{ lat: 20.5937, lng: 78.9629 }}
                                 zoom={5}
-                                markers={requests.map(req => ({
+                                markers={filteredRequests.map(req => ({
                                     position: {
                                         lat: req.location.latitude,
                                         lng: req.location.longitude
@@ -373,8 +417,8 @@ export default function RequestsPage() {
                     <div className="text-sm text-gray-600">
                         <p className="mb-2"><strong>Next Steps:</strong></p>
                         <ol className="list-decimal list-inside space-y-1">
+                            <li><strong>Contact the Requestee:</strong> Their phone number will be visible in "My Donations".</li>
                             <li>Visit the hospital location.</li>
-                            <li>Meet the requestor or patient attendant.</li>
                             <li>Share this <strong>Donor PIN</strong> with them to verify your donation.</li>
                         </ol>
                     </div>
