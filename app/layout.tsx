@@ -21,6 +21,11 @@ export const metadata = {
     formatDetection: {
         telephone: false,
     },
+    icons: {
+        icon: '/icon.png',
+        shortcut: '/favicon.ico',
+        apple: '/icons/icon-192x192.png',
+    },
 };
 
 export const viewport = {
