@@ -59,7 +59,7 @@ export async function POST(request: Request) {
         // - Is registered as a donor
         let query = supabase
             .from('profiles')
-            .select('id, full_name, distance_km: id') // Placeholder for future geo-calc if needed
+            .select('id, full_name, email, distance_km: id') // Placeholder for future geo-calc if needed
             .in('blood_group', groupsToNotify)
             .eq('is_donor', true)
 
@@ -79,7 +79,57 @@ export async function POST(request: Request) {
 
         const donorIds = donors.map(d => d.id)
 
-        // 3. Fetch subscriptions for these donors
+        // 3. Send Emails (Resend API)
+        let emailsSent = 0
+        const RESEND_API_KEY = process.env.RESEND_API_KEY
+
+        if (RESEND_API_KEY) {
+            const emailPromises = donors.map(donor => {
+                if (!donor.email) return Promise.resolve()
+
+                return fetch('https://api.resend.com/emails', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${RESEND_API_KEY}`
+                    },
+                    body: JSON.stringify({
+                        from: 'Vital App <onboarding@resend.dev>', // Use verified domain or test domain
+                        to: donor.email,
+                        subject: `URGENT: ${bloodGroup} Blood Needed in ${city}`,
+                        html: `
+                            <div style="font-family: sans-serif; padding: 20px; max-width: 600px; margin: 0 auto;">
+                                <h1 style="color: #e11d48;">Urgent Blood Request</h1>
+                                <p>Hi ${donor.full_name},</p>
+                                <p>There is an urgent need for <strong>${bloodGroup}</strong> blood nearby.</p>
+                                
+                                <div style="background: #f3f4f6; padding: 15px; border-radius: 8px; margin: 20px 0;">
+                                    <p><strong>🏥 Hospital:</strong> ${hospitalName}</p>
+                                    <p><strong>📍 City:</strong> ${city}</p>
+                                    <p><strong>🚨 Urgency:</strong> ${urgencyLevel}</p>
+                                </div>
+
+                                <p>You are receiving this because you are a registered donor and a medical match.</p>
+                                
+                                <a href="${process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://vitalapp.vercel.app'}/requests" 
+                                   style="display: inline-block; background: #e11d48; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">
+                                   View Request & Respond
+                                </a>
+                            </div>
+                        `
+                    })
+                })
+                    .then(res => {
+                        if (res.ok) emailsSent++
+                        else console.error('Email failed', res.status)
+                    })
+                    .catch(e => console.error('Email error', e))
+            })
+            // Fire emails in background (don't await strictly if performance is key, but await for MVP debugging)
+            await Promise.allSettled(emailPromises)
+        }
+
+        // 4. Fetch subscriptions for Push (Parallel track)
         const { data: subscriptions, error: subError } = await supabase
             .from('push_subscriptions')
             .select('subscription, user_id')
@@ -87,41 +137,39 @@ export async function POST(request: Request) {
 
         if (subError) throw subError
 
-        if (!subscriptions || subscriptions.length === 0) {
-            return NextResponse.json({ message: 'Found donors but no push subscriptions', count: 0 })
+        let pushSent = 0
+        if (subscriptions && subscriptions.length > 0) {
+            webpush.setVapidDetails(
+                process.env.VAPID_SUBJECT || 'mailto:admin@vitalapp.com',
+                process.env.VAPID_PUBLIC_KEY!,
+                process.env.VAPID_PRIVATE_KEY!
+            )
+
+            const payload = JSON.stringify({
+                title: `URGENT: ${bloodGroup} Blood Needed Nearby!`,
+                body: `${city}: ${hospitalName} needs help. You are a match!`,
+                icon: '/icon-192x192.png',
+                url: `/requests/${requestId}` // Deep link
+            })
+
+            const promises = subscriptions.map(sub =>
+                webpush.sendNotification(sub.subscription as any, payload)
+                    .then(() => pushSent++)
+                    .catch(err => {
+                        if (err.statusCode === 410 || err.statusCode === 404) {
+                            return supabase.from('push_subscriptions').delete().eq('user_id', sub.user_id)
+                        }
+                        console.error('Push error:', err)
+                    })
+            )
+            await Promise.allSettled(promises)
         }
-
-        // 4. Send Notifications
-        webpush.setVapidDetails(
-            process.env.VAPID_SUBJECT || 'mailto:admin@vitalapp.com',
-            process.env.VAPID_PUBLIC_KEY!,
-            process.env.VAPID_PRIVATE_KEY!
-        )
-
-        const payload = JSON.stringify({
-            title: `URGENT: ${bloodGroup} Blood Needed Nearby!`,
-            body: `${city}: ${hospitalName} needs help. You are a match!`,
-            icon: '/icon-192x192.png',
-            url: `/requests/${requestId}` // Deep link
-        })
-
-        const promises = subscriptions.map(sub =>
-            webpush.sendNotification(sub.subscription as any, payload)
-                .catch(err => {
-                    if (err.statusCode === 410 || err.statusCode === 404) {
-                        // Subscription expired, delete it
-                        return supabase.from('push_subscriptions').delete().eq('user_id', sub.user_id)
-                    }
-                    console.error('Push error:', err)
-                })
-        )
-
-        await Promise.all(promises)
 
         return NextResponse.json({
             success: true,
             matchedDonors: donorIds.length,
-            notificationsSent: subscriptions.length
+            notificationsSent: pushSent,
+            emailsSent: emailsSent
         })
 
     } catch (error: any) {
