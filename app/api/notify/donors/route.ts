@@ -2,6 +2,7 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import webpush from 'web-push'
+import { getBloodRequestEmailHtml } from '@/lib/email-templates'
 
 // Medical Compatibility Rules for Donors
 // Key: Patient Blood Group (Recipient)
