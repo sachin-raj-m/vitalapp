@@ -6,13 +6,13 @@
   "/(protected)/donations/page": "app/(protected)/donations/page.js",
   "/(protected)/nearby-donors/page": "app/(protected)/nearby-donors/page.js",
   "/(protected)/profile/page": "app/(protected)/profile/page.js",
-  "/(protected)/requests/my-requests/page": "app/(protected)/requests/my-requests/page.js",
-  "/(protected)/requests/new/page": "app/(protected)/requests/new/page.js",
-  "/(protected)/requests/page": "app/(protected)/requests/page.js",
   "/_global-error/page": "app/_global-error/page.js",
   "/_not-found/page": "app/_not-found/page.js",
   "/admin/page": "app/admin/page.js",
   "/auth/callback/page": "app/auth/callback/page.js",
   "/complete-registration/page": "app/complete-registration/page.js",
-  "/page": "app/page.js"
+  "/page": "app/page.js",
+  "/requests/my-requests/page": "app/requests/my-requests/page.js",
+  "/requests/new/page": "app/requests/new/page.js",
+  "/requests/page": "app/requests/page.js"
 }
