@@ -71,7 +71,7 @@ export function RequestsProvider({ children }: { children: React.ReactNode }) {
             .on('postgres_changes',
                 { event: '*', schema: 'public', table: 'blood_requests' },
                 () => {
-                    console.log('Real-time update: Refreshing requests...');
+
                     fetchRequests();
                 }
             )

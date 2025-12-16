@@ -73,7 +73,7 @@ export function MyRequestsContent() {
         setVerifyError('');
 
         try {
-            console.log('Verifying donation:', verifyModal);
+
 
             // Check OTP against database
             const { data: donationData, error: otpError } = await supabase
@@ -87,17 +87,16 @@ export function MyRequestsContent() {
                 throw otpError;
             }
 
-            console.log('OTP DB Data:', donationData);
-            console.log('Input OTP:', otpInput);
+
 
             if (donationData.otp === otpInput) {
-                console.log('OTP Matches. Updating donation...');
+
                 // 1. Update donation status and units
                 const updatePayload = {
                     status: 'completed',
                     units_donated: unitsDonatedInput
                 };
-                console.log('Update Payload:', updatePayload);
+
 
                 const { error: updateError, count } = await supabase
                     .from('donations')
@@ -117,7 +116,7 @@ export function MyRequestsContent() {
                     throw new Error(msg);
                 }
 
-                console.log('Donation updated successfully. Rows affected:', count);
+
 
                 // 2. Check total collected units to see if we should close the request
                 // Fetch all COMPLETED donations for this request (including the one just updated)
@@ -133,18 +132,15 @@ export function MyRequestsContent() {
                 }
 
                 const totalCollected = allDonations.reduce((sum, d) => sum + (d.units_donated || 0), 0);
-                console.log('Total Collected after update:', totalCollected);
 
                 // Find the original request to get units_needed
                 const request = requests.find(r => r.id === verifyModal.requestId);
                 const unitsNeeded = request?.units_needed || 0;
-                console.log('Units Needed:', unitsNeeded);
 
                 let message = 'Donation verified successfully!';
 
                 // 3. Auto-fulfill if enough units collected
                 if (totalCollected >= unitsNeeded) {
-                    console.log('Fulfilling request...');
                     const { error: requestError } = await supabase
                         .from('blood_requests')
                         .update({ status: 'fulfilled' })
@@ -156,7 +152,6 @@ export function MyRequestsContent() {
                         throw requestError;
                     }
                     message += ' Request has been fulfilled and closed.';
-                    console.log('Request fulfilled.');
                 } else {
                     message += ` Progress: ${totalCollected}/${unitsNeeded} units.`;
                 }
