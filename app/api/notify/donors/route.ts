@@ -87,6 +87,15 @@ export async function POST(request: Request) {
             const emailPromises = donors.map(donor => {
                 if (!donor.email) return Promise.resolve()
 
+                const html = getBloodRequestEmailHtml({
+                    donorName: donor.full_name,
+                    bloodGroup,
+                    hospitalName,
+                    city,
+                    urgencyLevel,
+                    requestLink: `${process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://vitalapp.vercel.app'}/requests/${requestId}`
+                });
+
                 return fetch('https://api.resend.com/emails', {
                     method: 'POST',
                     headers: {
@@ -97,26 +106,7 @@ export async function POST(request: Request) {
                         from: 'Vital App <onboarding@resend.dev>', // Use verified domain or test domain
                         to: donor.email,
                         subject: `URGENT: ${bloodGroup} Blood Needed in ${city}`,
-                        html: `
-                            <div style="font-family: sans-serif; padding: 20px; max-width: 600px; margin: 0 auto;">
-                                <h1 style="color: #e11d48;">Urgent Blood Request</h1>
-                                <p>Hi ${donor.full_name},</p>
-                                <p>There is an urgent need for <strong>${bloodGroup}</strong> blood nearby.</p>
-                                
-                                <div style="background: #f3f4f6; padding: 15px; border-radius: 8px; margin: 20px 0;">
-                                    <p><strong>🏥 Hospital:</strong> ${hospitalName}</p>
-                                    <p><strong>📍 City:</strong> ${city}</p>
-                                    <p><strong>🚨 Urgency:</strong> ${urgencyLevel}</p>
-                                </div>
-
-                                <p>You are receiving this because you are a registered donor and a medical match.</p>
-                                
-                                <a href="${process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://vitalapp.vercel.app'}/requests" 
-                                   style="display: inline-block; background: #e11d48; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">
-                                   View Request & Respond
-                                </a>
-                            </div>
-                        `
+                        html: html
                     })
                 })
                     .then(res => {
