@@ -8,28 +8,9 @@ import { Button } from '@/components/ui/Button';
 import { Alert } from '@/components/ui/Alert';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
-import { Loader2, User, MapPin, Phone, Mail, Droplet, Award, Calendar, Settings, LogOut } from 'lucide-react';
+import { Loader2, User, MapPin, Phone, Mail, Droplet, Award, Calendar, Settings, LogOut, Edit2, Check, X, Shield, Heart } from 'lucide-react';
 import type { BloodGroup } from '@/types';
-
-interface Profile {
-    id: string;
-    email: string;
-    full_name: string;
-    phone: string;
-    blood_group: BloodGroup;
-    blood_group_proof_type: string;
-    blood_group_proof_url: string;
-    is_donor: boolean;
-    is_available: boolean;
-    permanent_zip?: string;
-    present_zip?: string;
-    location: {
-        latitude: number;
-        longitude: number;
-        address: string;
-    };
-    created_at: string;
-}
+import { motion } from 'framer-motion';
 
 interface Stats {
     total_donations: number;
@@ -70,7 +51,6 @@ export default function ProfilePage() {
         try {
             if (!user) return;
 
-            // Load donations count
             const { data: donations, error: donationsError } = await supabase
                 .from('donations')
                 .select('created_at', { count: 'exact' })
@@ -78,7 +58,6 @@ export default function ProfilePage() {
 
             if (donationsError) throw donationsError;
 
-            // Load requests count
             const { data: requests, error: requestsError } = await supabase
                 .from('blood_requests')
                 .select('created_at', { count: 'exact' })
@@ -86,12 +65,10 @@ export default function ProfilePage() {
 
             if (requestsError) throw requestsError;
 
-            // Get last donation date
             const lastDonation = donations?.sort((a, b) =>
                 new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
             )[0];
 
-            // Calculate achievements
             const achievements = [];
             if (donations?.length >= 1) achievements.push('First Time Donor');
             if (donations?.length >= 5) achievements.push('Regular Donor');
@@ -149,106 +126,174 @@ export default function ProfilePage() {
     }
 
     return (
-        <div className="max-w-4xl mx-auto space-y-6">
+        <div className="max-w-6xl mx-auto space-y-6 pb-8">
             {error && (
                 <Alert variant="error" className="mb-4">
                     {error}
                 </Alert>
             )}
 
-            {/* Profile Header */}
-            <Card>
-                <CardBody className="relative">
-                    {!isEditing && (
-                        <Button
-                            variant="ghost"
-                            className="absolute top-4 right-4"
-                            onClick={() => setIsEditing(true)}
-                        >
-                            <Settings className="h-5 w-5" />
-                        </Button>
-                    )}
-                    <div className="flex items-center space-x-4">
-                        <div className="h-20 w-20 rounded-full bg-primary-100 flex items-center justify-center">
-                            <User className="h-10 w-10 text-primary-500" />
+            {/* Hero Header with Gradient */}
+            <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-red-500 via-red-600 to-pink-600 p-8 text-white shadow-xl"
+            >
+                <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl -mr-32 -mt-32"></div>
+                <div className="absolute bottom-0 left-0 w-48 h-48 bg-white/10 rounded-full blur-3xl -ml-24 -mb-24"></div>
+
+                <div className="relative flex items-start justify-between">
+                    <div className="flex items-center space-x-6">
+                        <div className="relative">
+                            <div className="h-24 w-24 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center ring-4 ring-white/30">
+                                <User className="h-12 w-12 text-white" />
+                            </div>
+                            {user?.is_donor && (
+                                <div className="absolute -bottom-2 -right-2 bg-white rounded-full p-2 shadow-lg">
+                                    <Droplet className="h-4 w-4 text-red-500" />
+                                </div>
+                            )}
                         </div>
                         <div>
-                            <h1 className="text-2xl font-bold text-gray-900">
-                                {user?.full_name}
-                            </h1>
-                        </div>
-                        <div className="flex flex-col space-y-1 mt-2 text-gray-600 text-sm">
-                            <div className="flex items-center">
-                                <span className="font-semibold text-gray-700 w-28">Permanent Zip:</span>
-                                <span>{user?.permanent_zip || 'N/A'}</span>
-                            </div>
-                            <div className="flex items-center">
-                                <span className="font-semibold text-gray-700 w-28">Present Zip:</span>
-                                <span>{user?.present_zip || 'N/A'}</span>
-                            </div>
-                        </div>
-                        <div className="flex items-center space-x-4 text-gray-600 mt-2">
-                            <div className="flex items-center">
-                                <Droplet className="h-4 w-4 mr-1" />
-                                {user?.blood_group || 'N/A'}
+                            <h1 className="text-3xl font-bold mb-2">{user?.full_name}</h1>
+                            <div className="flex items-center space-x-4 text-white/90">
+                                <div className="flex items-center space-x-2">
+                                    <Droplet className="h-4 w-4" />
+                                    <span className="font-semibold">{user?.blood_group || 'N/A'}</span>
+                                </div>
+                                {user?.is_donor && (
+                                    <div className="flex items-center space-x-2 bg-white/20 px-3 py-1 rounded-full">
+                                        <Heart className="h-4 w-4" />
+                                        <span className="text-sm font-medium">Active Donor</span>
+                                    </div>
+                                )}
                             </div>
                         </div>
-                    </div >
+                    </div>
 
-                </CardBody >
-            </Card >
+                    <Button
+                        variant="ghost"
+                        onClick={() => setIsEditing(!isEditing)}
+                        className="text-white hover:bg-white/20 border border-white/30"
+                    >
+                        {isEditing ? (
+                            <>
+                                <X className="h-4 w-4 mr-2" />
+                                Cancel
+                            </>
+                        ) : (
+                            <>
+                                <Edit2 className="h-4 w-4 mr-2" />
+                                Edit Profile
+                            </>
+                        )}
+                    </Button>
+                </div>
+            </motion.div>
+
+            {/* Stats Grid */}
+            <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.1 }}
+                className="grid grid-cols-1 md:grid-cols-3 gap-6"
+            >
+                <Card className="hover:shadow-lg transition-shadow">
+                    <CardBody className="text-center p-6">
+                        <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-red-100 mb-4">
+                            <Droplet className="h-6 w-6 text-red-600" />
+                        </div>
+                        <div className="text-3xl font-bold text-gray-900 mb-1">{stats?.total_donations || 0}</div>
+                        <div className="text-sm text-gray-600">Total Donations</div>
+                    </CardBody>
+                </Card>
+
+                <Card className="hover:shadow-lg transition-shadow">
+                    <CardBody className="text-center p-6">
+                        <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-blue-100 mb-4">
+                            <Calendar className="h-6 w-6 text-blue-600" />
+                        </div>
+                        <div className="text-3xl font-bold text-gray-900 mb-1">
+                            {stats?.last_donation_date
+                                ? new Date(stats.last_donation_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                                : 'Never'}
+                        </div>
+                        <div className="text-sm text-gray-600">Last Donation</div>
+                    </CardBody>
+                </Card>
+
+                <Card className="hover:shadow-lg transition-shadow">
+                    <CardBody className="text-center p-6">
+                        <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-amber-100 mb-4">
+                            <Award className="h-6 w-6 text-amber-600" />
+                        </div>
+                        <div className="text-3xl font-bold text-gray-900 mb-1">{stats?.achievements.length || 0}</div>
+                        <div className="text-sm text-gray-600">Achievements</div>
+                    </CardBody>
+                </Card>
+            </motion.div>
 
             {/* Edit Form */}
-            {
-                isEditing && (
+            {isEditing && (
+                <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                >
                     <Card>
                         <CardHeader>
-                            <h2 className="text-xl font-semibold">Edit Profile</h2>
+                            <h2 className="text-xl font-semibold">Edit Profile Information</h2>
                         </CardHeader>
                         <CardBody>
-                            <form onSubmit={handleEdit} className="space-y-4">
-                                <Input
-                                    label="Full Name"
-                                    value={editForm.full_name}
-                                    onChange={(e) => setEditForm({ ...editForm, full_name: e.target.value })}
-                                    required
-                                />
-                                <Input
-                                    label="Phone"
-                                    value={editForm.phone}
-                                    onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
-                                    required
-                                />
-                                <div className="grid grid-cols-2 gap-4">
+                            <form onSubmit={handleEdit} className="space-y-6">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                     <Input
-                                        label="Permanent Zip"
+                                        label="Full Name"
+                                        value={editForm.full_name}
+                                        onChange={(e) => setEditForm({ ...editForm, full_name: e.target.value })}
+                                        required
+                                    />
+                                    <Input
+                                        label="Phone"
+                                        value={editForm.phone}
+                                        onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
+                                        required
+                                    />
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <Input
+                                        label="Permanent Zip Code"
                                         value={editForm.permanent_zip}
                                         onChange={(e) => setEditForm({ ...editForm, permanent_zip: e.target.value })}
                                         required
                                         placeholder="e.g. 560001"
                                     />
                                     <Input
-                                        label="Present Zip"
+                                        label="Present Zip Code"
                                         value={editForm.present_zip}
                                         onChange={(e) => setEditForm({ ...editForm, present_zip: e.target.value })}
                                         required
                                         placeholder="e.g. 560001"
                                     />
                                 </div>
-                                <div className="flex items-center space-x-2">
+
+                                <div className="flex items-center space-x-3 p-4 bg-gray-50 rounded-lg">
                                     <input
                                         type="checkbox"
                                         id="is_available"
                                         checked={editForm.is_available}
                                         onChange={(e) => setEditForm({ ...editForm, is_available: e.target.checked })}
-                                        className="rounded border-gray-300 text-primary-500 focus:ring-primary-500"
+                                        className="w-5 h-5 rounded border-gray-300 text-red-600 focus:ring-red-500"
                                     />
-                                    <label htmlFor="is_available" className="text-sm text-gray-700">
-                                        Available for donation
+                                    <label htmlFor="is_available" className="text-sm font-medium text-gray-700 cursor-pointer">
+                                        I am available for blood donation
                                     </label>
                                 </div>
+
                                 <div className="flex space-x-4">
-                                    <Button type="submit" variant="primary">
+                                    <Button type="submit" variant="primary" className="flex-1">
+                                        <Check className="h-4 w-4 mr-2" />
                                         Save Changes
                                     </Button>
                                     <Button type="button" variant="secondary" onClick={() => setIsEditing(false)}>
@@ -258,95 +303,101 @@ export default function ProfilePage() {
                             </form>
                         </CardBody>
                     </Card>
-                )
-            }
+                </motion.div>
+            )}
 
             {/* Contact Information */}
-            <Card>
-                <CardHeader>
-                    <h2 className="text-xl font-semibold">Contact Information</h2>
-                </CardHeader>
-                <CardBody>
-                    <div className="space-y-4">
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center">
-                                <Mail className="h-5 w-5 text-gray-400 mr-2" />
-                                <span>{user?.email}</span>
+            <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.2 }}
+            >
+                <Card>
+                    <CardHeader>
+                        <h2 className="text-xl font-semibold">Contact Information</h2>
+                    </CardHeader>
+                    <CardBody>
+                        <div className="space-y-4">
+                            <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                                <div className="flex items-center space-x-3">
+                                    <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
+                                        <Mail className="h-5 w-5 text-blue-600" />
+                                    </div>
+                                    <div>
+                                        <div className="text-sm text-gray-500">Email</div>
+                                        <div className="font-medium">{user?.email}</div>
+                                    </div>
+                                </div>
+                                {session?.user && !session.user.email_confirmed_at && (
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={async () => {
+                                            try {
+                                                const { error } = await supabase.auth.resend({
+                                                    type: 'signup',
+                                                    email: session.user.email!,
+                                                    options: {
+                                                        emailRedirectTo: `${window.location.origin}/dashboard`
+                                                    }
+                                                });
+                                                if (error) throw error;
+                                                alert('Verification email sent!');
+                                            } catch (err: any) {
+                                                console.error('Verification error');
+                                                alert('Failed to send verification email');
+                                            }
+                                        }}
+                                    >
+                                        Verify Email
+                                    </Button>
+                                )}
                             </div>
-                            {session?.user && !session.user.email_confirmed_at && (
-                                <Button
-                                    size="sm"
-                                    variant="outline"
-                                    className="text-xs h-8"
-                                    onClick={async () => {
-                                        try {
-                                            const { error } = await supabase.auth.resend({
-                                                type: 'signup',
-                                                email: session.user.email!,
-                                                options: {
-                                                    emailRedirectTo: `${window.location.origin}/dashboard`
-                                                }
-                                            });
-                                            if (error) throw error;
-                                            alert('Verification email sent!');
-                                        } catch (err: any) {
-                                            console.error('Verification error');
-                                            alert('Failed to send verification email');
-                                        }
-                                    }}
-                                >
-                                    Verify
-                                </Button>
-                            )}
-                        </div>
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center">
-                                <Phone className="h-5 w-5 text-gray-400 mr-2" />
-                                <span>{user?.phone}</span>
-                            </div>
-                            {session?.user && (!session.user.phone_confirmed_at && user?.phone) && (
-                                <span className="text-xs text-yellow-600 bg-yellow-100 px-2 py-1 rounded">
-                                    Unverified
-                                </span>
-                            )}
-                        </div>
-                    </div>
-                </CardBody>
-            </Card>
 
-            {/* Statistics */}
-            <Card>
-                <CardHeader>
-                    <h2 className="text-xl font-semibold">Statistics</h2>
-                </CardHeader>
-                <CardBody>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div className="text-center p-4 bg-gray-50 rounded-lg">
-                            <Droplet className="h-8 w-8 text-primary-500 mx-auto mb-2" />
-                            <div className="text-2xl font-bold text-gray-900">{stats?.total_donations}</div>
-                            <div className="text-sm text-gray-600">Total Donations</div>
-                        </div>
-                        <div className="text-center p-4 bg-gray-50 rounded-lg">
-                            <Calendar className="h-8 w-8 text-primary-500 mx-auto mb-2" />
-                            <div className="text-2xl font-bold text-gray-900">
-                                {stats?.last_donation_date
-                                    ? new Date(stats.last_donation_date).toLocaleDateString()
-                                    : 'Never'}
+                            <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                                <div className="flex items-center space-x-3">
+                                    <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center">
+                                        <Phone className="h-5 w-5 text-green-600" />
+                                    </div>
+                                    <div>
+                                        <div className="text-sm text-gray-500">Phone</div>
+                                        <div className="font-medium">{user?.phone || 'Not provided'}</div>
+                                    </div>
+                                </div>
+                                {session?.user && (!session.user.phone_confirmed_at && user?.phone) && (
+                                    <span className="text-xs text-amber-600 bg-amber-100 px-3 py-1 rounded-full font-medium">
+                                        Unverified
+                                    </span>
+                                )}
                             </div>
-                            <div className="text-sm text-gray-600">Last Donation</div>
+
+                            <div className="flex items-center p-4 bg-gray-50 rounded-lg">
+                                <div className="flex items-center space-x-3">
+                                    <div className="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center">
+                                        <MapPin className="h-5 w-5 text-purple-600" />
+                                    </div>
+                                    <div>
+                                        <div className="text-sm text-gray-500">Location</div>
+                                        <div className="font-medium">
+                                            {user?.permanent_zip && user?.present_zip
+                                                ? `${user.permanent_zip} (Permanent) • ${user.present_zip} (Present)`
+                                                : 'Not provided'}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
-                        <div className="text-center p-4 bg-gray-50 rounded-lg">
-                            <Award className="h-8 w-8 text-primary-500 mx-auto mb-2" />
-                            <div className="text-2xl font-bold text-gray-900">{stats?.achievements.length}</div>
-                            <div className="text-sm text-gray-600">Achievements</div>
-                        </div>
-                    </div>
-                </CardBody>
-            </Card>
+                    </CardBody>
+                </Card>
+            </motion.div>
 
             {/* Achievements */}
-            {
-                stats?.achievements.length ? (
+            {stats?.achievements && stats.achievements.length > 0 && (
+                <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.3 }}
+                >
                     <Card>
                         <CardHeader>
                             <h2 className="text-xl font-semibold">Achievements</h2>
@@ -354,28 +405,39 @@ export default function ProfilePage() {
                         <CardBody>
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                                 {stats.achievements.map((achievement, index) => (
-                                    <div key={index} className="text-center p-4 bg-gray-50 rounded-lg">
-                                        <Award className="h-6 w-6 text-primary-500 mx-auto mb-2" />
-                                        <div className="text-sm font-medium text-gray-900">{achievement}</div>
-                                    </div>
+                                    <motion.div
+                                        key={index}
+                                        initial={{ opacity: 0, scale: 0.9 }}
+                                        animate={{ opacity: 1, scale: 1 }}
+                                        transition={{ delay: 0.4 + index * 0.1 }}
+                                        className="text-center p-6 bg-gradient-to-br from-amber-50 to-orange-50 rounded-xl border border-amber-200 hover:shadow-md transition-shadow"
+                                    >
+                                        <Award className="h-8 w-8 text-amber-600 mx-auto mb-3" />
+                                        <div className="text-sm font-semibold text-gray-900">{achievement}</div>
+                                    </motion.div>
                                 ))}
                             </div>
                         </CardBody>
                     </Card>
-                ) : null
-            }
+                </motion.div>
+            )}
 
             {/* Sign Out Button */}
-            <div className="flex justify-center">
+            <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.4 }}
+                className="flex justify-center pt-4"
+            >
                 <Button
                     variant="secondary"
                     onClick={handleSignOut}
-                    className="text-red-600 hover:text-red-700"
+                    className="text-red-600 hover:text-red-700 hover:bg-red-50"
                 >
                     <LogOut className="h-5 w-5 mr-2" />
                     Sign Out
                 </Button>
-            </div>
-        </div >
+            </motion.div>
+        </div>
     );
 }
