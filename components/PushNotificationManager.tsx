@@ -92,13 +92,17 @@ export function PushNotificationManager() {
     };
 
     const saveSubscription = async (sub: PushSubscription) => {
-        await fetch('/api/web-push/subscription', {
+        const response = await fetch('/api/web-push/subscription', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify(sub),
         });
+
+        if (!response.ok) {
+            throw new Error('Failed to save subscription');
+        }
     };
 
     if (loading) {
