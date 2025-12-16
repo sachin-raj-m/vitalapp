@@ -94,6 +94,7 @@ export function PushNotificationManager() {
     const saveSubscription = async (sub: PushSubscription) => {
         const response = await fetch('/api/web-push/subscription', {
             method: 'POST',
+            credentials: 'include',
             headers: {
                 'Content-Type': 'application/json',
             },
