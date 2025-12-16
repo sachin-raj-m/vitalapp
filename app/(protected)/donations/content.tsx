@@ -17,6 +17,7 @@ interface DonationWithRequest {
     status: string;
     request: {
         hospital_name: string;
+        status?: string;
     } | null;
 }
 
@@ -27,6 +28,7 @@ export default function DonationsPage() {
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState('');
     const [withdrawingId, setWithdrawingId] = useState<string | null>(null);
+    const [filter, setFilter] = useState<'all' | 'pending' | 'verified' | 'closed'>('all');
 
     useEffect(() => {
         const fetchDonations = async () => {
@@ -40,7 +42,8 @@ export default function DonationsPage() {
                         created_at,
                         status,
                         request:blood_requests (
-                            hospital_name
+                            hospital_name,
+                            status
                         )
                     `)
                     .eq('donor_id', user.id)
@@ -93,6 +96,29 @@ export default function DonationsPage() {
         }
     };
 
+    const getDisplayStatus = (donation: DonationWithRequest) => {
+        if (donation.status === 'completed') return { label: 'Verified', variant: 'success' as const };
+        if (donation.status === 'cancelled') return { label: 'Withdrawn', variant: 'neutral' as const };
+
+        // Donation is pending, check request status
+        if (donation.request?.status === 'fulfilled' || donation.request?.status === 'closed') {
+            return { label: 'Request Fulfilled', variant: 'neutral' as const };
+        }
+
+        return { label: 'Pending', variant: 'warning' as const };
+    };
+
+    const getFilteredDonations = () => {
+        return donations.filter(d => {
+            const status = getDisplayStatus(d).label;
+            if (filter === 'all') return true;
+            if (filter === 'pending') return status === 'Pending';
+            if (filter === 'verified') return status === 'Verified';
+            if (filter === 'closed') return status === 'Request Fulfilled' || status === 'Withdrawn';
+            return true;
+        });
+    };
+
     const completedDonations = donations.filter(d => d.status === 'completed');
     const totalDonations = completedDonations.length;
     const pointsEarned = totalDonations * 50; // 50 points per donation
@@ -113,6 +139,8 @@ export default function DonationsPage() {
 
     const nextAvailable = getNextAvailableDate();
     const isAvailableNow = nextAvailable <= new Date();
+
+    const filteredDonations = getFilteredDonations();
 
     if (isLoading) {
         return (
@@ -169,51 +197,75 @@ export default function DonationsPage() {
             </div>
 
             <Card>
-                <CardHeader>
+                <CardHeader className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                     <h3 className="text-lg font-medium text-gray-900">Donation History</h3>
+                    <div className="flex bg-gray-100 p-1 rounded-lg">
+                        {(['all', 'pending', 'verified', 'closed'] as const).map((tab) => (
+                            <button
+                                key={tab}
+                                onClick={() => setFilter(tab)}
+                                className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${filter === tab
+                                    ? 'bg-white text-gray-900 shadow-sm'
+                                    : 'text-gray-500 hover:text-gray-700'
+                                    }`}
+                            >
+                                {tab.charAt(0).toUpperCase() + tab.slice(1)}
+                            </button>
+                        ))}
+                    </div>
                 </CardHeader>
                 <CardBody>
-                    {donations.length === 0 ? (
+                    {filteredDonations.length === 0 ? (
                         <EmptyState
                             icon={Heart}
-                            title="Be a Hero Today"
-                            description="Your donation journey starts with a single step. Find a request and help save a life."
-                            actionLabel="Find Requests"
+                            title={filter === 'all' ? "No donations found" : `No ${filter} donations`}
+                            description={filter === 'all' ? "Your journey starts here. Find a request to help." : "Try changing the filter."}
+                            actionLabel={filter === 'all' ? "Find Requests" : undefined}
                             className="bg-white border-none shadow-none py-8"
                             onAction={() => window.location.href = '/requests'}
                         />
                     ) : (
                         <div className="space-y-4">
-                            {donations.map((donation) => (
-                                <div key={donation.id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 border-b last:border-0 gap-3">
-                                    <div>
-                                        <p className="font-medium">
-                                            {donation.request?.hospital_name || 'Unknown Hospital'}
-                                        </p>
-                                        <p className="text-sm text-gray-500 flex items-center mt-1">
-                                            <Calendar className="h-3 w-3 mr-1" />
-                                            {new Date(donation.created_at).toLocaleDateString()}
-                                        </p>
-                                    </div>
-                                    <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-start">
-                                        <Badge variant={donation.status === 'completed' ? 'success' : donation.status === 'cancelled' ? 'neutral' : 'warning'}>
-                                            {donation.status.charAt(0).toUpperCase() + donation.status.slice(1)}
-                                        </Badge>
+                            {filteredDonations.map((donation) => {
+                                const displayStatus = getDisplayStatus(donation);
+                                return (
+                                    <div key={donation.id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 border-b last:border-0 gap-3">
+                                        <div>
+                                            <p className="font-medium">
+                                                {donation.request?.hospital_name || 'Unknown Hospital'}
+                                            </p>
+                                            <p className="text-sm text-gray-500 flex items-center mt-1">
+                                                <Calendar className="h-3 w-3 mr-1" />
+                                                {new Date(donation.created_at).toLocaleDateString()}
+                                            </p>
+                                        </div>
+                                        <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-start">
+                                            <Badge variant={displayStatus.variant}>
+                                                {displayStatus.label}
+                                            </Badge>
 
-                                        {donation.status === 'pending' && (
-                                            <Button
-                                                variant="outline"
-                                                size="sm"
-                                                className="text-red-600 border-red-200 hover:bg-red-50"
-                                                onClick={() => handleWithdraw(donation.id)}
-                                                isLoading={withdrawingId === donation.id}
-                                            >
-                                                Withdraw
-                                            </Button>
-                                        )}
+                                            {/* Show descriptive text for fulfilled requests if selected or just generally helpful */}
+                                            {displayStatus.label === 'Request Fulfilled' && (
+                                                <span className="text-xs text-gray-500 hidden sm:inline-block">
+                                                    Donated by someone else
+                                                </span>
+                                            )}
+
+                                            {displayStatus.label === 'Pending' && (
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    className="text-red-600 border-red-200 hover:bg-red-50"
+                                                    onClick={() => handleWithdraw(donation.id)}
+                                                    isLoading={withdrawingId === donation.id}
+                                                >
+                                                    Withdraw
+                                                </Button>
+                                            )}
+                                        </div>
                                     </div>
-                                </div>
-                            ))}
+                                );
+                            })}
                         </div>
                     )}
                 </CardBody>
