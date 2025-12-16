@@ -13,6 +13,8 @@ const Map = dynamic(() => import('@/components/Map'), {
 });
 import { Button } from '@/components/ui/Button';
 import { Input, Select } from '@/components/ui/Input';
+import { AuthModal } from '@/components/AuthModal';
+import { useRouter } from 'next/navigation';
 import { Alert } from '@/components/ui/Alert';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
@@ -30,6 +32,9 @@ export default function RequestsPage() {
 
     // Local state for UI
     const [filteredRequests, setFilteredRequests] = useState<BloodRequest[]>([]);
+    const [selectedRequest, setSelectedRequest] = useState<BloodRequest | null>(null);
+    const [showAuthModal, setShowAuthModal] = useState(false);
+    const [pendingRequestToDonate, setPendingRequestToDonate] = useState<BloodRequest | null>(null);
     // Removed local offeredRequestIds, using myDonations from context
     const [viewMode, setViewMode] = useState<'list' | 'map'>('list');
     const [error, setError] = useState('');
@@ -79,15 +84,15 @@ export default function RequestsPage() {
     const [creatingPin, setCreatingPin] = useState(false);
     // Removed redundant refreshProfile declaration
 
-    const handleDonateClick = async (request: BloodRequest) => {
+    const handleDonateClick = (request: BloodRequest) => {
         if (!user) {
-            setError('Please login to donate');
+            setPendingRequestToDonate(request);
+            setShowAuthModal(true);
             return;
         }
 
         // Check Blood Compatibility
         if (!isBloodCompatible(user.blood_group, request.blood_group)) {
-            const allowed = [request.blood_group]; // Simplified for message, could use getCompatibleDonors
             setError(`Medical Safety: Your blood group (${user.blood_group}) is not compatible with the patient (${request.blood_group}).`);
             return;
         }
@@ -397,6 +402,35 @@ export default function RequestsPage() {
                     </div>
                 </div>
             </Modal>
+
+
+
+            <AuthModal
+                isOpen={showAuthModal}
+                onClose={() => {
+                    setShowAuthModal(false);
+                    setPendingRequestToDonate(null);
+                }}
+                onSuccess={() => {
+                    setShowAuthModal(false);
+                    if (pendingRequestToDonate) {
+                        // After login, proceed to check compatibility and open donation modal
+                        // We need a slight delay or re-check because 'user' object might take a moment to update in context? 
+                        // Actually, onSuccess is called after await signIn, so context should update soon.
+                        // Ideally we wait for user to be populated. 
+                        // For MVP, simply re-triggering the check might fail if user context isn't instant.
+                        // Let's rely on the user clicking again or refresh. 
+                        // BETTER UX: Auto-open if compatible. 
+                        // For now, let's just close and let them click again or (optional) auto-trigger.
+                        // Let's try to auto-trigger handleDonateClick logic? No, we need 'user' object.
+                        // Just closing is fine, they are now logged in.
+                        // Actually, let's keep it simple: Just close. The user sees they are logged in.
+                        // toast.success("Welcome back! You can now proceed to donate.");
+                        console.log("User logged in via modal");
+                    }
+                }}
+                message="Login to Donate"
+            />
 
             {/* PIN Success Modal */}
             <Modal
