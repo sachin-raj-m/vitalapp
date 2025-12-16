@@ -52,6 +52,24 @@
       "namedRegex": "^/admin(?:/)?$"
     },
     {
+      "page": "/api/auth/recovery",
+      "regex": "^/api/auth/recovery(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/auth/recovery(?:/)?$"
+    },
+    {
+      "page": "/api/notify/donors",
+      "regex": "^/api/notify/donors(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/notify/donors(?:/)?$"
+    },
+    {
+      "page": "/api/notify/welcome",
+      "regex": "^/api/notify/welcome(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/notify/welcome(?:/)?$"
+    },
+    {
       "page": "/api/web-push/send",
       "regex": "^/api/web\\-push/send(?:/)?$",
       "routeKeys": {},
@@ -86,6 +104,12 @@
       "regex": "^/donations(?:/)?$",
       "routeKeys": {},
       "namedRegex": "^/donations(?:/)?$"
+    },
+    {
+      "page": "/forgot-password",
+      "regex": "^/forgot\\-password(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/forgot\\-password(?:/)?$"
     },
     {
       "page": "/login",

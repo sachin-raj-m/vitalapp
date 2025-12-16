@@ -1,4 +1,5 @@
 {
+  "/(auth)/forgot-password/page": "app/(auth)/forgot-password/page.js",
   "/(auth)/login/page": "app/(auth)/login/page.js",
   "/(auth)/register/page": "app/(auth)/register/page.js",
   "/(protected)/achievements/page": "app/(protected)/achievements/page.js",
@@ -9,6 +10,9 @@
   "/_global-error/page": "app/_global-error/page.js",
   "/_not-found/page": "app/_not-found/page.js",
   "/admin/page": "app/admin/page.js",
+  "/api/auth/recovery/route": "app/api/auth/recovery/route.js",
+  "/api/notify/donors/route": "app/api/notify/donors/route.js",
+  "/api/notify/welcome/route": "app/api/notify/welcome/route.js",
   "/api/web-push/send/route": "app/api/web-push/send/route.js",
   "/api/web-push/subscription/route": "app/api/web-push/subscription/route.js",
   "/auth/callback/page": "app/auth/callback/page.js",

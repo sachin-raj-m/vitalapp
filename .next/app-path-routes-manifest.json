@@ -1,4 +1,5 @@
 {
+  "/(auth)/forgot-password/page": "/forgot-password",
   "/(auth)/login/page": "/login",
   "/(auth)/register/page": "/register",
   "/(protected)/achievements/page": "/achievements",
@@ -9,6 +10,9 @@
   "/_global-error/page": "/_global-error",
   "/_not-found/page": "/_not-found",
   "/admin/page": "/admin",
+  "/api/auth/recovery/route": "/api/auth/recovery",
+  "/api/notify/donors/route": "/api/notify/donors",
+  "/api/notify/welcome/route": "/api/notify/welcome",
   "/api/web-push/send/route": "/api/web-push/send",
   "/api/web-push/subscription/route": "/api/web-push/subscription",
   "/auth/callback/page": "/auth/callback",
