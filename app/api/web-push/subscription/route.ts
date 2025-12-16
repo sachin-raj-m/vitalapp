@@ -1,5 +1,6 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse } from 'next/server'
+import { cookies } from 'next/headers'
 
 export async function POST(request: Request) {
     const subscription = await request.json()
@@ -8,13 +9,7 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'No subscription provided' }, { status: 400 })
     }
 
-    const cookieStore = {
-        getAll() {
-            // @ts-ignore
-            return request.cookies.getAll?.() || []
-        },
-        setAll(cookiesToSet: any[]) { },
-    }
+    const cookieStore = await cookies()
 
     const supabase = createServerClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -22,11 +17,18 @@ export async function POST(request: Request) {
         {
             cookies: {
                 getAll() {
-                    // @ts-ignore
-                    return request.cookies.getAll()
+                    return cookieStore.getAll()
                 },
                 setAll(cookiesToSet) {
-                    // Not needed for simple data fetch/insert usually unless refreshing
+                    try {
+                        cookiesToSet.forEach(({ name, value, options }) =>
+                            cookieStore.set(name, value, options)
+                        )
+                    } catch {
+                        // The `setAll` method was called from a Server Component.
+                        // This can be ignored if you have middleware refreshing
+                        // user sessions.
+                    }
                 },
             },
         }
