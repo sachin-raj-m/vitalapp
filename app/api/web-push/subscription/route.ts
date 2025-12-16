@@ -37,6 +37,7 @@ export async function POST(request: Request) {
     const { data: { user } } = await supabase.auth.getUser()
 
     if (!user) {
+        console.error('Push Subscription 401: User not found. Cookies present:', cookieStore.getAll().map(c => c.name).join(', '));
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
