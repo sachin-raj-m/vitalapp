@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import webpush from 'web-push'
 import { getBloodRequestEmailHtml } from '@/lib/email-templates'
+import { sendEmail } from '@/lib/email'
 
 // Medical Compatibility Rules for Donors
 // Key: Patient Blood Group (Recipient)
@@ -80,11 +81,11 @@ export async function POST(request: Request) {
 
         const donorIds = donors.map(d => d.id)
 
-        // 3. Send Emails (Resend API)
+        // 3. Send Emails (SMTP via Zoho)
         let emailsSent = 0
-        const RESEND_API_KEY = process.env.RESEND_API_KEY
+        const SMTP_USER = process.env.SMTP_USER; // Check if configured
 
-        if (RESEND_API_KEY) {
+        if (SMTP_USER) {
             const emailPromises = donors.map(donor => {
                 if (!donor.email) return Promise.resolve()
 
@@ -97,26 +98,15 @@ export async function POST(request: Request) {
                     requestLink: `${process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://vitalapp.vercel.app'}/requests/${requestId}`
                 });
 
-                return fetch('https://api.resend.com/emails', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${RESEND_API_KEY}`
-                    },
-                    body: JSON.stringify({
-                        from: 'Vital App <onboarding@resend.dev>', // Use verified domain or test domain
-                        to: donor.email,
-                        subject: `URGENT: ${bloodGroup} Blood Needed in ${city}`,
-                        html: html
-                    })
+                return sendEmail({
+                    to: donor.email,
+                    subject: `URGENT: ${bloodGroup} Blood Needed in ${city}`,
+                    html
                 })
-                    .then(res => {
-                        if (res.ok) emailsSent++
-                        else console.error('Email failed', res.status)
-                    })
+                    .then(() => emailsSent++)
                     .catch(e => console.error('Email error', e))
             })
-            // Fire emails in background (don't await strictly if performance is key, but await for MVP debugging)
+            // Fire emails in background
             await Promise.allSettled(emailPromises)
         }
 

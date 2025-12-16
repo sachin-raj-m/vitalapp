@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
 import { getResetPasswordEmailHtml } from '@/lib/email-templates';
+import { sendEmail } from '@/lib/email';
 
 // We need SERVICE_ROLE_KEY to use admin.generateLink
 const supabaseAdmin = createClient(
@@ -38,25 +39,14 @@ export async function POST(request: Request) {
             throw new Error('Failed to generate reset link');
         }
 
-        // Send via Resend
-        const RESEND_API_KEY = process.env.RESEND_API_KEY;
-        if (RESEND_API_KEY) {
-            const html = getResetPasswordEmailHtml({ resetLink });
+        // Send via Zoho SMTP
+        const html = getResetPasswordEmailHtml({ resetLink });
 
-            await fetch('https://api.resend.com/emails', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${RESEND_API_KEY}`
-                },
-                body: JSON.stringify({
-                    from: 'Vital App <onboarding@resend.dev>',
-                    to: email,
-                    subject: 'Reset Your Password 🔒',
-                    html: html
-                })
-            });
-        }
+        await sendEmail({
+            to: email,
+            subject: 'Reset Your Password 🔒',
+            html
+        });
 
         return NextResponse.json({ success: true });
 
