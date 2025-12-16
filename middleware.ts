@@ -31,12 +31,14 @@ export async function middleware(request: NextRequest) {
         }
     )
 
-    // Refresh session if expired - required for Server Components
     const {
         data: { user },
+        error,
     } = await supabase.auth.getUser()
 
     const path = request.nextUrl.pathname
+    console.log(`[Middleware] ${request.method} ${path}`)
+    console.log(`[Middleware] User ID: ${user?.id || 'None'}, Error: ${error?.message || 'None'}`)
 
     // Protected Routes
     const protectedPaths = [
@@ -54,12 +56,14 @@ export async function middleware(request: NextRequest) {
     const isAuthPath = authPaths.some(p => path.startsWith(p))
 
     if (isProtectedPath && !user) {
+        console.log(`[Middleware] Redirecting unauthenticated user from ${path} to /login`)
         const redirectUrl = new URL('/login', request.url)
         redirectUrl.searchParams.set('redirect', path)
         return NextResponse.redirect(redirectUrl)
     }
 
     if (isAuthPath && user) {
+        console.log(`[Middleware] Redirecting authenticated user from ${path} to /dashboard`)
         return NextResponse.redirect(new URL('/dashboard', request.url)) // Default logged-in home
     }
 

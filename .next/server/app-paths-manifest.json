@@ -9,7 +9,7 @@
   "/_global-error/page": "app/_global-error/page.js",
   "/_not-found/page": "app/_not-found/page.js",
   "/admin/page": "app/admin/page.js",
-  "/auth/callback/page": "app/auth/callback/page.js",
+  "/auth/callback/route": "app/auth/callback/route.js",
   "/complete-registration/page": "app/complete-registration/page.js",
   "/page": "app/page.js",
   "/requests/my-requests/page": "app/requests/my-requests/page.js",
