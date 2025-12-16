@@ -50,17 +50,24 @@ export function PushNotificationManager() {
 
     const subscribeToPush = async () => {
         if (!PUBLIC_KEY) {
-            console.error('VAPID Public Key not found');
+            console.error('VAPID Public Key not found. Please check .env file.');
+            toast.error('Configuration error: Public Key missing');
             return;
         }
+
+        console.log('Using Public Key:', PUBLIC_KEY); // Debug
 
         setLoading(true);
         try {
             const registration = await navigator.serviceWorker.ready;
+            console.log('Service Worker ready:', registration); // Debug
+
             const sub = await registration.pushManager.subscribe({
                 userVisibleOnly: true,
                 applicationServerKey: urlBase64ToUint8Array(PUBLIC_KEY)
             });
+
+            console.log('Subscription object:', sub); // Debug
 
             // Send subscription to backend
             await saveSubscription(sub);
