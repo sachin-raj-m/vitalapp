@@ -97,11 +97,13 @@ export default function ForgotPasswordContent() {
                         </>
                     )}
 
-                    <div className="mt-6 text-center">
-                        <Link href="/login" className="text-sm text-gray-600 hover:text-gray-900 flex items-center justify-center gap-1">
-                            <ArrowLeft className="h-4 w-4" /> Back to Login
-                        </Link>
-                    </div>
+                    {!isSuccess && (
+                        <div className="mt-6 text-center">
+                            <Link href="/login" className="text-sm text-gray-600 hover:text-gray-900 flex items-center justify-center gap-1">
+                                <ArrowLeft className="h-4 w-4" /> Back to Login
+                            </Link>
+                        </div>
+                    )}
                 </CardBody>
             </Card>
         </div>
