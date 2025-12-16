@@ -7,6 +7,7 @@ import { Footer } from "@/components/Footer";
 const inter = Inter({ subsets: ["latin"] });
 
 import { PWAInstallPrompt } from "@/components/PWAInstallPrompt";
+import { Toaster } from 'sonner';
 
 export const metadata = {
     title: "Vital Blood Donation",
@@ -47,6 +48,7 @@ export default function RootLayout({
                         </main>
                         <PWAInstallPrompt />
                         <Footer />
+                        <Toaster />
                     </div>
                 </AuthProvider>
             </body>

@@ -1,0 +1,20 @@
+{
+  "/(auth)/login/page": "/login",
+  "/(auth)/register/page": "/register",
+  "/(protected)/achievements/page": "/achievements",
+  "/(protected)/dashboard/page": "/dashboard",
+  "/(protected)/donations/page": "/donations",
+  "/(protected)/nearby-donors/page": "/nearby-donors",
+  "/(protected)/profile/page": "/profile",
+  "/_global-error/page": "/_global-error",
+  "/_not-found/page": "/_not-found",
+  "/admin/page": "/admin",
+  "/api/web-push/send/route": "/api/web-push/send",
+  "/api/web-push/subscription/route": "/api/web-push/subscription",
+  "/auth/callback/page": "/auth/callback",
+  "/complete-registration/page": "/complete-registration",
+  "/page": "/",
+  "/requests/my-requests/page": "/requests/my-requests",
+  "/requests/new/page": "/requests/new",
+  "/requests/page": "/requests"
+}

@@ -8,7 +8,8 @@ import { Button } from '@/components/ui/Button';
 import { Alert } from '@/components/ui/Alert';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
-import { Loader2, User, MapPin, Phone, Mail, Droplet, Award, Calendar, Settings, LogOut, Edit2, Check, X, Shield, Heart } from 'lucide-react';
+import { Loader2, User, MapPin, Phone, Mail, Droplet, Award, Calendar, Settings, LogOut, Edit2, Check, X, Shield, Heart, Bell } from 'lucide-react';
+import { PushNotificationManager } from '@/components/PushNotificationManager';
 import type { BloodGroup } from '@/types';
 import { motion } from 'framer-motion';
 
@@ -305,6 +306,33 @@ export default function ProfilePage() {
                     </Card>
                 </motion.div>
             )}
+
+            {/* Preferences */}
+            <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.15 }}
+            >
+                <Card>
+                    <CardHeader>
+                        <h2 className="text-xl font-semibold">Preferences</h2>
+                    </CardHeader>
+                    <CardBody>
+                        <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                            <div className="flex items-center space-x-3">
+                                <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center">
+                                    <Bell className="h-5 w-5 text-indigo-600" />
+                                </div>
+                                <div>
+                                    <div className="font-medium text-gray-900">Push Notifications</div>
+                                    <div className="text-sm text-gray-500">Receive alerts when blood is needed nearby</div>
+                                </div>
+                            </div>
+                            <PushNotificationManager />
+                        </div>
+                    </CardBody>
+                </Card>
+            </motion.div>
 
             {/* Contact Information */}
             <motion.div
