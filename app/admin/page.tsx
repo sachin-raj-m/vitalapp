@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/Button';
 import { Alert } from '@/components/ui/Alert';
 import { Download, Loader2, Check, X, FileText, ExternalLink, Users, Activity, Shield, Search, Trash2, HeartPulse, User } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend, BarChart, Bar, XAxis, YAxis, CartesianGrid, LineChart, Line } from 'recharts';
+import { AnalyticsCharts } from '@/components/admin/AnalyticsCharts';
 
 interface Profile {
     id: string;
@@ -39,7 +39,7 @@ export default function AdminDashboard() {
     const [users, setUsers] = useState<Profile[]>([]);
     const [requests, setRequests] = useState<Request[]>([]);
     const [donations, setDonations] = useState<any[]>([]);
-    const [loading, setLoading] = useState(true);
+    const [isLoading, setIsLoading] = useState(true);
     const [actionLoading, setActionLoading] = useState<string | null>(null);
     const [error, setError] = useState('');
     const [searchTerm, setSearchTerm] = useState('');
@@ -122,11 +122,24 @@ export default function AdminDashboard() {
         try {
             const { error } = await supabase.from('blood_requests').delete().eq('id', requestId);
             if (error) throw error;
-            setRequests(prev => prev.filter(r => r.id !== requestId));
+            // Fetch all data again to ensure consistency after deletion
+            const [profilesRes, requestsRes, donationsRes] = await Promise.all([
+                supabase.from('profiles').select('*').order('created_at', { ascending: false }),
+                supabase.from('blood_requests').select('*').order('created_at', { ascending: false }),
+                supabase.from('donations').select('*').order('created_at', { ascending: false }) // Changed to false for consistency with other fetches
+            ]);
+
+            if (profilesRes.error) console.error('Error fetching profiles', profilesRes.error);
+            if (requestsRes.error) console.error('Error fetching requests', requestsRes.error);
+            if (donationsRes.error) console.error('Error fetching donations', donationsRes.error);
+
+            setUsers(profilesRes.data || []);
+            setRequests(requestsRes.data || []);
+            setDonations(donationsRes.data || []);
         } catch (err: any) {
             setError(err.message);
         } finally {
-            setActionLoading(null);
+            setActionLoading(null); // Reverted to original setActionLoading(null)
         }
     };
 
