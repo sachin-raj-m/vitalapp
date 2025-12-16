@@ -1,8 +1,27 @@
-import React from 'react';
+"use client";
+
+import React, { useState } from 'react';
 import Link from 'next/link';
 import { Mail } from 'lucide-react';
+import { useAuth } from '@/context/AuthContext';
+import { useRouter } from 'next/navigation';
+import { AuthModal } from './AuthModal';
+
 
 export const Footer: React.FC = () => {
+  const { user } = useAuth();
+  const router = useRouter();
+  const [showAuthModal, setShowAuthModal] = useState(false);
+
+  const handleRequestBlood = (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (user) {
+      router.push('/requests/new');
+    } else {
+      setShowAuthModal(true);
+    }
+  };
+
   return (
     <footer className="bg-white border-t border-gray-100 py-12 pb-24 md:pb-12 mt-auto">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 flex flex-col items-center">
@@ -19,9 +38,13 @@ export const Footer: React.FC = () => {
           <Link href="/requests" className="text-sm font-medium text-gray-600 hover:text-red-500 transition-colors">
             Find Donors
           </Link>
-          <Link href="/requests/new" className="text-sm font-medium text-gray-600 hover:text-red-500 transition-colors">
+          <a
+            href="/requests/new"
+            onClick={handleRequestBlood}
+            className="text-sm font-medium text-gray-600 hover:text-red-500 transition-colors cursor-pointer"
+          >
             Request Blood
-          </Link>
+          </a>
           <Link href="/register" className="text-sm font-medium text-gray-600 hover:text-red-500 transition-colors">
             Become a Donor
           </Link>
@@ -36,6 +59,16 @@ export const Footer: React.FC = () => {
           &copy; {new Date().getFullYear()} Vital Blood Donation. All rights reserved.
         </div>
       </div>
+
+      <AuthModal
+        isOpen={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
+        onSuccess={() => {
+          setShowAuthModal(false);
+          router.push('/requests/new');
+        }}
+        message="Login to Create Request"
+      />
     </footer>
   );
 };

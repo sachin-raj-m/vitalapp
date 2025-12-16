@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { MapPin, AlertCircle } from 'lucide-react';
 import { Card, CardHeader, CardBody } from '@/components/ui/Card';
@@ -23,9 +23,23 @@ const Map = dynamic(() => import('@/components/Map'), {
 
 export default function CreateRequestPage() {
     const router = useRouter();
-    const { user } = useAuth();
+    const { user, loading } = useAuth();
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState('');
+
+    useEffect(() => {
+        if (!loading && !user) {
+            router.push('/login?redirect=/requests/new');
+        }
+    }, [user, loading, router]);
+
+    if (loading || !user) {
+        return (
+            <div className="flex justify-center items-center min-h-[50vh]">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+            </div>
+        );
+    }
 
     const [formData, setFormData] = useState({
         bloodGroup: '' as BloodGroup,
