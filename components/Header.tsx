@@ -36,6 +36,7 @@ export function Header() {
             {user ? (
               <div className="flex items-center space-x-6">
                 <Link href="/dashboard" className="text-gray-600 hover:text-gray-900">Dashboard</Link>
+                <Link href="/requests" className="text-gray-600 hover:text-gray-900">Requests</Link>
                 <Link href="/requests/my-requests" className="text-gray-600 hover:text-gray-900">My Requests</Link>
                 <Link href="/donations" className="text-gray-600 hover:text-gray-900">Donations</Link>
                 <Link href="/nearby-donors" className="text-gray-600 hover:text-gray-900">Find Donors</Link>
@@ -71,6 +72,7 @@ export function Header() {
               <div className="flex flex-col space-y-3">
                 <Link href="/dashboard" onClick={closeMenu} className="block px-2 py-1 text-gray-600 hover:text-primary-600 hover:bg-gray-50 rounded-md">Dashboard</Link>
                 <Link href="/requests" onClick={closeMenu} className="block px-2 py-1 text-gray-600 hover:text-primary-600 hover:bg-gray-50 rounded-md">Requests</Link>
+                <Link href="/requests/my-requests" onClick={closeMenu} className="block px-2 py-1 text-gray-600 hover:text-primary-600 hover:bg-gray-50 rounded-md">My Requests</Link>
                 <Link href="/requests/my-requests" onClick={closeMenu} className="block px-2 py-1 text-gray-600 hover:text-primary-600 hover:bg-gray-50 rounded-md">My Requests</Link>
                 <Link href="/donations" onClick={closeMenu} className="block px-2 py-1 text-gray-600 hover:text-primary-600 hover:bg-gray-50 rounded-md">Donations</Link>
                 <Link href="/nearby-donors" onClick={closeMenu} className="block px-2 py-1 text-gray-600 hover:text-primary-600 hover:bg-gray-50 rounded-md">Find Donors</Link>
