@@ -37,27 +37,48 @@ export async function POST(request: Request) {
     const { data: { user } } = await supabase.auth.getUser()
 
     if (!user) {
+        // Fallback: Try Authorization header
+        const authHeader = request.headers.get('Authorization')
+        if (authHeader) {
+            const token = authHeader.replace('Bearer ', '')
+            const { data: { user: headerUser }, error: headerError } = await supabase.auth.getUser(token)
+
+            if (headerUser && !headerError) {
+                // Recovered user from header
+                // proceed with headerUser logic by re-assigning or just using it below?
+                // Better to just let the upsert use headerUser.id if user is null
+
+                // We need to re-assign or use a new variable. 
+                // Let's refactor slightly to handle both standard variable.
+                await upsertSubscription(supabase, headerUser.id, subscription);
+                return NextResponse.json({ success: true })
+            }
+        }
+
         console.error('Push Subscription 401: User not found. Cookies present:', cookieStore.getAll().map(c => c.name).join(', '));
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     try {
-        // Upsert subscription
-        const { error } = await supabase
-            .from('push_subscriptions')
-            .upsert({
-                user_id: user.id,
-                subscription: subscription
-            }, { onConflict: 'user_id, subscription' }) // We made UNIQUE(user_id, subscription)
-
-        if (error) {
-            console.error('Error saving subscription:', error)
-            return NextResponse.json({ error: 'Database error' }, { status: 500 })
-        }
-
+        await upsertSubscription(supabase, user.id, subscription);
         return NextResponse.json({ success: true })
     } catch (error) {
         console.error('Error in subscription route:', error)
         return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
     }
 }
+
+async function upsertSubscription(supabase: any, userId: string, subscription: any) {
+    const { error } = await supabase
+        .from('push_subscriptions')
+        .upsert({
+            user_id: userId,
+            subscription: subscription
+        }, { onConflict: 'user_id, subscription' })
+
+    if (error) {
+        console.error('Error saving subscription:', error)
+        throw error
+    }
+}
+
