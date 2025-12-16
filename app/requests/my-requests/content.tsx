@@ -338,7 +338,11 @@ export function MyRequestsContent() {
                                                         </div>
                                                         <div>
                                                             <p className="font-medium text-gray-900">{donation.profiles?.full_name || 'Anonymous'}</p>
-                                                            <p className="text-sm text-gray-500">{donation.profiles?.phone}</p>
+                                                            <p className="text-sm text-gray-500">
+                                                                {request.status === 'active'
+                                                                    ? donation.profiles?.phone
+                                                                    : <span className="text-gray-400 italic">Contact Hidden</span>}
+                                                            </p>
                                                         </div>
                                                     </div>
 
