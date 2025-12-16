@@ -1,5 +1,3 @@
-import withPWA from 'next-pwa';
-
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   images: {
@@ -17,10 +15,4 @@ const nextConfig = {
   turbopack: {},
 };
 
-export default withPWA({
-  dest: 'public',
-  disable: false, // Enable in dev for testing
-  register: true,
-  skipWaiting: true,
-  importScripts: ['/custom-sw.js'],
-})(nextConfig);
+export default nextConfig;
