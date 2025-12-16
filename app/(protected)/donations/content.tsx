@@ -4,9 +4,12 @@ import React, { useEffect, useState } from 'react';
 import { Card, CardHeader, CardBody } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { useAuth } from '@/context/AuthContext';
+import { useRequests } from '@/context/RequestsContext';
 import { supabase } from '@/lib/supabase';
-import { Loader2, Calendar } from 'lucide-react';
+import { Loader2, Calendar, XCircle, Heart } from 'lucide-react';
+import { Button } from '@/components/ui/Button';
 import { Alert } from '@/components/ui/Alert';
+import { EmptyState } from '@/components/EmptyState';
 
 interface DonationWithRequest {
     id: string;
@@ -19,9 +22,11 @@ interface DonationWithRequest {
 
 export default function DonationsPage() {
     const { user } = useAuth();
+    const { refreshRequests } = useRequests();
     const [donations, setDonations] = useState<DonationWithRequest[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState('');
+    const [withdrawingId, setWithdrawingId] = useState<string | null>(null);
 
     useEffect(() => {
         const fetchDonations = async () => {
@@ -60,6 +65,33 @@ export default function DonationsPage() {
 
         fetchDonations();
     }, [user]);
+
+    const handleWithdraw = async (donationId: string) => {
+        if (!confirm('Are you sure you want to withdraw this donation offer?')) return;
+
+        setWithdrawingId(donationId);
+        try {
+            const { error } = await supabase
+                .from('donations')
+                .update({ status: 'cancelled' })
+                .eq('id', donationId);
+
+            if (error) throw error;
+
+            // Update local state
+            setDonations(prev => prev.map(d =>
+                d.id === donationId ? { ...d, status: 'cancelled' } : d
+            ));
+
+            // Refresh global context to update "Offer Sent" buttons elsewhere
+            await refreshRequests();
+        } catch (err: any) {
+            console.error('Error withdrawing donation', err);
+            setError('Failed to withdraw donation');
+        } finally {
+            setWithdrawingId(null);
+        }
+    };
 
     const completedDonations = donations.filter(d => d.status === 'completed');
     const totalDonations = completedDonations.length;
@@ -100,7 +132,7 @@ export default function DonationsPage() {
                 </Alert>
             )}
 
-            <div className="grid md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <Card>
                     <CardHeader>
                         <h3 className="text-lg font-medium text-gray-900">Total Donations</h3>
@@ -142,13 +174,18 @@ export default function DonationsPage() {
                 </CardHeader>
                 <CardBody>
                     {donations.length === 0 ? (
-                        <div className="text-center py-8 text-gray-500">
-                            No donations found. Your journey starts with the first step!
-                        </div>
+                        <EmptyState
+                            icon={Heart}
+                            title="Be a Hero Today"
+                            description="Your donation journey starts with a single step. Find a request and help save a life."
+                            actionLabel="Find Requests"
+                            className="bg-white border-none shadow-none py-8"
+                            onAction={() => window.location.href = '/requests'}
+                        />
                     ) : (
                         <div className="space-y-4">
                             {donations.map((donation) => (
-                                <div key={donation.id} className="flex items-center justify-between p-4 border-b last:border-0">
+                                <div key={donation.id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 border-b last:border-0 gap-3">
                                     <div>
                                         <p className="font-medium">
                                             {donation.request?.hospital_name || 'Unknown Hospital'}
@@ -158,9 +195,23 @@ export default function DonationsPage() {
                                             {new Date(donation.created_at).toLocaleDateString()}
                                         </p>
                                     </div>
-                                    <Badge variant={donation.status === 'completed' ? 'success' : 'warning'}>
-                                        {donation.status.charAt(0).toUpperCase() + donation.status.slice(1)}
-                                    </Badge>
+                                    <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-start">
+                                        <Badge variant={donation.status === 'completed' ? 'success' : donation.status === 'cancelled' ? 'neutral' : 'warning'}>
+                                            {donation.status.charAt(0).toUpperCase() + donation.status.slice(1)}
+                                        </Badge>
+
+                                        {donation.status === 'pending' && (
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                className="text-red-600 border-red-200 hover:bg-red-50"
+                                                onClick={() => handleWithdraw(donation.id)}
+                                                isLoading={withdrawingId === donation.id}
+                                            >
+                                                Withdraw
+                                            </Button>
+                                        )}
+                                    </div>
                                 </div>
                             ))}
                         </div>

@@ -5,9 +5,9 @@ import { supabase } from '@/lib/supabase';
 import { Card, CardBody } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Alert } from '@/components/ui/Alert';
-import { Loader2, Check, X, FileText, ExternalLink, Users, Activity, Shield, Search, Trash2, HeartPulse, User } from 'lucide-react';
+import { Download, Loader2, Check, X, FileText, ExternalLink, Users, Activity, Shield, Search, Trash2, HeartPulse, User } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
+import { AnalyticsCharts } from '@/components/admin/AnalyticsCharts';
 
 interface Profile {
     id: string;
@@ -38,7 +38,8 @@ export default function AdminDashboard() {
     const [stats, setStats] = useState({ users: 0, donors: 0, pending: 0, requests: 0 });
     const [users, setUsers] = useState<Profile[]>([]);
     const [requests, setRequests] = useState<Request[]>([]);
-    const [loading, setLoading] = useState(true);
+    const [donations, setDonations] = useState<any[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
     const [actionLoading, setActionLoading] = useState<string | null>(null);
     const [error, setError] = useState('');
     const [searchTerm, setSearchTerm] = useState('');
@@ -49,22 +50,26 @@ export default function AdminDashboard() {
     }, []);
 
     const fetchAllData = async () => {
-        setLoading(true);
+        setIsLoading(true);
         try {
             // Parallel fetches for efficiency
-            const [usersRes, requestsRes] = await Promise.all([
+            const [usersRes, requestsRes, donationsRes] = await Promise.all([
                 supabase.from('profiles').select('*').order('created_at', { ascending: false }),
-                supabase.from('blood_requests').select('*').order('created_at', { ascending: false })
+                supabase.from('blood_requests').select('*').order('created_at', { ascending: false }),
+                supabase.from('donations').select('*').order('created_at', { ascending: true })
             ]);
 
             if (usersRes.error) throw usersRes.error;
             if (requestsRes.error) throw requestsRes.error;
+            if (donationsRes.error) throw donationsRes.error;
 
             const allUsers = usersRes.data || [];
             const allRequests = requestsRes.data || [];
+            const allDonations = donationsRes.data || [];
 
             setUsers(allUsers);
             setRequests(allRequests);
+            setDonations(allDonations);
 
             setStats({
                 users: allUsers.length,
@@ -75,7 +80,7 @@ export default function AdminDashboard() {
         } catch (err: any) {
             setError(err.message);
         } finally {
-            setLoading(false);
+            setIsLoading(false);
         }
     };
 
@@ -117,11 +122,24 @@ export default function AdminDashboard() {
         try {
             const { error } = await supabase.from('blood_requests').delete().eq('id', requestId);
             if (error) throw error;
-            setRequests(prev => prev.filter(r => r.id !== requestId));
+            // Fetch all data again to ensure consistency after deletion
+            const [profilesRes, requestsRes, donationsRes] = await Promise.all([
+                supabase.from('profiles').select('*').order('created_at', { ascending: false }),
+                supabase.from('blood_requests').select('*').order('created_at', { ascending: false }),
+                supabase.from('donations').select('*').order('created_at', { ascending: false }) // Changed to false for consistency with other fetches
+            ]);
+
+            if (profilesRes.error) console.error('Error fetching profiles', profilesRes.error);
+            if (requestsRes.error) console.error('Error fetching requests', requestsRes.error);
+            if (donationsRes.error) console.error('Error fetching donations', donationsRes.error);
+
+            setUsers(profilesRes.data || []);
+            setRequests(requestsRes.data || []);
+            setDonations(donationsRes.data || []);
         } catch (err: any) {
             setError(err.message);
         } finally {
-            setActionLoading(null);
+            setActionLoading(null); // Reverted to original setActionLoading(null)
         }
     };
 
@@ -175,7 +193,28 @@ export default function AdminDashboard() {
 
     const pendingDonors = users.filter(u => u.verification_status === 'pending' && u.is_donor);
 
-    if (loading) return <div className="flex justify-center p-8"><Loader2 className="animate-spin h-8 w-8 text-red-500" /></div>;
+    const downloadCSV = (data: any[], filename: string) => {
+        if (!data.length) return;
+        const headers = Object.keys(data[0]);
+        const csvContent = [
+            headers.join(','),
+            ...data.map(row => headers.map(fieldName => JSON.stringify(row[fieldName] || '')).join(','))
+        ].join('\n');
+
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement("a");
+        if (link.download !== undefined) {
+            const url = URL.createObjectURL(blob);
+            link.setAttribute("href", url);
+            link.setAttribute("download", filename);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+    };
+
+    if (isLoading) return <div className="flex justify-center p-8"><Loader2 className="animate-spin h-8 w-8 text-red-500" /></div>;
 
     return (
         <div className="space-y-8">
@@ -291,6 +330,16 @@ export default function AdminDashboard() {
                                 onChange={(e) => setSearchTerm(e.target.value)}
                             />
                         </div>
+                        <div className="flex justify-end mb-4">
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => downloadCSV(filteredUsers, 'users_export.csv')}
+                                className="flex items-center gap-2"
+                            >
+                                <Download size={16} /> Export CSV
+                            </Button>
+                        </div>
                         <div className="overflow-x-auto border rounded-lg">
                             <table className="min-w-full divide-y divide-gray-200">
                                 <thead className="bg-gray-50">
@@ -381,112 +430,54 @@ export default function AdminDashboard() {
                 )}
 
                 {activeTab === 'requests' && (
-                    <div className="overflow-x-auto border rounded-lg">
-                        <table className="min-w-full divide-y divide-gray-200">
-                            <thead className="bg-gray-50">
-                                <tr>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Hospital</th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Blood Group</th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Action</th>
-                                </tr>
-                            </thead>
-                            <tbody className="bg-white divide-y divide-gray-200">
-                                {requests.map(req => (
-                                    <tr key={req.id}>
-                                        <td className="px-6 py-4 text-sm font-medium text-gray-900">{req.hospital_name}</td>
-                                        <td className="px-6 py-4 text-sm text-gray-900">{req.blood_group} ({req.units_needed} units) <span className="text-xs text-red-500 border border-red-200 px-1 rounded">{req.urgency_level}</span></td>
-                                        <td className="px-6 py-4 text-sm">
-                                            <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${req.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
-                                                {req.status}
-                                            </span>
-                                        </td>
-                                        <td className="px-6 py-4 text-sm text-gray-500">{new Date(req.created_at).toLocaleDateString()}</td>
-                                        <td className="px-6 py-4 text-sm">
-                                            <button onClick={() => deleteRequest(req.id)} className="text-red-500 hover:text-red-700">
-                                                <Trash2 className="w-4 h-4" />
-                                            </button>
-                                        </td>
+                    <div className="space-y-4">
+                        <div className="flex justify-end">
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => downloadCSV(requests, 'requests_export.csv')}
+                                className="flex items-center gap-2"
+                            >
+                                <Download size={16} /> Export CSV
+                            </Button>
+                        </div>
+                        <div className="overflow-x-auto border rounded-lg">
+                            <table className="min-w-full divide-y divide-gray-200">
+                                <thead className="bg-gray-50">
+                                    <tr>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Hospital</th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Blood Group</th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Action</th>
                                     </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                                </thead>
+                                <tbody className="bg-white divide-y divide-gray-200">
+                                    {requests.map(req => (
+                                        <tr key={req.id}>
+                                            <td className="px-6 py-4 text-sm font-medium text-gray-900">{req.hospital_name}</td>
+                                            <td className="px-6 py-4 text-sm text-gray-900">{req.blood_group} ({req.units_needed} units) <span className="text-xs text-red-500 border border-red-200 px-1 rounded">{req.urgency_level}</span></td>
+                                            <td className="px-6 py-4 text-sm">
+                                                <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${req.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
+                                                    {req.status}
+                                                </span>
+                                            </td>
+                                            <td className="px-6 py-4 text-sm text-gray-500">{new Date(req.created_at).toLocaleDateString()}</td>
+                                            <td className="px-6 py-4 text-sm">
+                                                <button onClick={() => deleteRequest(req.id)} className="text-red-500 hover:text-red-700">
+                                                    <Trash2 className="w-4 h-4" />
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 )}
 
                 {activeTab === 'analytics' && (
-                    <div className="grid md:grid-cols-2 gap-8">
-                        <Card>
-                            <CardBody className="p-6">
-                                <h3 className="text-lg font-semibold mb-6 flex items-center">
-                                    <Users className="h-5 w-5 mr-2 text-red-500" />
-                                    Donor Distribution by Blood Group
-                                </h3>
-                                <div className="h-[300px] w-full">
-                                    <ResponsiveContainer width="100%" height="100%">
-                                        <PieChart>
-                                            <Pie
-                                                data={Object.entries(users
-                                                    .filter(u => u.is_donor && u.blood_group)
-                                                    .reduce((acc: any, curr) => {
-                                                        const bg = curr.blood_group || 'Unknown';
-                                                        acc[bg] = (acc[bg] || 0) + 1;
-                                                        return acc;
-                                                    }, {}))
-                                                    .map(([name, value]) => ({ name, value }))
-                                                }
-                                                cx="50%"
-                                                cy="50%"
-                                                innerRadius={60}
-                                                outerRadius={100}
-                                                paddingAngle={2}
-                                                dataKey="value"
-                                            >
-                                                {
-                                                    // Generate random colors or use a palette
-                                                    [0, 1, 2, 3, 4, 5, 6, 7].map((entry, index) => (
-                                                        <Cell key={`cell-${index}`} fill={['#EF4444', '#F87171', '#FCA5A5', '#B91C1C', '#991B1B', '#7F1D1D', '#FECACA', '#DC2626'][index % 8]} />
-                                                    ))
-                                                }
-                                            </Pie>
-                                            <Tooltip />
-                                            <Legend verticalAlign="bottom" height={36} />
-                                        </PieChart>
-                                    </ResponsiveContainer>
-                                </div>
-                            </CardBody>
-                        </Card>
-
-                        <Card>
-                            <CardBody className="p-6">
-                                <h3 className="text-lg font-semibold mb-6 flex items-center">
-                                    <Activity className="h-5 w-5 mr-2 text-blue-500" />
-                                    Requests by Urgency
-                                </h3>
-                                <div className="h-[300px] w-full">
-                                    <ResponsiveContainer width="100%" height="100%">
-                                        <BarChart
-                                            data={Object.entries(requests
-                                                .reduce((acc: any, curr) => {
-                                                    const level = curr.urgency_level || 'Normal';
-                                                    acc[level] = (acc[level] || 0) + 1;
-                                                    return acc;
-                                                }, {}))
-                                                .map(([name, value]) => ({ name, value }))
-                                            }
-                                        >
-                                            <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                                            <XAxis dataKey="name" />
-                                            <YAxis allowDecimals={false} />
-                                            <Tooltip cursor={{ fill: '#F3F4F6' }} />
-                                            <Bar dataKey="value" fill="#3B82F6" radius={[4, 4, 0, 0]} barSize={50} />
-                                        </BarChart>
-                                    </ResponsiveContainer>
-                                </div>
-                            </CardBody>
-                        </Card>
-                    </div>
+                    <AnalyticsCharts users={users} requests={requests} donations={donations} />
                 )}
             </div>
 

@@ -26,6 +26,8 @@ interface CompleteRegistrationForm {
     bloodGroup: BloodGroup;
     proofType: string;
     proofFile: File | null;
+    permanentZip: string;
+    presentZip: string;
 }
 
 export default function CompleteRegistration() {
@@ -41,6 +43,8 @@ export default function CompleteRegistration() {
         bloodGroup: '' as BloodGroup,
         proofType: '',
         proofFile: null,
+        permanentZip: '',
+        presentZip: ''
     });
     const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
@@ -134,6 +138,13 @@ export default function CompleteRegistration() {
             errors.proofFile = 'File size must be less than 1MB';
         }
 
+        if (!formData.permanentZip.trim()) {
+            errors.permanentZip = 'Permanent Zip Code is required';
+        }
+        if (!formData.presentZip.trim()) {
+            errors.presentZip = 'Present Zip Code is required';
+        }
+
         setFieldErrors(errors);
         return Object.keys(errors).length === 0;
     };
@@ -190,10 +201,12 @@ export default function CompleteRegistration() {
                         blood_group_proof_url: filePath,
                         is_donor: true,
                         is_available: true,
+                        permanent_zip: formData.permanentZip,
+                        present_zip: formData.presentZip,
                         location: {
                             latitude: 0,
                             longitude: 0,
-                            address: '',
+                            address: '', // Specific address removed as per requirement
                         },
                     },
                     {
@@ -303,11 +316,31 @@ export default function CompleteRegistration() {
                                     { value: 'AB+', label: 'AB+' },
                                     { value: 'AB-', label: 'AB-' },
                                     { value: 'O+', label: 'O+' },
+                                    { value: 'O+', label: 'O+' },
                                     { value: 'O-', label: 'O-' },
                                 ]}
                                 required
                                 error={fieldErrors.bloodGroup}
                             />
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <Input
+                                    label="Permanent Zip Code"
+                                    value={formData.permanentZip}
+                                    onChange={(e) => setFormData({ ...formData, permanentZip: e.target.value })}
+                                    required
+                                    placeholder="e.g. 560001"
+                                    error={fieldErrors.permanentZip}
+                                />
+                                <Input
+                                    label="Present Zip Code"
+                                    value={formData.presentZip}
+                                    onChange={(e) => setFormData({ ...formData, presentZip: e.target.value })}
+                                    required
+                                    placeholder="e.g. 560001"
+                                    error={fieldErrors.presentZip}
+                                />
+                            </div>
                             <Select
                                 label="Blood Group Proof Type"
                                 value={formData.proofType}

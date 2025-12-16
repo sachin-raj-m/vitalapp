@@ -6,9 +6,29 @@ import { Footer } from "@/components/Footer";
 
 const inter = Inter({ subsets: ["latin"] });
 
+import { PWAInstallPrompt } from "@/components/PWAInstallPrompt";
+
 export const metadata = {
     title: "Vital Blood Donation",
     description: "Blood donation platform",
+    manifest: "/manifest.json",
+    appleWebApp: {
+        capable: true,
+        statusBarStyle: "default",
+        title: "VitalApp",
+    },
+    formatDetection: {
+        telephone: false,
+    },
+};
+
+export const viewport = {
+    themeColor: "#ef4444",
+    width: "device-width",
+    initialScale: 1,
+    minimumScale: 1,
+    viewportFit: "cover",
+    userScalable: false,
 };
 
 export default function RootLayout({
@@ -25,6 +45,7 @@ export default function RootLayout({
                         <main className="flex-grow container mx-auto px-4 py-8">
                             {children}
                         </main>
+                        <PWAInstallPrompt />
                         <Footer />
                     </div>
                 </AuthProvider>
