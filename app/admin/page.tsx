@@ -50,7 +50,7 @@ export default function AdminDashboard() {
     }, []);
 
     const fetchAllData = async () => {
-        setLoading(true);
+        setIsLoading(true);
         try {
             // Parallel fetches for efficiency
             const [usersRes, requestsRes, donationsRes] = await Promise.all([
@@ -80,7 +80,7 @@ export default function AdminDashboard() {
         } catch (err: any) {
             setError(err.message);
         } finally {
-            setLoading(false);
+            setIsLoading(false);
         }
     };
 
@@ -214,7 +214,7 @@ export default function AdminDashboard() {
         }
     };
 
-    if (loading) return <div className="flex justify-center p-8"><Loader2 className="animate-spin h-8 w-8 text-red-500" /></div>;
+    if (isLoading) return <div className="flex justify-center p-8"><Loader2 className="animate-spin h-8 w-8 text-red-500" /></div>;
 
     return (
         <div className="space-y-8">
@@ -477,107 +477,7 @@ export default function AdminDashboard() {
                 )}
 
                 {activeTab === 'analytics' && (
-                    <div className="grid md:grid-cols-2 gap-8">
-                        <Card>
-                            <CardBody className="p-6">
-                                <h3 className="text-lg font-semibold mb-6 flex items-center">
-                                    <Users className="h-5 w-5 mr-2 text-red-500" />
-                                    Donor Distribution by Blood Group
-                                </h3>
-                                <div className="h-[300px] w-full">
-                                    <ResponsiveContainer width="100%" height="100%">
-                                        <PieChart>
-                                            <Pie
-                                                data={Object.entries(users
-                                                    .filter(u => u.is_donor && u.blood_group)
-                                                    .reduce((acc: any, curr) => {
-                                                        const bg = curr.blood_group || 'Unknown';
-                                                        acc[bg] = (acc[bg] || 0) + 1;
-                                                        return acc;
-                                                    }, {}))
-                                                    .map(([name, value]) => ({ name, value }))
-                                                }
-                                                cx="50%"
-                                                cy="50%"
-                                                innerRadius={60}
-                                                outerRadius={100}
-                                                paddingAngle={2}
-                                                dataKey="value"
-                                            >
-                                                {
-                                                    // Generate random colors or use a palette
-                                                    [0, 1, 2, 3, 4, 5, 6, 7].map((entry, index) => (
-                                                        <Cell key={`cell-${index}`} fill={['#EF4444', '#F87171', '#FCA5A5', '#B91C1C', '#991B1B', '#7F1D1D', '#FECACA', '#DC2626'][index % 8]} />
-                                                    ))
-                                                }
-                                            </Pie>
-                                            <Tooltip />
-                                            <Legend verticalAlign="bottom" height={36} />
-                                        </PieChart>
-                                    </ResponsiveContainer>
-                                </div>
-                            </CardBody>
-                        </Card>
-
-                        <Card>
-                            <CardBody className="p-6">
-                                <h3 className="text-lg font-semibold mb-6 flex items-center">
-                                    <Activity className="h-5 w-5 mr-2 text-blue-500" />
-                                    Requests by Urgency
-                                </h3>
-                                <div className="h-[300px] w-full">
-                                    <ResponsiveContainer width="100%" height="100%">
-                                        <BarChart
-                                            data={Object.entries(requests
-                                                .reduce((acc: any, curr) => {
-                                                    const level = curr.urgency_level || 'Normal';
-                                                    acc[level] = (acc[level] || 0) + 1;
-                                                    return acc;
-                                                }, {}))
-                                                .map(([name, value]) => ({ name, value }))
-                                            }
-                                        >
-                                            <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                                            <XAxis dataKey="name" />
-                                            <YAxis allowDecimals={false} />
-                                            <Tooltip cursor={{ fill: '#F3F4F6' }} />
-                                            <Bar dataKey="value" fill="#3B82F6" radius={[4, 4, 0, 0]} barSize={50} />
-                                        </BarChart>
-                                    </ResponsiveContainer>
-                                </div>
-                            </CardBody>
-                        </Card>
-
-                        {/* Line Chart: Donation Trends */}
-                        <Card className="md:col-span-2">
-                            <CardBody className="p-6">
-                                <h3 className="text-lg font-semibold mb-6 flex items-center">
-                                    <Activity className="h-5 w-5 mr-2 text-green-500" />
-                                    Donation Trends (Over Time)
-                                </h3>
-                                <div className="h-[300px] w-full">
-                                    <ResponsiveContainer width="100%" height="100%">
-                                        <LineChart
-                                            data={Object.entries(donations
-                                                .reduce((acc: any, curr) => {
-                                                    const date = new Date(curr.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-                                                    acc[date] = (acc[date] || 0) + 1;
-                                                    return acc; // Simple daily aggregation, relies on sort order
-                                                }, {}))
-                                                .map(([name, value]) => ({ name, value }))
-                                            }
-                                        >
-                                            <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                                            <XAxis dataKey="name" />
-                                            <YAxis allowDecimals={false} />
-                                            <Tooltip cursor={{ stroke: '#10B981' }} />
-                                            <Line type="monotone" dataKey="value" stroke="#10B981" strokeWidth={2} dot={{ r: 4 }} activeDot={{ r: 6 }} />
-                                        </LineChart>
-                                    </ResponsiveContainer>
-                                </div>
-                            </CardBody>
-                        </Card>
-                    </div>
+                    <AnalyticsCharts users={users} requests={requests} donations={donations} />
                 )}
             </div>
 
