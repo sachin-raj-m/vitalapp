@@ -6,6 +6,8 @@ import { Footer } from "@/components/Footer";
 
 const inter = Inter({ subsets: ["latin"] });
 
+import { PWAInstallPrompt } from "@/components/PWAInstallPrompt";
+
 export const metadata = {
     title: "Vital Blood Donation",
     description: "Blood donation platform",
@@ -43,6 +45,7 @@ export default function RootLayout({
                         <main className="flex-grow container mx-auto px-4 py-8">
                             {children}
                         </main>
+                        <PWAInstallPrompt />
                         <Footer />
                     </div>
                 </AuthProvider>
