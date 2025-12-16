@@ -8,6 +8,7 @@ import { Card, CardBody } from '@/components/ui/Card';
 import { MapPin, Navigation, Search } from 'lucide-react';
 import { Alert } from '@/components/ui/Alert';
 import { useAuth } from '@/context/AuthContext';
+import { NearbyDonorsSkeleton } from './skeleton';
 
 const Map = dynamic(() => import('@/components/Map'), {
     ssr: false,
@@ -195,6 +196,10 @@ export default function NearbyDonorsPageContent() {
         setNearbyDonors(sorted.slice(0, 20));
 
     }, [center, donors, user]);
+
+    if (loading) {
+        return <NearbyDonorsSkeleton />;
+    }
 
     return (
         <div className="space-y-6 h-[calc(100vh-140px)] flex flex-col">
