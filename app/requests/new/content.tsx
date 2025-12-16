@@ -71,7 +71,7 @@ export default function CreateRequestPage() {
         setError('');
 
         try {
-            const { error: requestError } = await supabase
+            const { data, error: requestError } = await supabase
                 .from('blood_requests')
                 .insert({
                     user_id: user.id,
@@ -88,9 +88,23 @@ export default function CreateRequestPage() {
                     city: formData.city,
                     zipcode: formData.zipcode,
                     status: 'active'
-                });
+                })
+                .select(); // Ensure the inserted data is returned
 
             if (requestError) throw requestError;
+
+            // Trigger Push Notifications (Fire and Forget)
+            fetch('/api/notify/donors', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    requestId: data?.[0]?.id, // Use the ID from the inserted data
+                    bloodGroup: formData.bloodGroup,
+                    hospitalName: formData.hospitalName,
+                    city: formData.city,
+                    urgencyLevel: formData.urgencyLevel
+                })
+            }).catch(e => console.error('Notification trigger failed', e));
 
             router.push('/requests');
         } catch (err: any) {
