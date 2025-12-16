@@ -9,6 +9,24 @@ const inter = Inter({ subsets: ["latin"] });
 export const metadata = {
     title: "Vital Blood Donation",
     description: "Blood donation platform",
+    manifest: "/manifest.json",
+    appleWebApp: {
+        capable: true,
+        statusBarStyle: "default",
+        title: "VitalApp",
+    },
+    formatDetection: {
+        telephone: false,
+    },
+};
+
+export const viewport = {
+    themeColor: "#ef4444",
+    width: "device-width",
+    initialScale: 1,
+    minimumScale: 1,
+    viewportFit: "cover",
+    userScalable: false,
 };
 
 export default function RootLayout({
