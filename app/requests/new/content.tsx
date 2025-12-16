@@ -27,13 +27,16 @@ export default function CreateRequestPage() {
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState('');
 
-    useEffect(() => {
-        if (!loading && !user) {
-            router.push('/login?redirect=/requests/new');
-        }
-    }, [user, loading, router]);
+    if (loading) {
+        return (
+            <div className="flex justify-center items-center min-h-[50vh]">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+            </div>
+        );
+    }
 
-    if (loading || !user) {
+    if (!user) {
+        router.push('/login?redirect=/requests/new');
         return (
             <div className="flex justify-center items-center min-h-[50vh]">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
