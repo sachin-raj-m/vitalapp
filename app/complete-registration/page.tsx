@@ -24,6 +24,7 @@ interface CompleteRegistrationForm {
     gender: string;
     phone: string;
     bloodGroup: BloodGroup | '';
+    state: string;
     city: string;
     district: string;
     permanentZip: string;
@@ -48,6 +49,7 @@ export default function CompleteRegistration() {
         gender: '',
         phone: '',
         bloodGroup: '',
+        state: '',
         city: '',
         district: '',
         permanentZip: '',
@@ -111,6 +113,7 @@ export default function CompleteRegistration() {
         if (!formData.phone.trim()) errors.phone = 'Phone number is required';
         if (!formData.dob) errors.dob = 'Date of birth is required';
         if (!formData.gender) errors.gender = 'Gender is required';
+        if (!formData.state.trim()) errors.state = 'State is required';
         if (!formData.city.trim()) errors.city = 'City is required';
         if (!formData.district.trim()) errors.district = 'District is required';
         if (!formData.permanentZip.trim()) errors.permanentZip = 'Permanent Zip Code is required';
@@ -157,6 +160,7 @@ export default function CompleteRegistration() {
                         blood_group: formData.bloodGroup || null,
                         city: formData.city,
                         district: formData.district,
+                        state: formData.state,
                         is_donor: true,
                         is_available: true,
                         permanent_zip: formData.permanentZip,
@@ -164,7 +168,7 @@ export default function CompleteRegistration() {
                         location: {
                             latitude: 0,
                             longitude: 0,
-                            address: `${formData.city}, ${formData.district}`
+                            address: `${formData.city}, ${formData.district}, ${formData.state}`
                         },
                         last_donation_date: formData.lastDonationDate || null,
                         willingness_to_travel: formData.willingTovelKm,
@@ -289,6 +293,14 @@ export default function CompleteRegistration() {
 
                             <div className="grid grid-cols-2 gap-4">
                                 <Input
+                                    label="State"
+                                    value={formData.state}
+                                    onChange={e => setFormData({ ...formData, state: e.target.value })}
+                                    required
+                                    placeholder="e.g. Kerala"
+                                    error={fieldErrors.state}
+                                />
+                                <Input
                                     label="City"
                                     value={formData.city}
                                     onChange={e => setFormData({ ...formData, city: e.target.value })}
@@ -296,15 +308,15 @@ export default function CompleteRegistration() {
                                     placeholder="e.g. Kochi"
                                     error={fieldErrors.city}
                                 />
-                                <Input
-                                    label="District"
-                                    value={formData.district}
-                                    onChange={e => setFormData({ ...formData, district: e.target.value })}
-                                    required
-                                    placeholder="e.g. Ernakulam"
-                                    error={fieldErrors.district}
-                                />
                             </div>
+                            <Input
+                                label="District"
+                                value={formData.district}
+                                onChange={e => setFormData({ ...formData, district: e.target.value })}
+                                required
+                                placeholder="e.g. Ernakulam"
+                                error={fieldErrors.district}
+                            />
 
                             <div className="grid grid-cols-2 gap-4">
                                 <Input
@@ -388,8 +400,8 @@ export default function CompleteRegistration() {
                                                 className="mt-1 rounded text-primary-600 focus:ring-primary-500 h-4 w-4"
                                             />
                                             <div className="text-sm text-gray-600">
-                                                <span className="font-medium text-gray-900 block mb-0.5">I am generally fit to donate.</span>
-                                                I do not have any recent surgeries, major illnesses, or disqualifying conditions.
+                                                <span className="font-medium text-gray-900 block mb-0.5">I am fit to donate.</span>
+                                                I confirm I do not have any serious chronic illness, recent major surgery, or disqualifying conditions.
                                             </div>
                                         </label>
                                     </div>
@@ -410,7 +422,7 @@ export default function CompleteRegistration() {
                                         <p>
                                             I consent to share my details (Name, Mobile, Location, Blood Group) with
                                             <strong> verified blood banks & hospitals </strong> only for the purpose of blood donation.
-                                            I understand I can withdraw this consent or delete my account at any time.
+                                            We retain this data until you withdraw consent or delete your account.
                                         </p>
                                     </div>
                                 </label>
