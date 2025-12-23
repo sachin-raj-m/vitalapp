@@ -102,11 +102,14 @@ export default function Map({
             <MapUpdater center={center} zoom={zoom} />
 
             {markers.map((marker, idx) => (
-                <Marker key={idx} position={[marker.position.lat, marker.position.lng]}>
+                <Marker
+                    key={`${marker.position.lat}-${marker.position.lng}-${idx}`}
+                    position={[marker.position.lat, marker.position.lng]}
+                >
                     {(marker.title || marker.description) && (
                         <Popup>
                             <div className="font-semibold">{marker.title}</div>
-                            <div className="text-sm">{marker.description}</div>
+                            {marker.description && <div className="text-sm">{marker.description}</div>}
                         </Popup>
                     )}
                 </Marker>

@@ -176,6 +176,42 @@ export default function NearbyDonorsPageContent() {
         );
     }, []);
 
+    // Get User Profile for Zip Code
+    useEffect(() => {
+        const fetchUserProfile = async () => {
+            if (!user) return;
+            const { data, error } = await supabase
+                .from('profiles')
+                .select('present_zip')
+                .eq('id', user.id)
+                .single();
+
+            if (data?.present_zip) {
+                // Try to geocode the zip immediately
+                try {
+                    const response = await fetch(`https://nominatim.openstreetmap.org/search?postalcode=${data.present_zip}&country=India&format=json&limit=1`, {
+                        headers: { 'User-Agent': 'VitalBloodApp/1.0' }
+                    });
+                    const results = await response.json();
+                    if (results && results.length > 0) {
+                        setCenter({
+                            lat: parseFloat(results[0].lat),
+                            lng: parseFloat(results[0].lon)
+                        });
+                    }
+                } catch (e) {
+                    console.error("Failed to set initial center from zip", e);
+                }
+            }
+        };
+        fetchUserProfile();
+    }, [user]);
+
+    // Auto-trigger Geolocation on mount
+    useEffect(() => {
+        getUserLocation();
+    }, [getUserLocation]);
+
     // Calculate distances when center or donors change
     useEffect(() => {
         // Filter out donors with invalid location AND the current user

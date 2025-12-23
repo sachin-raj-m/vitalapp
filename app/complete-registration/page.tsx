@@ -113,6 +113,7 @@ export default function CompleteRegistration() {
         if (!formData.phone.trim()) errors.phone = 'Phone number is required';
         if (!formData.dob) errors.dob = 'Date of birth is required';
         if (!formData.gender) errors.gender = 'Gender is required';
+        if (!formData.bloodGroup) errors.bloodGroup = 'Blood Group is required';
         if (!formData.state.trim()) errors.state = 'State is required';
         if (!formData.city.trim()) errors.city = 'City is required';
         if (!formData.district.trim()) errors.district = 'District is required';
@@ -269,11 +270,11 @@ export default function CompleteRegistration() {
                             />
 
                             <Select
-                                label="Blood Group (Optional)"
+                                label="Blood Group"
                                 value={formData.bloodGroup}
                                 onChange={e => setFormData({ ...formData, bloodGroup: e.target.value as BloodGroup })}
                                 options={[
-                                    { value: '', label: 'I don\'t know / Prefer not to say' },
+                                    { value: '', label: 'Select Blood Group' },
                                     { value: 'A+', label: 'A+' },
                                     { value: 'A-', label: 'A-' },
                                     { value: 'B+', label: 'B+' },
@@ -283,13 +284,9 @@ export default function CompleteRegistration() {
                                     { value: 'O+', label: 'O+' },
                                     { value: 'O-', label: 'O-' },
                                 ]}
+                                required
                                 error={fieldErrors.bloodGroup}
                             />
-                            {formData.bloodGroup && (
-                                <p className="text-xs text-yellow-600 -mt-3 mb-2">
-                                    * Your blood group will be confirmed by the blood bank before donation.
-                                </p>
-                            )}
 
                             <div className="grid grid-cols-2 gap-4">
                                 <Input

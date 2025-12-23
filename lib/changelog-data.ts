@@ -17,7 +17,9 @@ export const CHANGELOG_DATA: ChangelogEntry[] = [
             'Added "Danger Zone" in Profile to allow permanent account deletion.',
             'Refined registration process with explicit privacy consent.',
             'Introduced self-declaration for medical eligibility.',
-            'Stopped collection of sensitive documents to minimize data storage.'
+            'Stopped collection of sensitive documents to minimize data storage.',
+            'Made Blood Group selection mandatory for new donors.',
+            'Improved "Nearby Donors" with smart auto-location and map optimizations.'
         ],
         type: 'minor'
     },
