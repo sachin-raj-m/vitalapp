@@ -12,8 +12,6 @@ import type { BloodGroup } from '@/types';
 import { useAuth } from '@/context/AuthContext';
 import { isRegistrationComplete } from '@/utils/auth';
 
-const MAX_FILE_SIZE = 1024 * 1024; // 1MB in bytes
-
 interface PendingRegistration {
     userId: string;
     email: string;
@@ -22,12 +20,19 @@ interface PendingRegistration {
 
 interface CompleteRegistrationForm {
     fullName: string;
+    dob: string;
+    gender: string;
     phone: string;
-    bloodGroup: BloodGroup;
-    proofType: string;
-    proofFile: File | null;
+    bloodGroup: BloodGroup | '';
+    city: string;
+    district: string;
     permanentZip: string;
     presentZip: string;
+    lastDonationDate: string;
+    willingTovelKm: number;
+    availability: string[];
+    hasConditions: boolean;
+    consent: boolean;
 }
 
 export default function CompleteRegistration() {
@@ -39,38 +44,37 @@ export default function CompleteRegistration() {
     const [pendingData, setPendingData] = useState<PendingRegistration | null>(null);
     const [formData, setFormData] = useState<CompleteRegistrationForm>({
         fullName: '',
+        dob: '',
+        gender: '',
         phone: '',
-        bloodGroup: '' as BloodGroup,
-        proofType: '',
-        proofFile: null,
+        bloodGroup: '',
+        city: '',
+        district: '',
         permanentZip: '',
-        presentZip: ''
+        presentZip: '',
+        lastDonationDate: '',
+        willingTovelKm: 10,
+        availability: ['Weekends'],
+        hasConditions: false,
+        consent: false
     });
     const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
     useEffect(() => {
         const init = async () => {
-
             try {
-                // First check if we have a user
                 if (!user) {
                     router.push('/login');
                     return;
                 }
 
-
-
-                // Check if registration is already complete
                 const isComplete = await isRegistrationComplete(user.id);
-
                 if (isComplete) {
                     router.push('/dashboard');
                     return;
                 }
 
-                // Get stored registration data
                 const storedData = localStorage.getItem('pendingRegistration');
-
                 if (!storedData) {
                     setError('Registration data not found. Please register again.');
                     router.push('/register');
@@ -79,13 +83,9 @@ export default function CompleteRegistration() {
 
                 try {
                     const data = JSON.parse(storedData);
-
-                    if (data.userId !== user.id) {
-                        throw new Error('User ID mismatch');
-                    }
+                    if (data.userId !== user.id) throw new Error('User ID mismatch');
 
                     setPendingData(data);
-                    // Pre-fill phone if available from pending data
                     if (data.phone) {
                         setFormData(prev => ({ ...prev, phone: data.phone }));
                     }
@@ -101,42 +101,27 @@ export default function CompleteRegistration() {
             }
         };
 
-        if (user !== undefined) { // Wait for user state to be determined (null or object)
-            init();
-        }
+        if (user !== undefined) init();
     }, [router, user]);
 
     const validateForm = () => {
         const errors: Record<string, string> = {};
 
-        if (!formData.fullName.trim()) {
-            errors.fullName = 'Full name is required';
+        if (!formData.fullName.trim()) errors.fullName = 'Full name is required';
+        if (!formData.phone.trim()) errors.phone = 'Phone number is required';
+        if (!formData.dob) errors.dob = 'Date of birth is required';
+        if (!formData.gender) errors.gender = 'Gender is required';
+        if (!formData.city.trim()) errors.city = 'City is required';
+        if (!formData.district.trim()) errors.district = 'District is required';
+        if (!formData.permanentZip.trim()) errors.permanentZip = 'Permanent Zip Code is required';
+        if (!formData.presentZip.trim()) errors.presentZip = 'Present Zip Code is required';
+
+        if (formData.dob) {
+            const age = new Date().getFullYear() - new Date(formData.dob).getFullYear();
+            if (age < 18) errors.dob = 'You must be at least 18 years old to register as a donor.';
         }
 
-        if (!formData.phone.trim()) {
-            errors.phone = 'Phone number is required';
-        }
-
-        if (!formData.bloodGroup) {
-            errors.bloodGroup = 'Blood group is required';
-        }
-
-        if (!formData.proofType) {
-            errors.proofType = 'Please select proof type';
-        }
-
-        if (!formData.proofFile) {
-            errors.proofFile = 'Please upload proof document';
-        } else if (formData.proofFile.size > MAX_FILE_SIZE) {
-            errors.proofFile = 'File size must be less than 1MB';
-        }
-
-        if (!formData.permanentZip.trim()) {
-            errors.permanentZip = 'Permanent Zip Code is required';
-        }
-        if (!formData.presentZip.trim()) {
-            errors.presentZip = 'Present Zip Code is required';
-        }
+        if (!formData.consent) errors.consent = 'You must agree to the privacy policy to continue.';
 
         setFieldErrors(errors);
         return Object.keys(errors).length === 0;
@@ -146,41 +131,19 @@ export default function CompleteRegistration() {
         e.preventDefault();
         if (!validateForm() || !pendingData) return;
 
-        setStatus('uploading');
-        setProgress(25);
+        setStatus('creating_profile');
+        setProgress(50);
 
         try {
-            // Check if user is authenticated
             const { data: { session }, error: sessionError } = await supabase.auth.getSession();
             if (sessionError) throw sessionError;
-            if (!session) {
-                setError('Authentication required. Please sign in again.');
+            if (!session || session.user.id !== pendingData.userId) {
+                setError('Session invalid. Please sign in again.');
                 router.push('/login');
                 return;
             }
 
-            // Verify user ID matches
-            if (session.user.id !== pendingData.userId) {
-                setError('Session mismatch. Please register again.');
-                router.push('/register');
-                return;
-            }
-
-            // Upload the proof file
-            const filePath = `${session.user.id}/${Date.now()}-${formData.proofFile!.name}`;
-            const { error: uploadError } = await supabase.storage
-                .from('proofs')
-                .upload(filePath, formData.proofFile!, {
-                    upsert: false,
-                    contentType: formData.proofFile!.type
-                });
-
-            if (uploadError) throw uploadError;
-
-            setProgress(50);
-            setStatus('creating_profile');
-
-            // Create or update user profile using upsert
+            // Create/Update Profile
             const { error: profileError } = await supabase
                 .from('profiles')
                 .upsert(
@@ -189,9 +152,11 @@ export default function CompleteRegistration() {
                         email: pendingData.email,
                         full_name: formData.fullName,
                         phone: formData.phone,
-                        blood_group: formData.bloodGroup,
-                        blood_group_proof_type: formData.proofType,
-                        blood_group_proof_url: filePath,
+                        dob: formData.dob,
+                        gender: formData.gender,
+                        blood_group: formData.bloodGroup || null,
+                        city: formData.city,
+                        district: formData.district,
                         is_donor: true,
                         is_available: true,
                         permanent_zip: formData.permanentZip,
@@ -199,25 +164,27 @@ export default function CompleteRegistration() {
                         location: {
                             latitude: 0,
                             longitude: 0,
-                            address: '', // Specific address removed as per requirement
+                            address: `${formData.city}, ${formData.district}`
                         },
+                        last_donation_date: formData.lastDonationDate || null,
+                        willingness_to_travel: formData.willingTovelKm,
+                        availability: formData.availability,
+                        has_medical_conditions: formData.hasConditions,
+                        consent_agreed: true
                     },
-                    {
-                        onConflict: 'id',
-                        ignoreDuplicates: false
-                    }
+                    { onConflict: 'id' }
                 );
 
             if (profileError) throw profileError;
 
-            setProgress(75);
+            setProgress(90);
             setStatus('finalizing');
 
-            // Update user metadata to mark registration as completed
             const { error: updateError } = await supabase.auth.updateUser({
                 data: {
                     registration_completed: true,
-                    phone: formData.phone
+                    phone: formData.phone,
+                    full_name: formData.fullName
                 }
             });
 
@@ -225,12 +192,9 @@ export default function CompleteRegistration() {
 
             setProgress(100);
             setStatus('completed');
-
-            // Clean up stored data
             localStorage.removeItem('pendingRegistration');
-
-            // Redirect to dashboard after completion
             setTimeout(() => router.push('/dashboard'), 1500);
+
         } catch (err: any) {
             console.error('Registration completion error:', err);
             setError(err.message || 'Failed to complete registration');
@@ -238,70 +202,74 @@ export default function CompleteRegistration() {
         }
     };
 
-    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (file) {
-            if (file.size > MAX_FILE_SIZE) {
-                setFieldErrors(prev => ({
-                    ...prev,
-                    proofFile: 'File size must be less than 1MB'
-                }));
-            } else {
-                setFieldErrors(prev => {
-                    const newErrors = { ...prev };
-                    delete newErrors.proofFile;
-                    return newErrors;
-                });
-                setFormData(prev => ({ ...prev, proofFile: file }));
-            }
-        }
-    };
-
     const renderContent = () => {
         switch (status) {
             case 'loading':
                 return (
-                    <>
-                        <h2 className="text-xl font-semibold mb-4">Loading Registration Data</h2>
-                        <Loader2 className="h-8 w-8 animate-spin text-primary-500" />
-                    </>
+                    <div className="flex flex-col items-center py-8">
+                        <Loader2 className="h-8 w-8 animate-spin text-primary-500 mb-4" />
+                        <p className="text-gray-600">Loading...</p>
+                    </div>
                 );
 
             case 'form':
                 return (
                     <>
-                        <h2 className="text-xl font-semibold mb-4">Complete Your Registration</h2>
-                        {error && (
-                            <Alert variant="error" className="mb-4">
-                                {error}
-                            </Alert>
-                        )}
-                        <form onSubmit={handleSubmit} className="space-y-4">
+                        <h2 className="text-xl font-bold mb-2">Complete Profile</h2>
+                        <p className="text-sm text-gray-500 mb-6">Tell us a bit about yourself to find donors near you.</p>
+
+                        {error && <Alert variant="error" className="mb-4">{error}</Alert>}
+
+                        <form onSubmit={handleSubmit} className="space-y-4 text-left">
                             <Input
                                 label="Full Name"
                                 value={formData.fullName}
-                                onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
+                                onChange={e => setFormData({ ...formData, fullName: e.target.value })}
                                 required
-                                autoComplete="name"
-                                placeholder="Enter your full name"
+                                placeholder="e.g. John Doe"
                                 error={fieldErrors.fullName}
                             />
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <Input
+                                    label="Date of Birth"
+                                    type="date"
+                                    value={formData.dob}
+                                    onChange={e => setFormData({ ...formData, dob: e.target.value })}
+                                    required
+                                    error={fieldErrors.dob}
+                                />
+                                <Select
+                                    label="Gender"
+                                    value={formData.gender}
+                                    onChange={e => setFormData({ ...formData, gender: e.target.value })}
+                                    options={[
+                                        { value: '', label: 'Select Gender' },
+                                        { value: 'Male', label: 'Male' },
+                                        { value: 'Female', label: 'Female' },
+                                        { value: 'Other', label: 'Other' },
+                                    ]}
+                                    required
+                                    error={fieldErrors.gender}
+                                />
+                            </div>
+
                             <Input
-                                label="Phone Number"
+                                label="Mobile Number"
                                 type="tel"
                                 value={formData.phone}
-                                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                                onChange={e => setFormData({ ...formData, phone: e.target.value })}
                                 required
-                                autoComplete="tel"
-                                placeholder="Enter your phone number"
+                                placeholder="+91 9876543210"
                                 error={fieldErrors.phone}
                             />
+
                             <Select
-                                label="Blood Group"
+                                label="Blood Group (Optional)"
                                 value={formData.bloodGroup}
-                                onChange={(e) => setFormData({ ...formData, bloodGroup: e.target.value as BloodGroup })}
+                                onChange={e => setFormData({ ...formData, bloodGroup: e.target.value as BloodGroup })}
                                 options={[
-                                    { value: '', label: 'Select Blood Group' },
+                                    { value: '', label: 'I don\'t know / Prefer not to say' },
                                     { value: 'A+', label: 'A+' },
                                     { value: 'A-', label: 'A-' },
                                     { value: 'B+', label: 'B+' },
@@ -309,132 +277,187 @@ export default function CompleteRegistration() {
                                     { value: 'AB+', label: 'AB+' },
                                     { value: 'AB-', label: 'AB-' },
                                     { value: 'O+', label: 'O+' },
-                                    { value: 'O+', label: 'O+' },
                                     { value: 'O-', label: 'O-' },
                                 ]}
-                                required
                                 error={fieldErrors.bloodGroup}
                             />
+                            {formData.bloodGroup && (
+                                <p className="text-xs text-yellow-600 -mt-3 mb-2">
+                                    * Your blood group will be confirmed by the blood bank before donation.
+                                </p>
+                            )}
 
                             <div className="grid grid-cols-2 gap-4">
                                 <Input
-                                    label="Permanent Zip Code"
+                                    label="City"
+                                    value={formData.city}
+                                    onChange={e => setFormData({ ...formData, city: e.target.value })}
+                                    required
+                                    placeholder="e.g. Kochi"
+                                    error={fieldErrors.city}
+                                />
+                                <Input
+                                    label="District"
+                                    value={formData.district}
+                                    onChange={e => setFormData({ ...formData, district: e.target.value })}
+                                    required
+                                    placeholder="e.g. Ernakulam"
+                                    error={fieldErrors.district}
+                                />
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <Input
+                                    label="Permanent Pin Code"
                                     value={formData.permanentZip}
-                                    onChange={(e) => setFormData({ ...formData, permanentZip: e.target.value })}
+                                    onChange={e => setFormData({ ...formData, permanentZip: e.target.value })}
                                     required
                                     placeholder="e.g. 560001"
                                     error={fieldErrors.permanentZip}
                                 />
                                 <Input
-                                    label="Present Zip Code"
+                                    label="Present Pin Code"
                                     value={formData.presentZip}
-                                    onChange={(e) => setFormData({ ...formData, presentZip: e.target.value })}
+                                    onChange={e => setFormData({ ...formData, presentZip: e.target.value })}
                                     required
                                     placeholder="e.g. 560001"
                                     error={fieldErrors.presentZip}
                                 />
                             </div>
-                            <Select
-                                label="Blood Group Proof Type"
-                                value={formData.proofType}
-                                onChange={(e) => setFormData({ ...formData, proofType: e.target.value })}
-                                options={[
-                                    { value: '', label: 'Select Proof Type' },
-                                    { value: 'medical_certificate', label: 'Medical Certificate' },
-                                    { value: 'hospital_report', label: 'Hospital Report' },
-                                    { value: 'blood_donation_card', label: 'Blood Donation Card' },
-                                    { value: 'lab_report', label: 'Laboratory Report' },
-                                ]}
-                                required
-                                error={fieldErrors.proofType}
-                            />
-                            <div className="space-y-2">
-                                <label className="block text-sm font-medium text-gray-700">Upload Proof</label>
-                                <Input
-                                    type="file"
-                                    onChange={handleFileChange}
-                                    accept=".pdf,.jpg,.jpeg,.png"
-                                    required
-                                    className="w-full"
-                                    error={fieldErrors.proofFile}
-                                />
-                                <p className="text-xs text-gray-500">
-                                    Accepted formats: PDF, JPG, JPEG, PNG (Max size: 1MB)
-                                </p>
+
+                            {/* Preferences Section */}
+                            <div className="border-t pt-4 mt-6">
+                                <h3 className="text-sm font-semibold text-gray-900 mb-4">Donor Preferences</h3>
+
+                                <div className="space-y-6">
+                                    {/* Willingness to Travel */}
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                                            How far can you travel to donate?
+                                        </label>
+                                        <div className="flex items-center gap-4">
+                                            <input
+                                                type="range"
+                                                min="1" max="50"
+                                                value={formData.willingTovelKm}
+                                                onChange={e => setFormData({ ...formData, willingTovelKm: Number(e.target.value) })}
+                                                className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-primary-600"
+                                            />
+                                            <span className="text-sm font-bold w-16 text-right text-primary-700">{formData.willingTovelKm} km</span>
+                                        </div>
+                                    </div>
+
+                                    {/* Availability */}
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">When are you usually available?</label>
+                                        <div className="flex gap-6">
+                                            {['Weekdays', 'Weekends'].map(dayType => (
+                                                <label key={dayType} className="flex items-center space-x-2 cursor-pointer">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={formData.availability.includes(dayType)}
+                                                        onChange={e => {
+                                                            const newAvail = e.target.checked
+                                                                ? [...formData.availability, dayType]
+                                                                : formData.availability.filter(d => d !== dayType);
+                                                            setFormData({ ...formData, availability: newAvail });
+                                                        }}
+                                                        className="rounded text-primary-600 focus:ring-primary-500 h-4 w-4"
+                                                    />
+                                                    <span className="text-sm text-gray-700">{dayType}</span>
+                                                </label>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    {/* Last Donation */}
+                                    <Input
+                                        label="Last Donation Date (if any)"
+                                        type="date"
+                                        value={formData.lastDonationDate}
+                                        onChange={e => setFormData({ ...formData, lastDonationDate: e.target.value })}
+                                    />
+
+                                    {/* Medical Deferral */}
+                                    <div className="bg-gray-50 p-3 rounded-lg border border-gray-100">
+                                        <label className="flex items-start space-x-3 cursor-pointer">
+                                            <input
+                                                type="checkbox"
+                                                checked={!formData.hasConditions}
+                                                onChange={e => setFormData({ ...formData, hasConditions: !e.target.checked })}
+                                                className="mt-1 rounded text-primary-600 focus:ring-primary-500 h-4 w-4"
+                                            />
+                                            <div className="text-sm text-gray-600">
+                                                <span className="font-medium text-gray-900 block mb-0.5">I am generally fit to donate.</span>
+                                                I do not have any recent surgeries, major illnesses, or disqualifying conditions.
+                                            </div>
+                                        </label>
+                                    </div>
+                                </div>
                             </div>
-                            <Button
-                                type="submit"
-                                variant="primary"
-                                className="w-full"
-                            >
+
+                            {/* Consent Section (DPDP) */}
+                            <div className="mt-6 p-4 bg-blue-50 border border-blue-100 rounded-lg">
+                                <label className="flex items-start space-x-3 cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        checked={formData.consent}
+                                        onChange={e => setFormData({ ...formData, consent: e.target.checked })}
+                                        className="mt-1 rounded text-primary-600 focus:ring-primary-500 h-4 w-4"
+                                    />
+                                    <div className="text-sm text-gray-600">
+                                        <span className="font-bold text-gray-900 block mb-1">Privacy & Consent</span>
+                                        <p>
+                                            I consent to share my details (Name, Mobile, Location, Blood Group) with
+                                            <strong> verified blood banks & hospitals </strong> only for the purpose of blood donation.
+                                            I understand I can withdraw this consent or delete my account at any time.
+                                        </p>
+                                    </div>
+                                </label>
+                                {fieldErrors.consent && <p className="text-xs text-red-600 mt-2 font-medium">{fieldErrors.consent}</p>}
+                            </div>
+
+                            <Button type="submit" variant="primary" className="w-full mt-6">
                                 Complete Registration
                             </Button>
                         </form>
                     </>
                 );
 
-            case 'uploading':
             case 'creating_profile':
             case 'finalizing':
                 return (
-                    <>
-                        <h2 className="text-xl font-semibold mb-4">Completing Registration</h2>
+                    <div className="flex flex-col items-center py-8">
                         <div className="w-full bg-gray-200 rounded-full h-2.5 mb-4">
-                            <div
-                                className="bg-primary-500 h-2.5 rounded-full transition-all duration-500"
-                                style={{ width: `${progress}%` }}
-                            />
+                            <div className="bg-primary-500 h-2.5 rounded-full transition-all duration-500" style={{ width: `${progress}%` }} />
                         </div>
-                        <p className="text-gray-600">
-                            {status === 'uploading' && 'Uploading your documents...'}
-                            {status === 'creating_profile' && 'Creating your profile...'}
-                            {status === 'finalizing' && 'Finalizing your registration...'}
-                        </p>
-                    </>
+                        <p className="text-gray-600">{status === 'creating_profile' ? 'Creating profile...' : 'Finalizing...'}</p>
+                    </div>
                 );
 
             case 'completed':
                 return (
-                    <>
-                        <h2 className="text-xl font-semibold text-green-600 mb-4">
-                            Registration Complete!
-                        </h2>
-                        <p className="text-gray-600 mb-4">
-                            Your account has been successfully set up.
-                        </p>
-                        <p className="text-gray-600">
-                            Redirecting you to the dashboard...
-                        </p>
-                    </>
+                    <div className="text-center py-8">
+                        <h2 className="text-xl font-bold text-green-600 mb-2">You're All Set!</h2>
+                        <p className="text-gray-600">Redirecting to dashboard...</p>
+                    </div>
                 );
 
             case 'error':
                 return (
-                    <>
-                        <h2 className="text-xl font-semibold text-red-600 mb-4">
-                            Registration Error
-                        </h2>
-                        <Alert variant="error" className="mb-4">
-                            {error}
-                        </Alert>
-                        <Button
-                            variant="primary"
-                            onClick={() => router.push('/register')}
-                            className="w-full"
-                        >
-                            Try Again
-                        </Button>
-                    </>
+                    <div className="text-center py-8">
+                        <h2 className="text-xl font-bold text-red-600 mb-2">Error</h2>
+                        <p className="mb-4 text-gray-600">{error}</p>
+                        <Button onClick={() => setStatus('form')} variant="secondary">Try Again</Button>
+                    </div>
                 );
         }
     };
 
     return (
-        <div className="max-w-md mx-auto">
+        <div className="max-w-lg mx-auto p-4">
             <Card>
-                <CardBody className="text-center py-8">
-                    {renderContent()}
-                </CardBody>
+                <CardBody>{renderContent()}</CardBody>
             </Card>
         </div>
     );
