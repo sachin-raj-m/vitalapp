@@ -13,7 +13,7 @@
       "Introduced self-declaration for medical eligibility.",
       "Stopped collection of sensitive documents to minimize data storage."
     ],
-    "type": "minor"
+    "type": "major"
   },
   {
     "version": "0.3.0",
