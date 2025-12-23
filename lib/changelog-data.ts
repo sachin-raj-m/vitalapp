@@ -9,6 +9,18 @@ export interface ChangelogEntry {
 
 export const CHANGELOG_DATA: ChangelogEntry[] = [
     {
+        version: '0.5.0',
+        date: '2025-12-23',
+        title: 'Enhanced Discovery',
+        description: 'Improving how you find donors and complete your profile.',
+        changes: [
+            'Made Blood Group selection mandatory for new donors.',
+            'Improved "Nearby Donors" with smart auto-location from your Zip code.',
+            'Optimized Map performance and pin accuracy.'
+        ],
+        type: 'minor'
+    },
+    {
         version: '0.4.0',
         date: '2025-12-23',
         title: 'Privacy & User Rights',
@@ -17,9 +29,7 @@ export const CHANGELOG_DATA: ChangelogEntry[] = [
             'Added "Danger Zone" in Profile to allow permanent account deletion.',
             'Refined registration process with explicit privacy consent.',
             'Introduced self-declaration for medical eligibility.',
-            'Stopped collection of sensitive documents to minimize data storage.',
-            'Made Blood Group selection mandatory for new donors.',
-            'Improved "Nearby Donors" with smart auto-location and map optimizations.'
+            'Stopped collection of sensitive documents to minimize data storage.'
         ],
         type: 'minor'
     },
