@@ -7,19 +7,24 @@ export interface User {
   email: string;
   full_name: string;
   phone: string;
-  blood_group: BloodGroup;
-  blood_group_proof_type?: string;
-  blood_group_proof_url?: string;
+  dob?: string;
+  gender?: string;
+  blood_group?: BloodGroup; // Optional
+  city?: string;
+  district?: string;
   permanent_zip?: string;
   present_zip?: string;
   is_donor: boolean;
   is_available: boolean;
+  willingness_to_travel?: number;
+  last_donation_date?: string;
+  availability?: string[];
+  has_medical_conditions?: boolean;
   location: {
     latitude: number;
     longitude: number;
     address: string;
   };
-  government_id?: string;
   role?: 'user' | 'admin' | string;
   donor_pin?: string;
   created_at: string;
