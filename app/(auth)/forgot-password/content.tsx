@@ -22,7 +22,7 @@ export default function ForgotPasswordContent() {
         setError('');
 
         try {
-            // Using Custom Recovery API to send Resend template
+            // Using Custom Recovery API to send template via SMTP
             const response = await fetch('/api/auth/recovery', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },

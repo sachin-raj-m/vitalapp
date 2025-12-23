@@ -48,6 +48,9 @@ export const Footer: React.FC = () => {
           <Link href="/register" className="text-sm font-medium text-gray-600 hover:text-red-500 transition-colors">
             Become a Donor
           </Link>
+          <Link href="/changelog" className="text-sm font-medium text-gray-600 hover:text-red-500 transition-colors">
+            Changelog
+          </Link>
         </div>
 
         <div className="flex items-center space-x-2 text-gray-500 hover:text-red-500 transition-colors">
