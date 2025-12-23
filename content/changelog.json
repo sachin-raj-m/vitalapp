@@ -2,21 +2,12 @@
   {
     "version": "0.5.0",
     "date": "2025-12-23",
-    "title": "Enhanced Discovery",
-    "description": "Improving how you find donors and complete your profile.",
+    "title": "Enhanced Discovery & Privacy",
+    "description": "A major update improving how you find donors, complete your profile, and manage your data privacy.",
     "changes": [
       "Made Blood Group selection mandatory for new donors.",
       "Improved \"Nearby Donors\" with smart auto-location from your Zip code.",
-      "Optimized Map performance and pin accuracy."
-    ],
-    "type": "minor"
-  },
-  {
-    "version": "0.4.0",
-    "date": "2025-12-23",
-    "title": "Privacy & User Rights",
-    "description": "Focused on protecting user data and giving you more control.",
-    "changes": [
+      "Optimized Map performance and pin accuracy.",
       "Added \"Danger Zone\" in Profile to allow permanent account deletion.",
       "Refined registration process with explicit privacy consent.",
       "Introduced self-declaration for medical eligibility.",
