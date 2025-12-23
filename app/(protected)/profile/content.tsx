@@ -455,12 +455,43 @@ export default function ProfilePage() {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ delay: 0.4 }}
-                className="flex justify-center pt-4"
+                className="flex flex-col items-center pt-8 space-y-4"
             >
+                <div className="w-full max-w-2xl border-t border-gray-200 pt-8">
+                    <div className="rounded-lg border border-red-100 bg-red-50 p-6">
+                        <h3 className="text-lg font-medium text-red-800 mb-2 flex items-center">
+                            <Shield className="h-5 w-5 mr-2" />
+                            Danger Zone
+                        </h3>
+                        <p className="text-sm text-red-600 mb-4">
+                            Deleting your account is permanent. All your data including donation history and personal details will be wiped immediately.
+                        </p>
+                        <Button
+                            variant="primary"
+                            className="bg-red-600 hover:bg-red-700 text-white w-full sm:w-auto"
+                            onClick={async () => {
+                                if (confirm('Are you ABSOLUTELY sure? This action cannot be undone.')) {
+                                    try {
+                                        const res = await fetch('/api/auth/delete', { method: 'POST' });
+                                        if (!res.ok) throw new Error('Deletion failed');
+                                        await signOut();
+                                        router.push('/login');
+                                    } catch (e) {
+                                        alert('Failed to delete account. Please try again.');
+                                    }
+                                }
+                            }}
+                        >
+                            <User className="h-4 w-4 mr-2" />
+                            Delete My Account
+                        </Button>
+                    </div>
+                </div>
+
                 <Button
                     variant="secondary"
                     onClick={handleSignOut}
-                    className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                    className="text-gray-600 hover:text-gray-900"
                 >
                     <LogOut className="h-5 w-5 mr-2" />
                     Sign Out
