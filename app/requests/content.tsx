@@ -91,6 +91,11 @@ export default function RequestsPage() {
             return;
         }
 
+        if (!user.blood_group) {
+            setError('Please update your profile with your Blood Group to donate.');
+            return;
+        }
+
         // Check Blood Compatibility
         if (!isBloodCompatible(user.blood_group, request.blood_group)) {
             setError(`Medical Safety: Your blood group (${user.blood_group}) is not compatible with the patient (${request.blood_group}).`);

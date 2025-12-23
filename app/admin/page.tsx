@@ -18,7 +18,6 @@ interface Profile {
     verification_status: string;
     created_at: string;
     blood_group?: string;
-    blood_group_proof_url?: string;
     phone?: string;
 }
 
@@ -172,19 +171,7 @@ export default function AdminDashboard() {
         }
     };
 
-    const handleViewProof = async (path: string) => {
-        if (!path) return;
-        try {
-            const { data, error } = await supabase.storage.from('proofs').createSignedUrl(path, 60);
-            if (error) throw error;
-            if (data?.signedUrl) {
-                window.open(data.signedUrl, '_blank');
-            }
-        } catch (err: any) {
-            console.error('Error generating signed URL');
-            alert('Could not access document. Please ensure you are an admin.');
-        }
-    };
+
 
     const filteredUsers = users.filter(u =>
         u.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -411,14 +398,7 @@ export default function AdminDashboard() {
                                             </div>
                                         </div>
                                         <div className="flex gap-2">
-                                            {donor.blood_group_proof_url && (
-                                                <button
-                                                    onClick={() => handleViewProof(donor.blood_group_proof_url!)}
-                                                    className="flex items-center text-blue-600 text-sm hover:underline px-3"
-                                                >
-                                                    View Proof <ExternalLink className="ml-1 w-3 h-3" />
-                                                </button>
-                                            )}
+                                            {/* Proof viewing removed as per privacy policy */}
                                             <Button variant="secondary" size="sm" onClick={() => handleVerifyInList(donor.id, 'rejected')} isLoading={actionLoading === donor.id}>Reject</Button>
                                             <Button variant="success" size="sm" onClick={() => handleVerifyInList(donor.id, 'verified')} isLoading={actionLoading === donor.id}>Approve</Button>
                                         </div>

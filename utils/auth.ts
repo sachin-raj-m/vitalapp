@@ -5,7 +5,7 @@ export async function isRegistrationComplete(userId: string): Promise<boolean> {
 
         const { data: profile, error } = await supabase
             .from('profiles')
-            .select('full_name, blood_group, blood_group_proof_url')
+            .select('full_name, phone, city, district')
             .eq('id', userId)
             .single();
 
@@ -19,10 +19,10 @@ export async function isRegistrationComplete(userId: string): Promise<boolean> {
         const isComplete = !!(
             profile &&
             profile.full_name &&
-            profile.blood_group &&
-            profile.blood_group_proof_url
+            profile.phone &&
+            profile.city &&
+            profile.district
         );
-
 
         return isComplete;
     } catch (error) {
