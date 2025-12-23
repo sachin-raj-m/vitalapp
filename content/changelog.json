@@ -1,6 +1,6 @@
 [
   {
-    "version": "0.5.0",
+    "version": "0.4.0",
     "date": "2025-12-23",
     "title": "Enhanced Discovery & Privacy",
     "description": "A major update improving how you find donors, complete your profile, and manage your data privacy.",
@@ -55,7 +55,7 @@
   },
   {
     "version": "0.0.1",
-    "date": "2025-10-01",
+    "date": "2025-05-01",
     "title": "Inception",
     "description": "The beginning of the journey.",
     "changes": [
