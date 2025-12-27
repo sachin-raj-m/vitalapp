@@ -167,52 +167,59 @@ export function AdminNotificationConsole() {
 
             if (targetIds.length === 0) throw new Error('No eligible users found for this selection.');
 
-            // 2. Fetch Subscriptions for Targets
-            // We fetch in chunks of 500 to avoid query limits if massive
-            const { data: subscriptions, error: subError } = await supabase
-                .from('push_subscriptions')
-                .select('user_id, subscription')
-                .in('user_id', targetIds);
-
-            if (subError) throw subError;
-            if (!subscriptions || subscriptions.length === 0) throw new Error('None of the targeted users have push notifications enabled.');
-
-            // 3. Batch Send
-            const total = subscriptions.length;
+            // 2. Batch Send (Pass IDs to API)
+            const total = targetIds.length;
             let sentCount = 0;
             let failedCount = 0;
 
             setProgress(prev => ({ ...prev, total }));
 
             // Process sequentially or in small parallel batches to update progress
-            const BATCH_SIZE = 5;
+            // API now handles fetching subs, so we just send ID batches.
+            // We can send larger batches now since API handles logic, but keep it at ~20 to avoid timeouts.
+            const BATCH_SIZE = 20;
             for (let i = 0; i < total; i += BATCH_SIZE) {
-                const batch = subscriptions.slice(i, i + BATCH_SIZE);
-                await Promise.all(batch.map(async (sub) => {
-                    try {
-                        const res = await fetch('/api/web-push/send', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                subscription: sub.subscription,
-                                title,
-                                body,
-                                url
-                            })
-                        });
-                        if (res.ok) sentCount++;
-                        else failedCount++;
-                    } catch (e) {
-                        failedCount++;
+                const batchIds = targetIds.slice(i, i + BATCH_SIZE);
+
+                try {
+                    const res = await fetch('/api/web-push/send', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            userIds: batchIds, // Pass IDs, API fetches subs with Service Role
+                            title,
+                            body,
+                            url
+                        })
+                    });
+
+                    const result = await res.json();
+
+                    if (res.ok) {
+                        sentCount += (result.sent || 0);
+                        failedCount += (result.failed || 0);
+
+                        // If API reports 0 sent but success, it effectively means those users didn't have subs.
+                        // We count them as "failed" in terms of "Active Delivery", or we can track "Skipped".
+                        // For simplicity, let's treat "no sub found" as failed delivery attempt.
+                        if (result.sent === 0 && result.failed === 0) {
+                            failedCount += batchIds.length;
+                        }
+                    } else {
+                        failedCount += batchIds.length;
+                        console.error('Batch Send Error', result);
                     }
-                }));
+                } catch (e) {
+                    failedCount += batchIds.length;
+                    console.error('Batch Network Error', e);
+                }
 
                 setProgress({ sent: sentCount, failed: failedCount, total });
             }
 
             setStatus({
-                type: sentCount > 0 ? 'success' : 'error',
-                message: `Finished: Sent ${sentCount}, Failed ${failedCount} (Total Users: ${targetIds.length}, Subs: ${total})`
+                type: sentCount > 0 ? 'success' : 'info',
+                message: `Finished: Sent ${sentCount}, Skipped/Failed ${failedCount} (Total Targets: ${total})`
             });
 
             // Clear draft on success
