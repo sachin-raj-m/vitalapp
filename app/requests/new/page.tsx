@@ -6,6 +6,12 @@ export const metadata: Metadata = {
     description: 'Create a new blood donation request for urgent needs.',
 };
 
+import { ProtectedRoute } from '@/components/ProtectedRoute';
+
 export default function CreateRequestPage() {
-    return <CreateRequestPageContent />;
+    return (
+        <ProtectedRoute>
+            <CreateRequestPageContent />
+        </ProtectedRoute>
+    );
 }

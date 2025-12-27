@@ -5,6 +5,12 @@ export const metadata = {
     description: 'Manage your blood donation requests',
 };
 
+import { ProtectedRoute } from '@/components/ProtectedRoute';
+
 export default function MyRequestsPage() {
-    return <MyRequestsContent />;
+    return (
+        <ProtectedRoute>
+            <MyRequestsContent />
+        </ProtectedRoute>
+    );
 }
