@@ -9,9 +9,10 @@ import { Modal } from '@/components/ui/Modal';
 import { Alert } from '@/components/ui/Alert';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
-import { Loader2, CheckCircle, Clock, Heart } from 'lucide-react';
+import { Loader2, CheckCircle, Clock, Trash2 } from 'lucide-react';
 import type { BloodRequest, Donation } from '@/types';
 import { EmptyState } from '@/components/EmptyState';
+import { logActivity } from '@/lib/logger';
 
 interface RequestWithDonations extends BloodRequest {
     donations: (Donation & { profiles: { full_name: string; phone: string }, units_donated: number })[];
@@ -23,6 +24,9 @@ export function MyRequestsContent() {
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState('');
     const [activeTab, setActiveTab] = useState<'active' | 'past'>('active');
+
+    // New state for delete operation
+    const [deletingId, setDeletingId] = useState<string | null>(null);
 
     const filteredRequests = requests.filter(req => {
         if (activeTab === 'active') return req.status === 'active';
@@ -56,9 +60,6 @@ export function MyRequestsContent() {
                 .order('created_at', { ascending: false });
 
             if (error) throw error;
-
-            // Calculate progress for each request locally if needed, or rely on DB
-            // We'll calculate 'collected' dynamically
             setRequests(data as any);
         } catch (err: any) {
             console.error('Error fetching requests');
@@ -68,13 +69,42 @@ export function MyRequestsContent() {
         }
     };
 
+    const handleDelete = async (requestId: string) => {
+        if (!confirm('Are you sure you want to delete this request? This action cannot be undone.')) return;
+        if (!user) return;
+
+        setDeletingId(requestId);
+        try {
+            const { error } = await supabase
+                .from('blood_requests')
+                .delete()
+                .eq('id', requestId);
+
+            if (error) throw error;
+
+            await logActivity({
+                userId: user.id,
+                action: 'DELETE_REQUEST',
+                entityType: 'blood_requests',
+                entityId: requestId,
+                metadata: { timestamp: new Date().toISOString() }
+            });
+
+            await fetchMyRequests();
+            alert('Request deleted successfully.');
+        } catch (err: any) {
+            console.error('Delete error', err);
+            alert('Failed to delete request.');
+        } finally {
+            setDeletingId(null);
+        }
+    };
+
     const handleVerify = async () => {
         setVerifying(true);
         setVerifyError('');
 
         try {
-
-
             // Check OTP against database
             const { data: donationData, error: otpError } = await supabase
                 .from('donations')
@@ -82,58 +112,47 @@ export function MyRequestsContent() {
                 .eq('id', verifyModal.donationId)
                 .single();
 
-            if (otpError) {
-                console.error('OTP Check Error:', otpError);
-                throw otpError;
-            }
-
-
+            if (otpError) throw otpError;
 
             if (donationData.otp === otpInput) {
-
                 // 1. Update donation status and units
                 const updatePayload = {
                     status: 'completed',
                     units_donated: unitsDonatedInput
                 };
 
-
                 const { error: updateError, count } = await supabase
                     .from('donations')
                     .update(updatePayload, { count: 'exact' })
                     .eq('id', verifyModal.donationId);
 
-                if (updateError) {
-                    console.error('Donation Update Error:', updateError);
-                    alert(`Update Failed: ${updateError.message}\nDetails: ${updateError.details || 'N/A'}`);
-                    throw updateError;
+                if (updateError) throw updateError;
+                if (count === 0) throw new Error('Permission denied updating donation.');
+
+                // Log Verification
+                if (user) {
+                    await logActivity({
+                        userId: user.id,
+                        action: 'VERIFY_DONATION',
+                        entityType: 'donations',
+                        entityId: verifyModal.donationId,
+                        metadata: {
+                            requestId: verifyModal.requestId,
+                            unitsDonated: unitsDonatedInput
+                        }
+                    });
                 }
 
-                if (count === 0) {
-                    const msg = 'Permission Error: The system blocked the update. You might not have permission to verify this donation.';
-                    console.error(msg);
-                    alert(msg);
-                    throw new Error(msg);
-                }
-
-
-
-                // 2. Check total collected units to see if we should close the request
-                // Fetch all COMPLETED donations for this request (including the one just updated)
+                // 2. Check total collected units
                 const { data: allDonations, error: sumError } = await supabase
                     .from('donations')
                     .select('units_donated')
                     .eq('request_id', verifyModal.requestId)
                     .eq('status', 'completed');
 
-                if (sumError) {
-                    console.error('Sum Calculation Error:', sumError);
-                    throw sumError;
-                }
+                if (sumError) throw sumError;
 
                 const totalCollected = allDonations.reduce((sum, d) => sum + (d.units_donated || 0), 0);
-
-                // Find the original request to get units_needed
                 const request = requests.find(r => r.id === verifyModal.requestId);
                 const unitsNeeded = request?.units_needed || 0;
 
@@ -148,30 +167,35 @@ export function MyRequestsContent() {
 
                     if (requestError) {
                         console.error('Request Fulfillment Error:', requestError);
-                        alert('Warning: Donation verified but failed to close request automatically.');
-                        throw requestError;
+                        message += ' (Warning: Failed to auto-close request)';
+                    } else {
+                        message += ' Request has been fulfilled and closed.';
+                        if (user) {
+                            await logActivity({
+                                userId: user.id,
+                                action: 'FULFILL_REQUEST',
+                                entityType: 'blood_requests',
+                                entityId: verifyModal.requestId,
+                                metadata: { totalUnits: totalCollected }
+                            });
+                        }
                     }
-                    message += ' Request has been fulfilled and closed.';
                 } else {
                     message += ` Progress: ${totalCollected}/${unitsNeeded} units.`;
                 }
 
-                // Refresh list
                 await fetchMyRequests();
                 setVerifyModal({ isOpen: false, donationId: '', requestId: '', donorName: '', maxUnits: 0 });
                 setOtpInput('');
                 setUnitsDonatedInput(1);
-
-                // Small delay to allow UI to paint before alert blocks it
                 setTimeout(() => alert(message), 100);
 
             } else {
-                setVerifyError('Invalid PIN. Please ask the donor for their correct PIN.');
+                setVerifyError('Invalid PIN.');
             }
         } catch (err: any) {
             console.error('Verification error', err);
             setVerifyError(err.message || 'Verification failed');
-            alert(`Verification Error: ${err.message}`);
         } finally {
             setVerifying(false);
         }
@@ -226,7 +250,6 @@ export function MyRequestsContent() {
             ) : (
                 <div className="space-y-6">
                     {filteredRequests.map((request) => {
-                        // Calculate stats helper
                         const fulfilledUnits = request.donations.filter(d => d.status === 'completed').reduce((sum, d) => sum + (d.units_donated || 1), 0);
                         const isPast = request.status !== 'active';
 
@@ -268,42 +291,28 @@ export function MyRequestsContent() {
                                                             <span className="font-medium text-gray-900">{new Date(request.date_needed).toLocaleDateString()}</span>
                                                         </div>
                                                     )}
-                                                    <div className="flex flex-col md:hidden">
-                                                        <span className="text-gray-500 text-xs uppercase font-semibold">Date Posted</span>
-                                                        <span className="font-medium text-gray-900">{new Date(request.created_at).toLocaleDateString()}</span>
-                                                    </div>
-                                                </div>
-                                            )}
-
-                                            {isPast && (
-                                                <div className="mt-3 flex flex-wrap gap-4 text-sm bg-gray-50 p-3 rounded-lg border border-gray-100">
-                                                    <div className="flex flex-col">
-                                                        <span className="text-gray-500 text-xs uppercase font-semibold">Units Required</span>
-                                                        <span className="font-medium text-gray-900">{request.units_needed} Units</span>
-                                                    </div>
-                                                    <div className="flex flex-col">
-                                                        <span className="text-gray-500 text-xs uppercase font-semibold">Units Received</span>
-                                                        <span className="font-medium text-success-600">{fulfilledUnits} Units</span>
-                                                    </div>
-                                                    {request.date_needed && (
-                                                        <div className="flex flex-col">
-                                                            <span className="text-gray-500 text-xs uppercase font-semibold">Date Needed</span>
-                                                            <span className="font-medium text-gray-900">{new Date(request.date_needed).toLocaleDateString()}</span>
-                                                        </div>
-                                                    )}
-                                                    <div className="flex flex-col md:hidden">
-                                                        <span className="text-gray-500 text-xs uppercase font-semibold">Date Posted</span>
-                                                        <span className="font-medium text-gray-900">{new Date(request.created_at).toLocaleDateString()}</span>
-                                                    </div>
                                                 </div>
                                             )}
                                         </div>
                                         <div className="flex flex-col items-end gap-1 self-end md:self-auto pl-4">
-                                            <Badge variant={request.status === 'active' ? 'warning' : request.status === 'fulfilled' ? 'success' : 'neutral'}>
-                                                {request.status.charAt(0).toUpperCase() + request.status.slice(1)}
-                                            </Badge>
+                                            <div className="flex items-center gap-2">
+                                                <Badge variant={request.status === 'active' ? 'warning' : request.status === 'fulfilled' ? 'success' : 'neutral'}>
+                                                    {request.status.charAt(0).toUpperCase() + request.status.slice(1)}
+                                                </Badge>
+                                                {request.status === 'active' && (
+                                                    <Button
+                                                        size="sm"
+                                                        variant="ghost"
+                                                        className="text-red-500 hover:text-red-700 hover:bg-red-50 p-1 h-auto"
+                                                        onClick={() => handleDelete(request.id)}
+                                                        isLoading={deletingId === request.id}
+                                                        title="Delete Request"
+                                                    >
+                                                        <Trash2 className="w-4 h-4" />
+                                                    </Button>
+                                                )}
+                                            </div>
 
-                                            {/* Progress Bar for Active Requests */}
                                             {request.status === 'active' && (
                                                 <div className="w-32 mt-1">
                                                     <div className="flex justify-between text-xs text-gray-500 mb-1">
@@ -362,10 +371,10 @@ export function MyRequestsContent() {
                                                             </Button>
                                                         ) : donation.status === 'completed' ? (
                                                             <span className="flex items-center text-green-600 text-sm font-medium">
-                                                                <CheckCircle className="h-4 w-4 mr-1" /> {donation.units_donated || 1} Unit(s) Verified
+                                                                <CheckCircle className="h-4 w-4 mr-1" /> Verified
                                                             </span>
                                                         ) : (
-                                                            <Badge variant="neutral">{donation.status === 'cancelled' ? 'Withdrawn' : donation.status}</Badge>
+                                                            <Badge variant="neutral">{donation.status}</Badge>
                                                         )}
                                                     </div>
                                                 </div>
@@ -381,7 +390,6 @@ export function MyRequestsContent() {
                 </div>
             )}
 
-            {/* Verification Modal */}
             <Modal
                 isOpen={verifyModal.isOpen}
                 onClose={() => setVerifyModal({ ...verifyModal, isOpen: false })}
@@ -389,13 +397,8 @@ export function MyRequestsContent() {
             >
                 <div className="space-y-4">
                     <p className="text-sm text-gray-600">
-                        Ask the donor for their <strong>4-digit Donor PIN</strong> and enter it below to confirm the donation.
-                        <br />
-                        <span className="text-xs text-orange-600 font-medium mt-1 block">
-                            Note: verifying this will mark the request as fulfilled.
-                        </span>
+                        Ask the donor for their <strong>4-digit Donor PIN</strong> and enter it below to confirm.
                     </p>
-
                     <Input
                         label="Enter Donor PIN"
                         placeholder="e.g. 1234"
@@ -404,49 +407,18 @@ export function MyRequestsContent() {
                         maxLength={4}
                         className="text-center text-2xl tracking-widest"
                     />
-
                     <div className="bg-blue-50 p-4 rounded-lg">
-                        <label className="block text-sm font-medium text-blue-900 mb-2">
-                            Units Donated
-                        </label>
+                        <label className="block text-sm font-medium text-blue-900 mb-2">Units Donated</label>
                         <div className="flex items-center gap-3">
-                            <button
-                                className="w-10 h-10 rounded-md bg-white border border-blue-200 text-blue-600 font-bold hover:bg-blue-100"
-                                onClick={() => setUnitsDonatedInput(Math.max(1, unitsDonatedInput - 1))}
-                            >
-                                -
-                            </button>
-                            <span className="text-xl font-bold text-gray-800 w-8 text-center">{unitsDonatedInput}</span>
-                            <button
-                                className="w-10 h-10 rounded-md bg-white border border-blue-200 text-blue-600 font-bold hover:bg-blue-100"
-                                onClick={() => setUnitsDonatedInput(unitsDonatedInput + 1)}
-                            >
-                                +
-                            </button>
+                            <button className="w-10 h-10 border border-blue-200 text-blue-600 font-bold hover:bg-blue-100" onClick={() => setUnitsDonatedInput(Math.max(1, unitsDonatedInput - 1))}>-</button>
+                            <span className="text-xl font-bold">{unitsDonatedInput}</span>
+                            <button className="w-10 h-10 border border-blue-200 text-blue-600 font-bold hover:bg-blue-100" onClick={() => setUnitsDonatedInput(unitsDonatedInput + 1)}>+</button>
                         </div>
-                        <p className="text-xs text-blue-600 mt-2">
-                            Confirm the number of blood units collected from this donor.
-                        </p>
                     </div>
-
-                    {verifyError && (
-                        <p className="text-red-500 text-sm">{verifyError}</p>
-                    )}
-
+                    {verifyError && <p className="text-red-500 text-sm">{verifyError}</p>}
                     <div className="flex justify-end gap-3 pt-2">
-                        <Button
-                            variant="secondary"
-                            onClick={() => setVerifyModal({ ...verifyModal, isOpen: false })}
-                        >
-                            Cancel
-                        </Button>
-                        <Button
-                            onClick={handleVerify}
-                            isLoading={verifying}
-                            disabled={otpInput.length !== 4}
-                        >
-                            Verify & Complete
-                        </Button>
+                        <Button variant="secondary" onClick={() => setVerifyModal({ ...verifyModal, isOpen: false })}>Cancel</Button>
+                        <Button onClick={handleVerify} isLoading={verifying} disabled={otpInput.length !== 4}>Verify & Complete</Button>
                     </div>
                 </div>
             </Modal>

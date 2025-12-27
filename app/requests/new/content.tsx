@@ -11,6 +11,7 @@ import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
 import type { BloodGroup, UrgencyLevel } from '@/types';
 import dynamic from 'next/dynamic';
+import { logActivity } from '@/lib/logger';
 
 const Map = dynamic(() => import('@/components/Map'), {
     ssr: false,
@@ -93,6 +94,10 @@ export default function CreateRequestPage() {
 
             if (requestError) throw requestError;
 
+
+
+            // ... inside component ...
+
             // Trigger Push Notifications (Fire and Forget)
             fetch('/api/notify/donors', {
                 method: 'POST',
@@ -105,6 +110,19 @@ export default function CreateRequestPage() {
                     urgencyLevel: formData.urgencyLevel
                 })
             }).catch(e => console.error('Notification trigger failed', e));
+
+            // Log Activity
+            await logActivity({
+                userId: user.id,
+                action: 'CREATE_REQUEST',
+                entityType: 'blood_requests',
+                entityId: data?.[0]?.id,
+                metadata: {
+                    bloodGroup: formData.bloodGroup,
+                    city: formData.city,
+                    units: formData.unitsNeeded
+                }
+            });
 
             router.push('/requests');
         } catch (err: any) {
