@@ -114,7 +114,6 @@ export default function CreateRequestPage() {
         }
     };
 
-    // TODO: Implement geolocation
     const handleGetLocation = () => {
         if ('geolocation' in navigator) {
             navigator.geolocation.getCurrentPosition(
@@ -129,9 +128,12 @@ export default function CreateRequestPage() {
                     }));
                 },
                 (error) => {
-                    console.error('Error getting location');
+                    console.error('Error getting location', error);
+                    alert('Unable to retrieve your location. Please check browser permissions.');
                 }
             );
+        } else {
+            alert('Geolocation is not supported by your browser.');
         }
     };
 

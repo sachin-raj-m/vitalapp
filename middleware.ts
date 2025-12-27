@@ -26,7 +26,34 @@ export async function middleware(request: NextRequest) {
         }
     )
 
-    await supabase.auth.getUser()
+    const { data: { user } } = await supabase.auth.getUser()
+
+    // Protected Routes Pattern
+    const protectedPaths = [
+        '/dashboard',
+        '/profile',
+        '/nearby-donors',
+        '/donations',
+        '/requests/new',
+        '/requests/my-requests'
+    ]
+
+    const isProtected = protectedPaths.some(path => request.nextUrl.pathname.startsWith(path))
+
+    if (isProtected && !user) {
+        const redirectUrl = request.nextUrl.clone()
+        redirectUrl.pathname = '/login'
+        redirectUrl.searchParams.set('redirect', request.nextUrl.pathname)
+        return NextResponse.redirect(redirectUrl)
+    }
+
+    // Auth Routes Pattern (Redirect to dashboard if already logged in)
+    const authPaths = ['/login', '/register', '/forgot-password']
+    const isAuthPage = authPaths.some(path => request.nextUrl.pathname.startsWith(path))
+
+    if (isAuthPage && user) {
+        return NextResponse.redirect(new URL('/dashboard', request.url))
+    }
 
     return response
 }
