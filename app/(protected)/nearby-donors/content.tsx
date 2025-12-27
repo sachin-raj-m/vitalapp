@@ -238,7 +238,7 @@ export default function NearbyDonorsPageContent() {
     }
 
     return (
-        <div className="space-y-6 h-[calc(100vh-140px)] flex flex-col">
+        <div className="space-y-6 h-auto lg:h-[calc(100vh-140px)] flex flex-col">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 flex-shrink-0">
                 <div>
                     <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Find Donors Nearby</h1>
@@ -258,7 +258,7 @@ export default function NearbyDonorsPageContent() {
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 flex-grow min-h-0">
                 {/* Map Section */}
-                <div className="lg:col-span-8 h-[400px] lg:h-full rounded-2xl overflow-hidden border border-gray-200 shadow-sm relative group bg-gray-50">
+                <div className="lg:col-span-8 h-[250px] md:h-[350px] lg:h-full rounded-2xl overflow-hidden border border-gray-200 shadow-sm relative group bg-gray-50">
                     <Map
                         center={center}
                         zoom={11}
@@ -274,7 +274,7 @@ export default function NearbyDonorsPageContent() {
                 </div>
 
                 {/* List Section */}
-                <div className="lg:col-span-4 flex flex-col h-full min-h-0 bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+                <div className="lg:col-span-4 flex flex-col h-[500px] lg:h-full min-h-0 bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
                     <div className="p-4 border-b border-gray-100 bg-gray-50/50 flex justify-between items-center">
                         <h2 className="font-semibold text-gray-800 flex items-center">
                             <Search className="w-4 h-4 mr-2 text-gray-400" />

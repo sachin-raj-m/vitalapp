@@ -73,7 +73,6 @@ export function Header() {
                 <Link href="/dashboard" onClick={closeMenu} className="block px-2 py-1 text-gray-600 hover:text-primary-600 hover:bg-gray-50 rounded-md">Dashboard</Link>
                 <Link href="/requests" onClick={closeMenu} className="block px-2 py-1 text-gray-600 hover:text-primary-600 hover:bg-gray-50 rounded-md">Requests</Link>
                 <Link href="/requests/my-requests" onClick={closeMenu} className="block px-2 py-1 text-gray-600 hover:text-primary-600 hover:bg-gray-50 rounded-md">My Requests</Link>
-                <Link href="/requests/my-requests" onClick={closeMenu} className="block px-2 py-1 text-gray-600 hover:text-primary-600 hover:bg-gray-50 rounded-md">My Requests</Link>
                 <Link href="/donations" onClick={closeMenu} className="block px-2 py-1 text-gray-600 hover:text-primary-600 hover:bg-gray-50 rounded-md">Donations</Link>
                 <Link href="/nearby-donors" onClick={closeMenu} className="block px-2 py-1 text-gray-600 hover:text-primary-600 hover:bg-gray-50 rounded-md">Find Donors</Link>
                 {user.role === 'admin' && (
