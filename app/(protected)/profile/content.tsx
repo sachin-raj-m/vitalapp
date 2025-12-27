@@ -10,6 +10,7 @@ import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { Loader2, User, MapPin, Phone, Mail, Droplet, Award, Calendar, Settings, LogOut, Edit2, Check, X, Shield, Heart, Bell } from 'lucide-react';
 import { PushNotificationManager } from '@/components/PushNotificationManager';
+import { SecuritySettings } from './SecuritySettings';
 import type { BloodGroup } from '@/types';
 import { motion } from 'framer-motion';
 
@@ -306,6 +307,15 @@ export default function ProfilePage() {
                     </Card>
                 </motion.div>
             )}
+
+            {/* Security Settings */}
+            <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.12 }}
+            >
+                <SecuritySettings />
+            </motion.div>
 
             {/* Preferences */}
             <motion.div
