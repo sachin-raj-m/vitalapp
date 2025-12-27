@@ -13,8 +13,9 @@ export const Input: React.FC<InputProps> = ({
   className = '',
   ...props
 }) => {
-  const id = props.id || props.name || Math.random().toString(36).substring(2, 9);
-  
+  const generatedId = React.useId();
+  const id = props.id || props.name || generatedId;
+
   return (
     <div className="mb-4">
       {label && (
@@ -38,6 +39,7 @@ export const Input: React.FC<InputProps> = ({
   );
 };
 
+
 interface SelectProps extends React.SelectHTMLAttributes<HTMLSelectElement> {
   label?: string;
   error?: string;
@@ -53,8 +55,9 @@ export const Select: React.FC<SelectProps> = ({
   className = '',
   ...props
 }) => {
-  const id = props.id || props.name || Math.random().toString(36).substring(2, 9);
-  
+  const generatedId = React.useId();
+  const id = props.id || props.name || generatedId;
+
   return (
     <div className="mb-4">
       {label && (
@@ -97,8 +100,9 @@ export const Textarea: React.FC<TextareaProps> = ({
   className = '',
   ...props
 }) => {
-  const id = props.id || props.name || Math.random().toString(36).substring(2, 9);
-  
+  const generatedId = React.useId();
+  const id = props.id || props.name || generatedId;
+
   return (
     <div className="mb-4">
       {label && (

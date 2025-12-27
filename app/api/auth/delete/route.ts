@@ -27,7 +27,7 @@ export async function POST(request: Request) {
         }
 
         const userId = session.user.id;
-        console.log(`Requesting deletion for user: ${userId}`);
+
 
         // Initialize Service Role Client to perform deletion
         // Note: Using standard supabase-js client for admin operations

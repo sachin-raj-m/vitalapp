@@ -419,19 +419,8 @@ export default function RequestsPage() {
                 onSuccess={() => {
                     setShowAuthModal(false);
                     if (pendingRequestToDonate) {
-                        // After login, proceed to check compatibility and open donation modal
-                        // We need a slight delay or re-check because 'user' object might take a moment to update in context? 
-                        // Actually, onSuccess is called after await signIn, so context should update soon.
-                        // Ideally we wait for user to be populated. 
-                        // For MVP, simply re-triggering the check might fail if user context isn't instant.
-                        // Let's rely on the user clicking again or refresh. 
-                        // BETTER UX: Auto-open if compatible. 
-                        // For now, let's just close and let them click again or (optional) auto-trigger.
-                        // Let's try to auto-trigger handleDonateClick logic? No, we need 'user' object.
-                        // Just closing is fine, they are now logged in.
-                        // Actually, let's keep it simple: Just close. The user sees they are logged in.
-                        // toast.success("Welcome back! You can now proceed to donate.");
-
+                        // User logged in. Allow them to retry the donation action manually 
+                        // by clicking "I can donate" again, which is now cleaner UX than auto-triggering.
                     }
                 }}
                 message="Login to Donate"
