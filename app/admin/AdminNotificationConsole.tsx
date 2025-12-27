@@ -225,10 +225,29 @@ export function AdminNotificationConsole() {
                 setProgress({ sent: sentCount, failed: failedCount, total });
             }
 
-            setStatus({
-                type: sentCount > 0 ? 'success' : 'info',
-                message: `Finished: Sent ${sentCount}, Skipped/Failed ${failedCount} (Total Targets: ${total})`
-            });
+            const skippedCount = failedCount; // In our API logic, silent fails are usually "no sub"
+
+            if (mode === 'single' && sentCount === 0) {
+                setStatus({
+                    type: 'error',
+                    message: `Failed to send: The user "${userSearchTerm || userId}" has not enabled push notifications.`
+                });
+            } else if (skippedCount > 0 && sentCount > 0) {
+                setStatus({
+                    type: 'info',
+                    message: `Partial Success: Sent to ${sentCount} users. ${skippedCount} users were skipped (not subscribed).`
+                });
+            } else if (sentCount > 0) {
+                setStatus({
+                    type: 'success',
+                    message: `Success! Notification sent to ${sentCount} user(s).`
+                });
+            } else {
+                setStatus({
+                    type: 'error',
+                    message: `Failed: Sent 0 notifications. Targets likely have not enabled push notifications.`
+                });
+            }
 
             // Clear draft on success
             if (sentCount > 0) {
