@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardHeader, CardBody } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input, Textarea } from '@/components/ui/Input';
@@ -12,6 +12,31 @@ export function AdminNotificationConsole() {
     const [userId, setUserId] = useState(''); // Optional: Target specific user
     const [sending, setSending] = useState(false);
     const [status, setStatus] = useState<{ type: 'success' | 'error', message: string } | null>(null);
+
+    // Persistence Key
+    const STORAGE_KEY = 'admin_notification_draft';
+
+    // Load draft on mount
+    useEffect(() => {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (saved) {
+            try {
+                const draft = JSON.parse(saved);
+                setTitle(draft.title || '');
+                setBody(draft.body || '');
+                setUrl(draft.url || '/');
+                setUserId(draft.userId || '');
+            } catch (e) {
+                console.error('Failed to parse draft', e);
+            }
+        }
+    }, []);
+
+    // Save draft on change
+    useEffect(() => {
+        const draft = { title, body, url, userId };
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(draft));
+    }, [title, body, url, userId]);
 
     const handleSend = async () => {
         setSending(true);
@@ -64,6 +89,12 @@ export function AdminNotificationConsole() {
             if (!response.ok) throw new Error(result.error || 'Failed to send');
 
             setStatus({ type: 'success', message: 'Notification sent successfully!' });
+            // Clear draft on success
+            localStorage.removeItem(STORAGE_KEY);
+            setTitle('');
+            setBody('');
+            setUrl('/');
+            setUserId('');
         } catch (err: any) {
             setStatus({ type: 'error', message: err.message });
         } finally {
