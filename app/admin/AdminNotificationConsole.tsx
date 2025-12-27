@@ -167,7 +167,12 @@ export function AdminNotificationConsole() {
 
             if (targetIds.length === 0) throw new Error('No eligible users found for this selection.');
 
-            // 2. Batch Send (Pass IDs to API)
+            // 2. Resolve Session for Token
+            const { data: { session } } = await supabase.auth.getSession();
+            const token = session?.access_token;
+            if (!token) throw new Error('Authentication lost. Please reload.');
+
+            // 3. Batch Send (Pass IDs to API)
             const total = targetIds.length;
             let sentCount = 0;
             let failedCount = 0;
@@ -184,8 +189,10 @@ export function AdminNotificationConsole() {
                 try {
                     const res = await fetch('/api/web-push/send', {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        credentials: 'include', // Ensure Auth Cookies are sent
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${token}`
+                        },
                         body: JSON.stringify({
                             userIds: batchIds, // Pass IDs, API fetches subs with Service Role
                             title,
