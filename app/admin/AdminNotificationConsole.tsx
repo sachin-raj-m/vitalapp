@@ -185,6 +185,7 @@ export function AdminNotificationConsole() {
                     const res = await fetch('/api/web-push/send', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
+                        credentials: 'include', // Ensure Auth Cookies are sent
                         body: JSON.stringify({
                             userIds: batchIds, // Pass IDs, API fetches subs with Service Role
                             title,
