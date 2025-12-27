@@ -294,7 +294,7 @@ export function MyRequestsContent() {
                                                 </div>
                                             )}
                                         </div>
-                                        <div className="flex flex-col items-end gap-1 self-end md:self-auto pl-4">
+                                        <div className="flex flex-col items-end gap-1 self-end md:self-auto pl-0 md:pl-4 mt-2 md:mt-0 w-full md:w-auto">
                                             <div className="flex items-center gap-2">
                                                 <Badge variant={request.status === 'active' ? 'warning' : request.status === 'fulfilled' ? 'success' : 'neutral'}>
                                                     {request.status.charAt(0).toUpperCase() + request.status.slice(1)}
@@ -314,7 +314,7 @@ export function MyRequestsContent() {
                                             </div>
 
                                             {request.status === 'active' && (
-                                                <div className="w-32 mt-1">
+                                                <div className="w-full md:w-32 mt-1">
                                                     <div className="flex justify-between text-xs text-gray-500 mb-1">
                                                         <span>Collected</span>
                                                         <span>{fulfilledUnits} / {request.units_needed}</span>

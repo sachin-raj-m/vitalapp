@@ -256,7 +256,7 @@ export default function CreateRequestPage() {
                             <label className="block text-sm font-medium text-gray-700">
                                 Location Selection (Click on map)
                             </label>
-                            <div className="h-[400px] border border-gray-300 rounded-lg overflow-hidden relative z-0">
+                            <div className="h-[300px] md:h-[400px] border border-gray-300 rounded-lg overflow-hidden relative z-0">
                                 <Map
                                     interactive={true}
                                     center={{ lat: 20.5937, lng: 78.9629 }}
