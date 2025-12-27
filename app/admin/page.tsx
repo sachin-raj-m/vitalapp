@@ -9,6 +9,9 @@ import { Download, Loader2, Check, X, FileText, ExternalLink, Users, Activity, S
 import { motion } from 'framer-motion';
 import { AnalyticsCharts } from '@/components/admin/AnalyticsCharts';
 import { AdminNotificationConsole } from './AdminNotificationConsole';
+import { useAuth } from '@/context/AuthContext';
+import { useRouter } from 'next/navigation';
+import { toast } from 'sonner';
 
 interface Profile {
     id: string;
@@ -34,6 +37,8 @@ interface Request {
 }
 
 export default function AdminDashboard() {
+    const { user, loading: authLoading } = useAuth();
+    const router = useRouter();
     const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'verifications' | 'requests' | 'analytics' | 'notifications'>('overview');
     const [stats, setStats] = useState({ users: 0, donors: 0, pending: 0, requests: 0 });
     const [users, setUsers] = useState<Profile[]>([]);
@@ -45,9 +50,35 @@ export default function AdminDashboard() {
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedUser, setSelectedUser] = useState<Profile | null>(null);
 
+    // Protect Admin Route & Fetch Data
     useEffect(() => {
-        fetchAllData();
-    }, []);
+        if (authLoading) return;
+
+        if (!user) {
+            router.push('/login');
+            return;
+        }
+
+        // Check explicit admin role
+        const checkAdmin = async () => {
+            const { data, error } = await supabase
+                .from('profiles')
+                .select('role')
+                .eq('id', user.id)
+                .single();
+
+            if (error || data?.role !== 'admin') {
+                toast.error("Access Denied: Admins Only");
+                router.push('/dashboard');
+                return;
+            }
+
+            // Only fetch if admin confirmed
+            fetchAllData();
+        };
+
+        checkAdmin();
+    }, [user, authLoading, router]);
 
     const fetchAllData = async () => {
         setIsLoading(true);
@@ -202,7 +233,7 @@ export default function AdminDashboard() {
         }
     };
 
-    if (isLoading) return <div className="flex justify-center p-8"><Loader2 className="animate-spin h-8 w-8 text-red-500" /></div>;
+    if (authLoading || isLoading) return <div className="flex justify-center p-8"><Loader2 className="animate-spin h-8 w-8 text-red-500" /></div>;
 
     return (
         <div className="space-y-8">
