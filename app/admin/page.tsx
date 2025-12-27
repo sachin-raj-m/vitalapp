@@ -40,6 +40,7 @@ export default function AdminDashboard() {
     const { user, loading: authLoading } = useAuth();
     const router = useRouter();
     const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'verifications' | 'requests' | 'analytics' | 'notifications'>('overview');
+    const [activityFilter, setActivityFilter] = useState<'all' | 'users' | 'requests' | 'donations'>('all'); // New Activity Filter State
     const [stats, setStats] = useState({ users: 0, donors: 0, pending: 0, requests: 0 });
     const [users, setUsers] = useState<Profile[]>([]);
     const [requests, setRequests] = useState<Request[]>([]);
@@ -300,28 +301,57 @@ export default function AdminDashboard() {
             <div className="min-h-[400px]">
                 <div className={activeTab === 'overview' ? 'block' : 'hidden'}>
                     <div className="space-y-6">
-                        <h3 className="text-lg font-semibold">Activity Stream</h3>
+                        <div className="flex justify-between items-center">
+                            <h3 className="text-lg font-semibold">Activity Stream</h3>
+                            <div className="flex space-x-2">
+                                {(['all', 'users', 'requests', 'donations'] as const).map(filter => (
+                                    <button
+                                        key={filter}
+                                        onClick={() => setActivityFilter(filter)} // Needs state
+                                        className={`px-3 py-1 text-xs font-medium rounded-full capitalize transition-colors ${activityFilter === filter
+                                            ? 'bg-gray-900 text-white'
+                                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                            }`}
+                                    >
+                                        {filter}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
                         <div className="space-y-4">
-                            {[...users, ...requests]
-                                .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-                                .slice(0, 10)
-                                .map((item: any, i) => {
-                                    const isUser = 'full_name' in item;
+                            {[
+                                ...users.map(u => ({ type: 'user', date: u.created_at, data: u })),
+                                ...requests.map(r => ({ type: 'request', date: r.created_at, data: r })),
+                                ...donations.map(d => ({ type: 'donation', date: d.created_at, data: d }))
+                            ]
+                                .filter(item => activityFilter === 'all' || item.type === activityFilter)
+                                .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+                                .slice(0, 20) // Increased limit
+                                .map((item, i) => {
                                     return (
                                         <div key={i} className="flex items-start space-x-3 p-3 bg-white rounded-lg border border-gray-100 hover:shadow-sm transition-shadow">
-                                            <div className={`p-2 rounded-full ${isUser ? 'bg-blue-100 text-blue-600' : 'bg-red-100 text-red-600'}`}>
-                                                {isUser ? <User size={16} /> : <Activity size={16} />}
+                                            <div className={`p-2 rounded-full ${item.type === 'user' ? 'bg-blue-100 text-blue-600' :
+                                                item.type === 'request' ? 'bg-red-100 text-red-600' :
+                                                    'bg-green-100 text-green-600'
+                                                }`}>
+                                                {item.type === 'user' && <User size={16} />}
+                                                {item.type === 'request' && <Activity size={16} />}
+                                                {item.type === 'donation' && <HeartPulse size={16} />}
                                             </div>
                                             <div>
                                                 <p className="text-sm text-gray-900">
-                                                    {isUser ? (
-                                                        <span>New user <span className="font-semibold">{item.full_name}</span> joined the platform.</span>
-                                                    ) : (
-                                                        <span>New blood request for <span className="font-semibold">{item.blood_group}</span> at {item.hospital_name}.</span>
+                                                    {item.type === 'user' && (
+                                                        <span>New user <span className="font-semibold">{(item.data as any).full_name}</span> joined.</span>
+                                                    )}
+                                                    {item.type === 'request' && (
+                                                        <span>New blood request for <span className="font-semibold">{(item.data as any).blood_group}</span> at {(item.data as any).hospital_name}.</span>
+                                                    )}
+                                                    {item.type === 'donation' && (
+                                                        <span>New donation offer for request #{(item.data as any).request_id?.slice(0, 8)}.</span>
                                                     )}
                                                 </p>
                                                 <p className="text-xs text-gray-500 mt-1">
-                                                    {new Date(item.created_at).toLocaleString()}
+                                                    {new Date(item.date).toLocaleString()}
                                                 </p>
                                             </div>
                                         </div>
