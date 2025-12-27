@@ -76,7 +76,7 @@ export async function POST(request: Request) {
         if (donorError) throw donorError
 
         if (!donors || donors.length === 0) {
-            console.log(`No compatible donors found in ${city} for ${bloodGroup}`)
+
             return NextResponse.json({ message: 'No matching donors found', count: 0 })
         }
 
