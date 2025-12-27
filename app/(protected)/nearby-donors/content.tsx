@@ -103,9 +103,9 @@ export default function NearbyDonorsPageContent() {
                     if (newZipCache[zip]) continue;
 
                     try {
-                        const response = await fetch(`https://nominatim.openstreetmap.org/search?postalcode=${zip}&country=India&format=json&limit=1`, {
+                        const response = await fetch(`/api/geocode?zip=${zip}`, {
                             headers: {
-                                'User-Agent': 'VitalBloodApp/1.0'
+                                'Content-Type': 'application/json'
                             }
                         });
                         const results = await response.json();
@@ -189,8 +189,8 @@ export default function NearbyDonorsPageContent() {
             if (data?.present_zip) {
                 // Try to geocode the zip immediately
                 try {
-                    const response = await fetch(`https://nominatim.openstreetmap.org/search?postalcode=${data.present_zip}&country=India&format=json&limit=1`, {
-                        headers: { 'User-Agent': 'VitalBloodApp/1.0' }
+                    const response = await fetch(`/api/geocode?zip=${data.present_zip}`, {
+                        headers: { 'Content-Type': 'application/json' }
                     });
                     const results = await response.json();
                     if (results && results.length > 0) {
