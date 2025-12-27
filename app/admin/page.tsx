@@ -8,6 +8,7 @@ import { Alert } from '@/components/ui/Alert';
 import { Download, Loader2, Check, X, FileText, ExternalLink, Users, Activity, Shield, Search, Trash2, HeartPulse, User } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { AnalyticsCharts } from '@/components/admin/AnalyticsCharts';
+import { AdminNotificationConsole } from './AdminNotificationConsole';
 
 interface Profile {
     id: string;
@@ -33,7 +34,7 @@ interface Request {
 }
 
 export default function AdminDashboard() {
-    const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'verifications' | 'requests' | 'analytics'>('overview');
+    const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'verifications' | 'requests' | 'analytics' | 'notifications'>('overview');
     const [stats, setStats] = useState({ users: 0, donors: 0, pending: 0, requests: 0 });
     const [users, setUsers] = useState<Profile[]>([]);
     const [requests, setRequests] = useState<Request[]>([]);
@@ -249,7 +250,7 @@ export default function AdminDashboard() {
 
             {/* Tabs */}
             <div className="flex space-x-1 border-b overflow-x-auto pb-1">
-                {['overview', 'users', 'verifications', 'requests', 'analytics'].map((tab) => (
+                {['overview', 'users', 'verifications', 'requests', 'analytics', 'notifications'].map((tab) => (
                     <button
                         key={tab}
                         onClick={() => setActiveTab(tab as any)}
@@ -458,6 +459,12 @@ export default function AdminDashboard() {
 
                 {activeTab === 'analytics' && (
                     <AnalyticsCharts users={users} requests={requests} donations={donations} />
+                )}
+
+                {activeTab === 'notifications' && (
+                    <div className="max-w-2xl mx-auto">
+                        <AdminNotificationConsole />
+                    </div>
                 )}
             </div>
 
