@@ -17,6 +17,7 @@ import { DashboardSkeleton } from '@/components/skeletons/DashboardSkeleton';
 import { EmptyState } from '@/components/EmptyState';
 
 import { useRequests } from '@/context/RequestsContext';
+import { NotificationBanner } from '@/components/NotificationBanner';
 
 // ... (other imports remain, remove BloodRequest type import if unused or keep)
 
@@ -137,8 +138,11 @@ export default function DashboardPage() {
         return <DashboardSkeleton />;
     }
 
+    // ...
+
     return (
         <div className="space-y-8">
+            <NotificationBanner />
             {/* Header Section */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div>
