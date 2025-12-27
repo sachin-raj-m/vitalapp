@@ -21,12 +21,6 @@ const COMPATIBLE_DONORS: Record<string, string[]> = {
 }
 
 export async function POST(request: Request) {
-    const { requestId, bloodGroup, hospitalName, city, urgencyLevel } = await request.json()
-
-    if (!requestId || !bloodGroup || !city) {
-        return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
-    }
-
     const cookieStore = await cookies()
     const supabase = createServerClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -48,6 +42,13 @@ export async function POST(request: Request) {
             },
         }
     )
+
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const { requestId, bloodGroup, hospitalName, city, urgencyLevel } = await request.json()
 
     try {
         // 1. Determine Compatible Donor Groups
