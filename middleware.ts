@@ -33,14 +33,14 @@ export async function middleware(request: NextRequest) {
     // We are relaxing server-side protection for user routes to avoid race conditions 
     // where client has session but server cookie is stale. 
     // We rely on client-side ProtectedRoute for these.
-    const protectedPaths = [
+    const protectedPaths: string[] = [
         // '/dashboard',
         // '/profile',
         // '/nearby-donors',
         // '/donations',
         // '/requests/new',
         // '/requests/my-requests'
-        '/admin' // Keep admin protected strictly
+        // '/admin' // Keep admin protected strictly
     ]
 
     const isProtected = protectedPaths.some(path => request.nextUrl.pathname.startsWith(path))
