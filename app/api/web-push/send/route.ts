@@ -13,7 +13,20 @@ export async function POST(request: Request) {
     )
 
     // 1. Authenticate caller (Must be logged in)
-    const { data: { user } } = await supabase.auth.getUser()
+    let user;
+
+    // Check Authorization header first (Robust for client-side fetch)
+    const authHeader = request.headers.get('Authorization');
+    if (authHeader) {
+        const token = authHeader.replace('Bearer ', '').trim();
+        const { data } = await supabase.auth.getUser(token);
+        user = data.user;
+    } else {
+        // Fallback to cookies
+        const { data } = await supabase.auth.getUser();
+        user = data.user;
+    }
+
     if (!user) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
