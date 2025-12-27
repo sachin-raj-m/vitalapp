@@ -235,7 +235,7 @@ export default function CompleteRegistration() {
                                 error={fieldErrors.fullName}
                             />
 
-                            <div className="grid grid-cols-2 gap-4">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <Input
                                     label="Date of Birth"
                                     type="date"

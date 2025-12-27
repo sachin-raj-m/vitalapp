@@ -128,7 +128,7 @@ export const BloodRequestCard: React.FC<BloodRequestCardProps> = ({ request, onR
               )}
             </div>
 
-            <div className="mt-4 flex justify-between items-center gap-2">
+            <div className="mt-4 flex flex-wrap justify-between items-center gap-4">
               <ShareButton
                 title={`Urgent: ${request.blood_group} Blood Needed`}
                 text={`${request.hospital_name} needs ${request.units_needed} units of ${request.blood_group} blood. Please help!`}
