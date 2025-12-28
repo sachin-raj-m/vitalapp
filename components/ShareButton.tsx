@@ -23,9 +23,14 @@ export const ShareButton: React.FC<ShareButtonProps> = ({ title, text, url }) =>
     const handleShare = async () => {
         setIsLoading(true);
         const shareUrl = url || window.location.href;
+
+        // WhatsApp friendly format with bolding (using asterisks)
+        const formattedTitle = title;
+        const formattedText = `${text}\n\n👉 *Tap to donate:*`;
+
         const shareData = {
-            title,
-            text,
+            title: title,
+            text: `${formattedTitle}\n${formattedText}`,
             url: shareUrl
         };
 
@@ -34,7 +39,7 @@ export const ShareButton: React.FC<ShareButtonProps> = ({ title, text, url }) =>
                 // Mobile / Supported Browsers
                 await navigator.share(shareData);
             } else {
-                // Desktop / Fallback
+                // Desktop / Fallback -> Single blob for clipboard
                 await navigator.clipboard.writeText(`${title}\n${text}\n${shareUrl}`);
                 setCopied(true);
                 setTimeout(() => setCopied(false), 2000);
