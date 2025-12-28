@@ -11,6 +11,8 @@ import { Loader2 } from 'lucide-react';
 import type { BloodGroup } from '@/types';
 import { useAuth } from '@/context/AuthContext';
 import { isRegistrationComplete } from '@/utils/auth';
+import { PermanentDeferralQuestions } from '@/components/nbtc/PermanentDeferralQuestions';
+import { addDays } from 'date-fns';
 
 interface PendingRegistration {
     userId: string;
@@ -61,6 +63,7 @@ export default function CompleteRegistration() {
         consent: false
     });
     const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+    const [nbtcEligible, setNbtcEligible] = useState<boolean>(true);
 
     useEffect(() => {
         const init = async () => {
@@ -162,20 +165,20 @@ export default function CompleteRegistration() {
                         city: formData.city,
                         district: formData.district,
                         state: formData.state,
-                        is_donor: true,
-                        is_available: true,
-                        permanent_zip: formData.permanentZip,
-                        present_zip: formData.presentZip,
-                        location: {
-                            latitude: 0,
-                            longitude: 0,
-                            address: `${formData.city}, ${formData.district}, ${formData.state}`
-                        },
-                        last_donation_date: formData.lastDonationDate || null,
-                        willingness_to_travel: formData.willingTovelKm,
                         availability: formData.availability,
                         has_medical_conditions: formData.hasConditions,
-                        consent_agreed: true
+                        consent_agreed: true,
+                        next_eligible_date: (() => {
+                            if (!nbtcEligible) return null; // Permanent deferral
+                            if (!formData.lastDonationDate) return new Date().toISOString();
+
+                            const lastDate = new Date(formData.lastDonationDate);
+                            const daysToAdd = formData.gender === 'Female' ? 120 : 90;
+                            return addDays(lastDate, daysToAdd).toISOString();
+                        })(),
+                        // If NBTC ineligible, force is_donor to false (Volunteer Only)
+                        is_donor: nbtcEligible,
+                        is_available: nbtcEligible
                     },
                     { onConflict: 'id' }
                 );

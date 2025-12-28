@@ -18,6 +18,7 @@ export interface User {
   is_available: boolean;
   willingness_to_travel?: number;
   last_donation_date?: string;
+  next_eligible_date?: string; // New NBTC Field
   availability?: string[];
   has_medical_conditions?: boolean;
   location: {

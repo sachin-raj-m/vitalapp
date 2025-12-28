@@ -23,6 +23,8 @@ import { isBloodCompatible } from '@/lib/blood-compatibility';
 import { useRequests } from '@/context/RequestsContext';
 import { RequestCardSkeleton } from '@/components/skeletons/RequestCardSkeleton';
 import type { BloodGroup } from '@/types';
+import { TemporaryDeferralModal } from '@/components/nbtc/TemporaryDeferralModal';
+import { DonorReadinessModal } from '@/components/nbtc/DonorReadinessModal';
 
 // ...
 
@@ -79,9 +81,12 @@ export default function RequestsPage() {
 
     const [otpModal, setOtpModal] = useState({ isOpen: false, pin: '', hospitalName: '' });
     const [confirmModal, setConfirmModal] = useState<{ isOpen: boolean; request: BloodRequest | null }>({ isOpen: false, request: null });
+    const [deferralModalOpen, setDeferralModalOpen] = useState(false);
+    const [readinessModalOpen, setReadinessModalOpen] = useState(false);
     const [createPinModal, setCreatePinModal] = useState<{ isOpen: boolean; request: BloodRequest | null }>({ isOpen: false, request: null });
     const [newPin, setNewPin] = useState('');
     const [creatingPin, setCreatingPin] = useState(false);
+
     // Removed redundant refreshProfile declaration
 
     const handleDonateClick = (request: BloodRequest) => {
@@ -101,6 +106,16 @@ export default function RequestsPage() {
             setError(`Medical Safety: Your blood group (${user.blood_group}) is not compatible with the patient (${request.blood_group}).`);
             return;
         }
+
+        // NBTC Safety Check: Open Deferral Modal First
+        setSelectedRequest(request);
+        setDeferralModalOpen(true);
+    };
+
+    const handleDeferralPassed = () => {
+        setDeferralModalOpen(false);
+        const request = selectedRequest;
+        if (!request || !user) return;
 
         // Check if user has a PIN
         if (!user.donor_pin) {
@@ -173,7 +188,9 @@ export default function RequestsPage() {
             // Trigger global refresh to update "Offer Sent" and Analytics
             await refreshRequests();
 
-            setOtpModal({ isOpen: true, pin, hospitalName: confirmModal.request.hospital_name });
+            // NBTC: Show Readiness Modal before PIN
+            setReadinessModalOpen(true);
+            // setOtpModal({ isOpen: true, pin, hospitalName: confirmModal.request.hospital_name });
         } catch (err: any) {
             console.error('Donation error');
             setError(err.message || 'Failed to process donation request');
@@ -461,6 +478,27 @@ export default function RequestsPage() {
                     </div>
                 </div>
             </Modal>
+            {/* NBTC Safety Modals */}
+            <TemporaryDeferralModal
+                isOpen={deferralModalOpen}
+                onClose={() => setDeferralModalOpen(false)}
+                onConfirm={handleDeferralPassed}
+            />
+
+            <DonorReadinessModal
+                isOpen={readinessModalOpen}
+                onClose={() => {
+                    setReadinessModalOpen(false);
+                    // Open PIN Modal after Readiness check
+                    if (user?.donor_pin && confirmModal.request) {
+                        setOtpModal({
+                            isOpen: true,
+                            pin: user.donor_pin,
+                            hospitalName: confirmModal.request.hospital_name
+                        });
+                    }
+                }}
+            />
         </div>
     );
 }
