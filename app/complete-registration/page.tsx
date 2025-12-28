@@ -10,7 +10,7 @@ import { supabase } from '@/lib/supabase';
 import { Loader2, MapPin, ShieldCheck } from 'lucide-react';
 import type { BloodGroup } from '@/types';
 import { useAuth } from '@/context/AuthContext';
-import { isRegistrationComplete } from '@/utils/auth';
+import { isRegistrationComplete } from '@/lib/auth-helpers';
 import { PermanentDeferralQuestions } from '@/components/nbtc/PermanentDeferralQuestions';
 import { addDays } from 'date-fns';
 import { toast } from 'sonner';

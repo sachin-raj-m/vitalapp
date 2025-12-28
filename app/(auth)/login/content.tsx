@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/Button';
 import { Alert } from '@/components/ui/Alert';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
-import { isRegistrationComplete } from '@/utils/auth';
+import { isRegistrationComplete } from '@/lib/auth-helpers';
 
 export default function LoginPage() {
     const router = useRouter();

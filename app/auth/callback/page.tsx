@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Card, CardBody } from '@/components/ui/Card';
 import { Loader2 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
-import { isRegistrationComplete } from '@/utils/auth';
+import { isRegistrationComplete } from '@/lib/auth-helpers';
 
 export default function AuthCallback() {
     const router = useRouter();
