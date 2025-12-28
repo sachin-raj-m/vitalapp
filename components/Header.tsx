@@ -66,6 +66,7 @@ export function Header() {
               </div>
             ) : (
               <div className="flex items-center space-x-6">
+                <Link href="/#how-it-works" className="text-gray-600 hover:text-gray-900">How it Works</Link>
                 <Link href="/requests" className="text-gray-600 hover:text-gray-900">Requests</Link>
                 <Link href="/nearby-donors" className="text-gray-600 hover:text-gray-900">Find Donors</Link>
                 <Link href="/login">
