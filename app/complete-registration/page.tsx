@@ -7,12 +7,13 @@ import { Input, Select } from '@/components/ui/Input';
 import { Alert } from '@/components/ui/Alert';
 import { Button } from '@/components/ui/Button';
 import { supabase } from '@/lib/supabase';
-import { Loader2 } from 'lucide-react';
+import { Loader2, MapPin, ShieldCheck } from 'lucide-react';
 import type { BloodGroup } from '@/types';
 import { useAuth } from '@/context/AuthContext';
 import { isRegistrationComplete } from '@/utils/auth';
 import { PermanentDeferralQuestions } from '@/components/nbtc/PermanentDeferralQuestions';
 import { addDays } from 'date-fns';
+import { toast } from 'sonner';
 
 interface PendingRegistration {
     userId: string;
@@ -201,6 +202,9 @@ export default function CompleteRegistration() {
             setProgress(100);
             setStatus('completed');
             localStorage.removeItem('pendingRegistration');
+            toast.success("Welcome to the Network!", {
+                description: "You are now part of our lifesaving algorithm."
+            });
             setTimeout(() => router.push('/dashboard'), 1500);
 
         } catch (err: any) {
@@ -225,6 +229,19 @@ export default function CompleteRegistration() {
                     <>
                         <h2 className="text-xl font-bold mb-2">Complete Profile</h2>
                         <p className="text-sm text-gray-500 mb-6">Tell us a bit about yourself to find donors near you.</p>
+
+                        {/* Storytelling: Precision Matching */}
+                        <div className="bg-blue-50 border border-blue-100 rounded-lg p-4 mb-6 flex gap-3">
+                            <div className="bg-blue-100 rounded-full p-2 h-fit">
+                                <MapPin className="w-4 h-4 text-blue-600" />
+                            </div>
+                            <div>
+                                <h4 className="font-bold text-sm text-blue-900">Why accurate location matters?</h4>
+                                <p className="text-xs text-blue-700 mt-1">
+                                    Vital uses a <strong>hyper-local algorithm</strong>. We only alert you when a patient within 5-10km needs your specific blood type, preventing unnecessary travel and fatigue.
+                                </p>
+                            </div>
+                        </div>
 
                         {error && <Alert variant="error" className="mb-4">{error}</Alert>}
 
