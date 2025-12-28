@@ -130,8 +130,9 @@ export const BloodRequestCard: React.FC<BloodRequestCardProps> = ({ request, onR
 
             <div className="mt-4 flex flex-wrap justify-between items-center gap-4">
               <ShareButton
-                title={`Urgent: ${request.blood_group} Blood Needed`}
-                text={`${request.hospital_name} needs ${request.units_needed} units of ${request.blood_group} blood. Please help!`}
+                title={`🔴 Needs ${request.units_needed} units of ${request.blood_group}`}
+                text={`${request.hospital_name} needs help urgency: ${request.urgency_level}`}
+                url={`${typeof window !== 'undefined' ? window.location.origin : ''}/requests/${request.id}`}
               />
               <div className="flex justify-end items-center gap-2">
                 {isOwnRequest ? (
