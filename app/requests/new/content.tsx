@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { MapPin, AlertCircle } from 'lucide-react';
+import { MapPin, AlertCircle, Activity, Info } from 'lucide-react';
 import { Card, CardHeader, CardBody } from '@/components/ui/Card';
 import { Input, Select, Textarea } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
@@ -12,6 +12,7 @@ import { supabase } from '@/lib/supabase';
 import type { BloodGroup, UrgencyLevel } from '@/types';
 import dynamic from 'next/dynamic';
 import { logActivity } from '@/lib/logger';
+import { toast } from 'sonner';
 
 const Map = dynamic(() => import('@/components/Map'), {
     ssr: false,
@@ -124,6 +125,10 @@ export default function CreateRequestPage() {
                 }
             });
 
+            toast.success("Request Broadcasted Successfully", {
+                description: `Our algorithm is now scanning for ${formData.bloodGroup} donors within 10km.`
+            });
+
             router.push('/requests');
         } catch (err: any) {
             setError(err.message || 'Failed to create request');
@@ -168,6 +173,35 @@ export default function CreateRequestPage() {
                             {error}
                         </Alert>
                     )}
+
+                    {/* Storytelling: Algorithm Preview */}
+                    <div className="bg-slate-50 border border-slate-200 rounded-lg p-5 mb-8">
+                        <div className="flex items-start gap-4">
+                            <div className="p-2 bg-red-100 rounded-full shrink-0">
+                                <Activity className="w-5 h-5 text-red-600" />
+                            </div>
+                            <div>
+                                <h4 className="font-bold text-slate-900 text-sm">How it works</h4>
+                                <p className="text-xs text-slate-600 mt-1 leading-relaxed">
+                                    Once you submit, our <strong>Real-time Matching Engine</strong> will:
+                                </p>
+                                <ul className="mt-2 space-y-1">
+                                    <li className="text-xs text-slate-500 flex items-center gap-2">
+                                        <span className="w-1.5 h-1.5 bg-red-500 rounded-full"></span>
+                                        Scan for <strong>{formData.bloodGroup || 'compatible'}</strong> donors within a smart radius.
+                                    </li>
+                                    <li className="text-xs text-slate-500 flex items-center gap-2">
+                                        <span className="w-1.5 h-1.5 bg-red-500 rounded-full"></span>
+                                        Filter out donors who recently donated.
+                                    </li>
+                                    <li className="text-xs text-slate-500 flex items-center gap-2">
+                                        <span className="w-1.5 h-1.5 bg-red-500 rounded-full"></span>
+                                        Send an instant <strong>Push Notification</strong> to matches.
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
 
                     <form onSubmit={handleSubmit} className="space-y-6">
                         <div className="grid md:grid-cols-2 gap-4">
