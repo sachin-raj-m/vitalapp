@@ -498,14 +498,6 @@ export default function ProfilePage() {
                     </div>
                 </div>
 
-                <Button
-                    variant="secondary"
-                    onClick={handleSignOut}
-                    className="text-gray-600 hover:text-gray-900"
-                >
-                    <LogOut className="h-5 w-5 mr-2" />
-                    Sign Out
-                </Button>
             </motion.div>
         </div>
     );
