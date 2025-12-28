@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { Loader2 } from 'lucide-react';
+import { SidebarWrapper } from '@/components/SidebarWrapper';
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
     const { user } = useAuth();
@@ -53,9 +54,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     if (!isAdmin) return null;
 
     return (
-        <div className="container mx-auto px-4 py-8">
-            <h1 className="text-2xl font-bold mb-6 text-gray-900 border-b pb-4">Admin Console</h1>
-            {children}
-        </div>
+        <SidebarWrapper>
+            <div className="space-y-6">
+                <h1 className="text-2xl font-bold mb-6 text-gray-900 border-b pb-4">Admin Console</h1>
+                {children}
+            </div>
+        </SidebarWrapper>
     );
 }

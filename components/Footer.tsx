@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { Mail } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { AuthModal } from './AuthModal';
 
 
@@ -12,6 +12,17 @@ export const Footer: React.FC = () => {
   const { user } = useAuth();
   const router = useRouter();
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const pathname = usePathname();
+
+  // Hide footer on protected app routes
+  const isAppRoute = pathname?.startsWith('/dashboard') ||
+    pathname?.startsWith('/admin') ||
+    pathname?.startsWith('/requests') ||
+    pathname?.startsWith('/profile') ||
+    pathname?.startsWith('/nearby-donors') ||
+    pathname?.startsWith('/donations');
+
+  if (isAppRoute && user) return null; // Conditional return
 
   const handleRequestBlood = (e: React.MouseEvent) => {
     e.preventDefault();
