@@ -136,11 +136,17 @@ export default function HowItWorksPage() {
             </section>
 
             {/* CTA */}
-            <section className="py-24 bg-slate-900 text-white text-center">
-                <div className="container mx-auto px-4">
-                    <h2 className="text-3xl md:text-5xl font-bold mb-8">Ready to be part of the algorithm?</h2>
+            <section className="py-24 bg-red-50 text-center relative overflow-hidden">
+                <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-10"></div>
+                <div className="container mx-auto px-4 relative z-10">
+                    <h2 className="text-3xl md:text-5xl font-bold text-slate-900 mb-6 tracking-tight">
+                        Ready to be part of the <span className="text-red-600">algorithm</span>?
+                    </h2>
+                    <p className="text-xl text-slate-600 mb-10 max-w-2xl mx-auto">
+                        Your registration inserts a new verified node into our network. When a request matches you, you'll be the first to know.
+                    </p>
                     <Link href="/register">
-                        <Button size="xl" className="bg-red-600 hover:bg-red-700 text-white rounded-full px-12 py-6 text-xl font-bold shadow-xl shadow-red-900/20">
+                        <Button size="xl" className="bg-red-600 hover:bg-red-700 text-white rounded-full px-12 py-6 text-xl font-bold shadow-xl shadow-red-200 transition-all hover:scale-105">
                             Join the Network
                         </Button>
                     </Link>

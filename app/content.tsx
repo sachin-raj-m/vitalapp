@@ -6,12 +6,13 @@ import { useRouter } from 'next/navigation';
 import {
     Heart, Activity, Users, Clock,
     Shield, CheckCircle, Bell,
-    MapPin, Calendar, Lock, PlayCircle, ArrowRight
+    MapPin, Calendar, Lock, PlayCircle, ArrowRight, Share
 } from 'lucide-react';
 import { motion, useScroll, useTransform } from 'framer-motion';
 import { Button } from '@/components/ui/Button';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
+import { toast } from 'sonner';
 
 export default function HomePage() {
     const { user } = useAuth();
@@ -46,6 +47,29 @@ export default function HomePage() {
             });
         } catch (error) {
             console.error("Error fetching stats:", error);
+        }
+    };
+
+    const handleShare = async () => {
+        const shareData = {
+            title: 'Vital - Live Blood Donation Network',
+            text: 'I just discovered Vital. It connects blood donors with patients instantly. Check it out!',
+            url: window.location.href,
+        };
+
+        if (navigator.share) {
+            try {
+                await navigator.share(shareData);
+            } catch (err) {
+                console.log('Share dismissed', err);
+            }
+        } else {
+            try {
+                await navigator.clipboard.writeText(window.location.href);
+                toast.success("Link copied to clipboard!");
+            } catch (err) {
+                toast.error("Failed to copy link");
+            }
         }
     };
 
@@ -407,11 +431,15 @@ export default function HomePage() {
                                     Register as a Donor
                                 </Button>
                             </Link>
-                            <Link href="/share">
-                                <Button variant="outline" size="xl" className="rounded-md px-10 py-6 text-lg font-bold border-red-200 text-red-600 hover:bg-red-50">
-                                    I want to help spread the word
-                                </Button>
-                            </Link>
+                            <Button
+                                variant="outline"
+                                size="xl"
+                                onClick={handleShare}
+                                className="rounded-md px-10 py-6 text-lg font-bold border-red-200 text-red-600 hover:bg-red-50 flex items-center gap-2"
+                            >
+                                <Share className="w-5 h-5" />
+                                I want to help spread the word
+                            </Button>
                         </div>
                     </div>
                 </div>
