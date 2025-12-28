@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../context/AuthContext';
-import { isRegistrationComplete } from '../utils/auth';
+import { isRegistrationComplete } from '../lib/auth-helpers';
 import { Card, CardBody } from './ui/Card';
 import { Loader2 } from 'lucide-react';
 

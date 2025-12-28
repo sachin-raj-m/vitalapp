@@ -61,7 +61,7 @@ export default function HomePage() {
             try {
                 await navigator.share(shareData);
             } catch (err) {
-                console.log('Share dismissed', err);
+                // Share dismissed
             }
         } else {
             try {
