@@ -61,16 +61,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const isRefreshing = useRef(false);
   const lastProfileFetch = useRef<number>(0);
 
-  const fetchUserProfile = async (userId: string) => {
+  const fetchUserProfile = async (userId: string, options: { silent?: boolean } = {}) => {
     // Prevent duplicate fetches within 2 seconds
     const now = Date.now();
-    if (now - lastProfileFetch.current < 2000) {
-
+    if (now - lastProfileFetch.current < 2000 && !options.silent) {
+      // If mostly silent update, we might still want to proceed if data is stale, 
+      // but strictly following existing debounce for now unless forced.
       return state.user;
     }
 
     if (isRefreshing.current) {
-
       return state.user;
     }
 
@@ -78,8 +78,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     lastProfileFetch.current = now;
 
     try {
-
-      setState(prev => ({ ...prev, loading: true }));
+      if (!options.silent) {
+        setState(prev => ({ ...prev, loading: true }));
+      }
 
       const { data, error } = await supabase
         .from('profiles')
@@ -94,8 +95,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       if (data) {
-
-
         // Cache the profile in localStorage
         cacheUserProfile(data as User);
 
@@ -109,16 +108,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         return data as User;
       } else {
-
-
         // Get user data from auth
         const { data: { user: authUser } } = await supabase.auth.getUser();
 
         if (!authUser) {
           throw new Error('No auth user found');
         }
-
-
 
         // Create a new profile
         const { data: newProfile, error: createError } = await supabase
@@ -138,7 +133,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
           // Check for duplicate key error (profile might have been created in another tab/request)
           if (createError.code === '23505') {
-
             const { data: existingProfile } = await supabase
               .from('profiles')
               .select('*')
@@ -160,7 +154,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setState(prev => ({ ...prev, loading: false, error: createError as Error }));
           throw createError;
         }
-
 
         cacheUserProfile(newProfile as User);
         setState(prev => ({
@@ -436,7 +429,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       if (!state.user?.id) throw new Error('No user logged in');
 
-      setState(prev => ({ ...prev, loading: true }));
+      // Don't set global loading state to prevent UI flicker/reload
+      // setState(prev => ({ ...prev, loading: true }));
 
       const { error } = await supabase
         .from('profiles')
@@ -445,8 +439,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (error) throw error;
 
-      // Refresh user data
-      await fetchUserProfile(state.user.id);
+      // Refresh user data silently
+      await fetchUserProfile(state.user.id, { silent: true });
     } catch (error) {
       setState(prev => ({ ...prev, error: error as Error, loading: false }));
       throw error;
