@@ -188,9 +188,9 @@ export default async function PublicDonorPage({ params }: Props) {
                     <span className="text-lg font-bold text-slate-900 tracking-tight">Vital</span>
                 </Link>
 
-                <Link href="/register">
+                <Link href={currentUser ? "/dashboard" : "/register"}>
                     <Button size="sm" className="bg-slate-900 hover:bg-slate-800 text-white rounded-full px-5 h-9 font-medium shadow-sm text-sm transition-transform hover:scale-105">
-                        Become a Donor
+                        {currentUser ? "Go to Dashboard" : "Become a Donor"}
                     </Button>
                 </Link>
             </header>
