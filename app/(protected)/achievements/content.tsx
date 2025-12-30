@@ -1,10 +1,12 @@
 "use client";
 
+
 import React, { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { Card, CardBody } from '@/components/ui/Card';
 import { useAuth } from '@/context/AuthContext';
 import { fetchUserStats, type Achievement } from '@/lib/stats';
-import { Award, Droplet, Heart, Lock, Calendar, Trophy, Star, Shield } from 'lucide-react';
+import { Award, Droplet, Heart, Lock, Calendar, Trophy, Star, Shield, ArrowLeft } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 export default function AchievementsPage() {
@@ -59,9 +61,14 @@ export default function AchievementsPage() {
 
     return (
         <div className="max-w-6xl mx-auto py-8 space-y-8">
-            <div className="flex items-center gap-3">
-                <Trophy className="w-8 h-8 text-amber-500" />
-                <h1 className="text-3xl font-bold text-slate-900">Your Achievements</h1>
+            <div className="flex items-start gap-3">
+                <Link href="/dashboard" className="p-1 rounded-full hover:bg-slate-100 text-slate-500 transition-colors mt-1">
+                    <ArrowLeft className="w-6 h-6" />
+                </Link>
+                <div className="flex items-center gap-3">
+                    <Trophy className="w-8 h-8 text-amber-500" />
+                    <h1 className="text-3xl font-bold text-slate-900">Your Achievements</h1>
+                </div>
             </div>
 
             {/* Stats Overview */}
