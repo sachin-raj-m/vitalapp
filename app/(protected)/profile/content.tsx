@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/Button';
 import { Alert } from '@/components/ui/Alert';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
+import { fetchUserStats, calculateEligibility } from '@/lib/stats';
 import { Loader2, User, MapPin, Phone, Mail, Droplet, Award, Calendar, Settings, LogOut, Edit2, Check, X, Shield, Heart, Bell, Share, Download, ChevronDown } from 'lucide-react';
 import html2canvas from 'html2canvas';
 
@@ -109,36 +110,8 @@ export default function ProfilePage() {
         try {
             if (!user) return;
 
-            const { data: donations, error: donationsError } = await supabase
-                .from('donations')
-                .select('created_at', { count: 'exact' })
-                .eq('donor_id', user.id);
-
-            if (donationsError) throw donationsError;
-
-            const { data: requests, error: requestsError } = await supabase
-                .from('blood_requests')
-                .select('created_at', { count: 'exact' })
-                .eq('user_id', user.id);
-
-            if (requestsError) throw requestsError;
-
-            const lastDonation = donations?.sort((a, b) =>
-                new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-            )[0];
-
-            const achievements = [];
-            if (donations?.length >= 1) achievements.push('First Time Donor');
-            if (donations?.length >= 5) achievements.push('Regular Donor');
-            if (donations?.length >= 10) achievements.push('Super Donor');
-            if (requests?.length >= 1) achievements.push('Life Saver');
-
-            setStats({
-                total_donations: donations?.length || 0,
-                total_requests: requests?.length || 0,
-                last_donation_date: lastDonation?.created_at || null,
-                achievements
-            });
+            const stats = await fetchUserStats(user.id);
+            setStats(stats);
         } catch (err: any) {
             console.error('Error loading stats');
             setError('Failed to load statistics');
@@ -158,26 +131,8 @@ export default function ProfilePage() {
         }
     };
 
-    // Eligibility Logic
-    const getEligibilityStatus = (lastDate: string | null) => {
-        if (!lastDate) return { isEligible: true, daysRemaining: 0, distinctText: "You are eligible to donate today!" };
-
-        const last = new Date(lastDate);
-        const nextDate = new Date(last);
-        nextDate.setDate(last.getDate() + 90); // Approx 3 months
-
-        const today = new Date();
-        const diffTime = nextDate.getTime() - today.getTime();
-        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-        if (diffDays <= 0) {
-            return { isEligible: true, daysRemaining: 0, distinctText: "You represent a ready hope for someone in need." };
-        } else {
-            return { isEligible: false, daysRemaining: diffDays, distinctText: `Next eligibility in ${diffDays} days.` };
-        }
-    };
-
-    const eligibility = getEligibilityStatus(stats?.last_donation_date || null);
+    // Eligibility Logic using shared utility
+    const eligibility = calculateEligibility(stats?.last_donation_date || null);
 
     if (isLoading) {
         return (
