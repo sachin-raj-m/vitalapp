@@ -152,11 +152,11 @@ export default function CreateRequestPage() {
                 },
                 (error) => {
                     console.error('Error getting location', error);
-                    alert('Unable to retrieve your location. Please check browser permissions.');
+                    toast.error('Unable to retrieve your location. Please check browser permissions.');
                 }
             );
         } else {
-            alert('Geolocation is not supported by your browser.');
+            toast.error('Geolocation is not supported by your browser.');
         }
     };
 

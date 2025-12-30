@@ -18,6 +18,8 @@ import { SecuritySettings } from './SecuritySettings';
 import type { BloodGroup } from '@/types';
 import { motion } from 'framer-motion';
 import DonorCard from '@/components/DonorCard';
+import { toast } from 'sonner';
+import { ConfirmationModal } from '@/components/ui/ConfirmationModal';
 
 export default function ProfilePage() {
     const router = useRouter();
@@ -26,6 +28,7 @@ export default function ProfilePage() {
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState('');
     const [isShareOpen, setIsShareOpen] = useState(false);
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
     const cardRef = useRef<HTMLDivElement>(null);
 
     const handleLinkShare = () => {
@@ -44,7 +47,20 @@ export default function ProfilePage() {
             // Optimistic update if needed, but AuthContext should handle it
         } catch (err) {
             console.error('Failed to toggle visibility', err);
-            setError('Failed to update visibility settings');
+            toast.error('Failed to update visibility settings');
+        }
+    };
+
+    const handleDeleteAccount = async () => {
+        try {
+            const res = await fetch('/api/auth/delete', { method: 'POST' });
+            if (!res.ok) throw new Error('Deletion failed');
+            await signOut();
+            router.push('/login');
+            toast.success('Account deleted successfully');
+        } catch (e) {
+            toast.error('Failed to delete account. Please try again.');
+            setShowDeleteModal(false);
         }
     };
 
@@ -97,7 +113,7 @@ export default function ProfilePage() {
             link.click();
         } catch (err) {
             console.error('Download failed:', err);
-            alert('Could not generate image. Please try again.');
+            toast.error('Could not generate image. Please try again.');
         } finally {
             // Restore styles (though we mostly used a clone, it's good practice)
             cardRef.current.style.cssText = originalStyle;
@@ -459,7 +475,7 @@ export default function ProfilePage() {
                                             const uniqueId = user?.donor_number || user?.id;
                                             const vanitySlug = `${cleanName}@${uniqueId}`;
                                             navigator.clipboard.writeText(`${window.location.origin}/donor/${vanitySlug}`);
-                                            alert('Link copied to clipboard!');
+                                            toast.success('Link copied to clipboard!');
                                         }}
                                         className="flex-1 md:flex-none h-10 md:h-11"
                                     >
@@ -545,11 +561,20 @@ export default function ProfilePage() {
                 </div>
             </div>
 
-            {/* --- DANGER ZONE & SIGN OUT --- */}
+
+            {/* --- DELETE ACCOUNT MODAL --- */}
+            <ConfirmationModal
+                isOpen={showDeleteModal}
+                onClose={() => setShowDeleteModal(false)}
+                onConfirm={handleDeleteAccount}
+                title="Delete Account"
+                description="Are you absolutely sure? This action cannot be undone and will permanently delete your account and all data."
+                confirmText="Yes, Delete My Account"
+                cancelText="Cancel"
+                variant="danger"
+            />
+
             <div className="pt-8 border-t border-slate-200 mt-12 space-y-8">
-
-
-
                 <div className="rounded-xl border border-red-200 bg-red-50 p-6">
                     <div className="flex items-start gap-4">
                         <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center shrink-0">
@@ -565,20 +590,7 @@ export default function ProfilePage() {
                             <Button
                                 size="sm"
                                 className="bg-red-600 text-white hover:bg-red-700 shadow-sm border border-red-600"
-                                onClick={async () => {
-                                    if (confirm('CRITICAL WARNING: You are about to permanently delete your account.\n\nType "DELETE" to confirm.')) {
-                                        if (confirm('Are you absolutely sure? There is no going back.')) {
-                                            try {
-                                                const res = await fetch('/api/auth/delete', { method: 'POST' });
-                                                if (!res.ok) throw new Error('Deletion failed');
-                                                await signOut();
-                                                router.push('/login');
-                                            } catch (e) {
-                                                alert('Failed to delete account. Please try again.');
-                                            }
-                                        }
-                                    }
-                                }}
+                                onClick={() => setShowDeleteModal(true)}
                             >
                                 Delete My Account
                             </Button>

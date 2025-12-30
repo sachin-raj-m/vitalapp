@@ -11,6 +11,9 @@ import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { Loader2, CheckCircle, Clock, Trash2 } from 'lucide-react';
 import type { BloodRequest, Donation } from '@/types';
+import { formatDistanceToNow } from 'date-fns';
+import { toast } from 'sonner';
+import { ConfirmationModal } from '@/components/ui/ConfirmationModal';
 import { EmptyState } from '@/components/EmptyState';
 import { logActivity } from '@/lib/logger';
 
@@ -26,7 +29,7 @@ export function MyRequestsContent() {
     const [activeTab, setActiveTab] = useState<'active' | 'past'>('active');
 
     // New state for delete operation
-    const [deletingId, setDeletingId] = useState<string | null>(null);
+    const [requestToDelete, setRequestToDelete] = useState<string | null>(null);
 
     const filteredRequests = requests.filter(req => {
         if (activeTab === 'active') return req.status === 'active';
@@ -41,11 +44,13 @@ export function MyRequestsContent() {
     const [verifyError, setVerifyError] = useState('');
 
     useEffect(() => {
-        fetchMyRequests();
+        loadRequests();
     }, [user]);
 
-    const fetchMyRequests = async () => {
+    const loadRequests = async () => {
         if (!user) return;
+        setIsLoading(true);
+        setError('');
         try {
             const { data, error } = await supabase
                 .from('blood_requests')
@@ -62,23 +67,21 @@ export function MyRequestsContent() {
             if (error) throw error;
             setRequests(data as any);
         } catch (err: any) {
-            console.error('Error fetching requests');
+            console.error('Error fetching requests', err);
             setError('Failed to load your requests');
         } finally {
             setIsLoading(false);
         }
     };
 
-    const handleDelete = async (requestId: string) => {
-        if (!confirm('Are you sure you want to delete this request? This action cannot be undone.')) return;
-        if (!user) return;
+    const handleDelete = async () => {
+        if (!requestToDelete || !user) return;
 
-        setDeletingId(requestId);
         try {
             const { error } = await supabase
                 .from('blood_requests')
                 .delete()
-                .eq('id', requestId);
+                .eq('id', requestToDelete);
 
             if (error) throw error;
 
@@ -86,17 +89,17 @@ export function MyRequestsContent() {
                 userId: user.id,
                 action: 'DELETE_REQUEST',
                 entityType: 'blood_requests',
-                entityId: requestId,
+                entityId: requestToDelete,
                 metadata: { timestamp: new Date().toISOString() }
             });
 
-            await fetchMyRequests();
-            alert('Request deleted successfully.');
-        } catch (err: any) {
+            setRequests(requests.filter(r => r.id !== requestToDelete));
+            toast.success('Request deleted successfully.');
+        } catch (err) {
             console.error('Delete error', err);
-            alert('Failed to delete request.');
+            toast.error('Failed to delete request.');
         } finally {
-            setDeletingId(null);
+            setRequestToDelete(null);
         }
     };
 
@@ -184,11 +187,11 @@ export function MyRequestsContent() {
                     message += ` Progress: ${totalCollected}/${unitsNeeded} units.`;
                 }
 
-                await fetchMyRequests();
+                await loadRequests();
                 setVerifyModal({ isOpen: false, donationId: '', requestId: '', donorName: '', maxUnits: 0 });
                 setOtpInput('');
                 setUnitsDonatedInput(1);
-                setTimeout(() => alert(message), 100);
+                setTimeout(() => toast.success(message), 100);
 
             } else {
                 setVerifyError('Invalid PIN.');
@@ -302,13 +305,12 @@ export function MyRequestsContent() {
                                                 {request.status === 'active' && (
                                                     <Button
                                                         size="sm"
-                                                        variant="ghost"
-                                                        className="text-red-500 hover:text-red-700 hover:bg-red-50 p-1 h-auto"
-                                                        onClick={() => handleDelete(request.id)}
-                                                        isLoading={deletingId === request.id}
-                                                        title="Delete Request"
+                                                        variant="outline"
+                                                        className="text-red-600 border-red-200 hover:bg-red-50"
+                                                        onClick={() => setRequestToDelete(request.id)}
                                                     >
-                                                        <Trash2 className="w-4 h-4" />
+                                                        <Trash2 className="w-4 h-4 mr-2" />
+                                                        Delete
                                                     </Button>
                                                 )}
                                             </div>
@@ -422,6 +424,16 @@ export function MyRequestsContent() {
                     </div>
                 </div>
             </Modal>
+
+            <ConfirmationModal
+                isOpen={!!requestToDelete}
+                onClose={() => setRequestToDelete(null)}
+                onConfirm={handleDelete}
+                title="Delete Request"
+                description="Are you sure you want to delete this request? This action cannot be undone."
+                confirmText="Delete"
+                variant="danger"
+            />
         </div>
     );
 }
