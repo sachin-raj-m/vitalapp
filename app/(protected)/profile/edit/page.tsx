@@ -7,7 +7,8 @@ import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { Alert } from '@/components/ui/Alert';
 import { useAuth } from '@/context/AuthContext';
-import { ArrowLeft, Check } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
+import { ArrowLeft, Check, Lock } from 'lucide-react';
 
 export default function ProfileEditPage() {
     const router = useRouter();
@@ -22,6 +23,11 @@ export default function ProfileEditPage() {
         permanent_zip: '',
         present_zip: ''
     });
+
+    // OTP Verification State
+    const [isVerifying, setIsVerifying] = useState(false);
+    const [otp, setOtp] = useState('');
+    const [pendingPhone, setPendingPhone] = useState('');
 
     useEffect(() => {
         if (user) {
@@ -41,18 +47,64 @@ export default function ProfileEditPage() {
         setIsLoading(true);
 
         try {
+            // Check if phone number changed
+            if (editForm.phone !== user?.phone) {
+                // Initiate Phone Verification
+                const { error: authError } = await supabase.auth.updateUser({
+                    phone: editForm.phone
+                });
+
+                if (authError) throw authError;
+
+                setPendingPhone(editForm.phone);
+                setIsVerifying(true);
+                setIsLoading(false); // Stop loading to show modal
+                return;
+            }
+
+            // Normal update without phone change
             await updateProfile({
                 full_name: editForm.full_name,
-                phone: editForm.phone,
+                is_available: editForm.is_available,
+                permanent_zip: editForm.permanent_zip,
+                present_zip: editForm.present_zip
+                // phone is not updated here directly if not changed
+            });
+            router.push('/profile');
+        } catch (err: any) {
+            console.error('Error updating profile:', err);
+            setError(err.message || 'Failed to update profile');
+            setIsLoading(false);
+        }
+    };
+
+    const handleVerifyOtp = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setError('');
+        setIsLoading(true);
+
+        try {
+            const { error: verifyError } = await supabase.auth.verifyOtp({
+                phone: pendingPhone,
+                token: otp,
+                type: 'phone_change'
+            });
+
+            if (verifyError) throw verifyError;
+
+            // Update remaining profile details
+            await updateProfile({
+                full_name: editForm.full_name,
+                phone: pendingPhone, // Explicitly set new phone
                 is_available: editForm.is_available,
                 permanent_zip: editForm.permanent_zip,
                 present_zip: editForm.present_zip
             });
+
             router.push('/profile');
         } catch (err: any) {
-            console.error('Error updating profile');
-            setError('Failed to update profile');
-        } finally {
+            console.error('Error verifying OTP:', err);
+            setError(err.message || 'Invalid verification code');
             setIsLoading(false);
         }
     };
@@ -174,6 +226,58 @@ export default function ProfileEditPage() {
                     </form>
                 </CardBody>
             </Card>
+
+            {/* OTP Verification Modal */}
+            {isVerifying && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+                    <Card className="w-full max-w-md shadow-2xl animate-in zoom-in-95 duration-200">
+                        <CardHeader className="bg-slate-50 border-b border-slate-100 p-6 text-center">
+                            <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                                <Lock className="w-6 h-6 text-red-600" />
+                            </div>
+                            <h2 className="text-xl font-bold text-slate-900">Verify Phone Number</h2>
+                            <p className="text-sm text-slate-500 mt-2">
+                                We sent a 6-digit code to <span className="font-semibold text-slate-900">{pendingPhone}</span>
+                            </p>
+                        </CardHeader>
+                        <CardBody className="p-6">
+                            <form onSubmit={handleVerifyOtp} className="space-y-6">
+                                <Input
+                                    label="Verification Code"
+                                    value={otp}
+                                    onChange={(e) => setOtp(e.target.value)}
+                                    placeholder="000000"
+                                    required
+                                    className="h-12 text-center text-lg tracking-widest letter-spacing-2"
+                                />
+
+                                <div className="space-y-3">
+                                    <Button
+                                        type="submit"
+                                        size="lg"
+                                        className="w-full bg-red-600 hover:bg-red-700 text-white font-bold h-12"
+                                        disabled={isLoading || otp.length < 6}
+                                    >
+                                        {isLoading ? 'Verifying...' : 'Verify & Save'}
+                                    </Button>
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        className="w-full text-slate-500"
+                                        onClick={() => {
+                                            setIsVerifying(false);
+                                            setIsLoading(false);
+                                            setOtp('');
+                                        }}
+                                    >
+                                        Cancel
+                                    </Button>
+                                </div>
+                            </form>
+                        </CardBody>
+                    </Card>
+                </div>
+            )}
         </div>
     );
 }
