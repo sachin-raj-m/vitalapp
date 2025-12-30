@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, CardHeader, CardBody } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
@@ -8,7 +8,9 @@ import { Button } from '@/components/ui/Button';
 import { Alert } from '@/components/ui/Alert';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
-import { Loader2, User, MapPin, Phone, Mail, Droplet, Award, Calendar, Settings, LogOut, Edit2, Check, X, Shield, Heart, Bell, Share } from 'lucide-react';
+import { Loader2, User, MapPin, Phone, Mail, Droplet, Award, Calendar, Settings, LogOut, Edit2, Check, X, Shield, Heart, Bell, Share, Download } from 'lucide-react';
+import html2canvas from 'html2canvas';
+
 import { PushNotificationManager } from '@/components/PushNotificationManager';
 import { SecuritySettings } from './SecuritySettings';
 import type { BloodGroup } from '@/types';
@@ -35,6 +37,38 @@ export default function ProfilePage() {
         permanent_zip: '',
         present_zip: ''
     });
+    const cardRef = useRef<HTMLDivElement>(null);
+
+    const handleShare = async () => {
+        if (!cardRef.current) return;
+        try {
+            const canvas = await html2canvas(cardRef.current, {
+                backgroundColor: null,
+                scale: 3,
+                useCORS: true
+            });
+
+            const dataUrl = canvas.toDataURL('image/png');
+            const blob = await (await fetch(dataUrl)).blob();
+            const file = new File([blob], 'vital-donor-card.png', { type: 'image/png' });
+
+            if (navigator.share && navigator.canShare({ files: [file] })) {
+                await navigator.share({
+                    title: 'My Vital Donor Card',
+                    text: `I'm a proud blood donor on Vital! Blood Group: ${user?.blood_group}`,
+                    files: [file]
+                });
+            } else {
+                const link = document.createElement('a');
+                link.href = dataUrl;
+                link.download = `Vital_Donor_Card_${user?.full_name || 'Member'}.png`;
+                link.click();
+            }
+        } catch (err) {
+            console.error('Share failed:', err);
+            alert('Could not share image. Trying to download instead...');
+        }
+    };
 
     useEffect(() => {
         if (user) {
@@ -198,8 +232,18 @@ export default function ProfilePage() {
                                     <Settings className="w-4 h-4 mr-2" />
                                     Settings
                                 </Button>
+                                <Button
+                                    onClick={() => signOut()}
+                                    className="bg-white/10 hover:bg-white/25 text-white border border-white/40 backdrop-blur-md"
+                                >
+                                    <LogOut className="w-4 h-4 mr-2" />
+                                    Sign Out
+                                </Button>
                                 {user?.is_donor && (
-                                    <Button className="bg-white text-red-600 hover:bg-red-50 shadow-lg border-0">
+                                    <Button
+                                        onClick={handleShare}
+                                        className="bg-white text-red-700 font-bold hover:bg-red-50 shadow-lg border-2 border-transparent hover:border-red-100"
+                                    >
                                         <Share className="w-4 h-4 mr-2" />
                                         Share Impact
                                     </Button>
@@ -210,6 +254,7 @@ export default function ProfilePage() {
                         {/* RIGHT: Digital Donor Card */}
                         {/* RIGHT: Digital Donor Card */}
                         <motion.div
+                            ref={cardRef}
                             initial={{ opacity: 0, rotateY: 90 }}
                             animate={{ opacity: 1, rotateY: 0 }}
                             transition={{ delay: 0.2, type: "spring" }}
@@ -448,17 +493,6 @@ export default function ProfilePage() {
                         <h3 className="text-lg font-bold text-slate-900">Preferences</h3>
                         <p className="text-slate-500 text-sm">Customize your notification experience.</p>
                     </div>
-                    <Card className="hover:shadow-md transition-shadow">
-                        <CardBody className="p-0">
-                            <div className="flex items-center justify-between p-6">
-                                <div className="flex items-center space-x-4">
-                                    <div className="w-12 h-12 rounded-full bg-indigo-50 flex items-center justify-center">
-                                        <Bell className="h-6 w-6 text-indigo-600" />
-                                    </div>
-                                    <div>
-                                        <div className="font-bold text-slate-900">Push Notifications</div>
-                                        <div className="text-sm text-slate-500">Receive alerts when blood is needed nearby</div>
-                                    </div>
                                 </div>
                                 <PushNotificationManager />
                             </div>
@@ -491,17 +525,7 @@ export default function ProfilePage() {
             {/* --- DANGER ZONE & SIGN OUT --- */}
             <div className="pt-8 border-t border-slate-200 mt-12 space-y-8">
 
-                <div className="flex justify-end">
-                    <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-slate-500 hover:text-slate-900"
-                        onClick={() => signOut()}
-                    >
-                        <LogOut className="w-4 h-4 mr-2" />
-                        Sign Out
-                    </Button>
-                </div>
+
 
                 <div className="rounded-xl border border-red-200 bg-red-50 p-6">
                     <div className="flex items-start gap-4">
@@ -517,7 +541,7 @@ export default function ProfilePage() {
                             </div>
                             <Button
                                 size="sm"
-                                className="bg-white border border-red-200 text-red-600 hover:bg-red-600 hover:text-white transition-colors shadow-sm"
+                                className="bg-red-600 text-white hover:bg-red-700 shadow-sm border border-red-600"
                                 onClick={async () => {
                                     if (confirm('CRITICAL WARNING: You are about to permanently delete your account.\n\nType "DELETE" to confirm.')) {
                                         if (confirm('Are you absolutely sure? There is no going back.')) {
