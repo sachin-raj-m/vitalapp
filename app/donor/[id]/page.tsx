@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/Button';
 import Link from 'next/link';
 import { Lock, Shield, ArrowLeft, HeartPulse } from 'lucide-react';
 import { calculateAchievements } from '@/lib/stats';
+import PublicProfileHeader from '../components/PublicProfileHeader';
 
 // Set revalidation time to 0 for instant updates
 export const revalidate = 0;
@@ -182,18 +183,7 @@ export default async function PublicDonorPage({ params }: Props) {
             </div>
 
             {/* Custom Navbar - Extreme Edges */}
-            <header className="relative z-20 w-full flex items-center justify-between">
-                <Link href="/" className="flex items-center gap-2 group hover:opacity-80 transition-opacity">
-                    <HeartPulse className="h-6 w-6 text-red-600" />
-                    <span className="text-lg font-bold text-slate-900 tracking-tight">Vital</span>
-                </Link>
-
-                <Link href={currentUser ? "/dashboard" : "/register"}>
-                    <Button size="sm" className="bg-slate-900 hover:bg-slate-800 text-white rounded-full px-5 h-9 font-medium shadow-sm text-sm transition-transform hover:scale-105">
-                        {currentUser ? "Go to Dashboard" : "Become a Donor"}
-                    </Button>
-                </Link>
-            </header>
+            <PublicProfileHeader />
 
             {/* Main Content - Centered Card with Pulse Effect */}
             <main className="flex-grow flex flex-col items-center justify-center relative z-10 w-full pb-10">
