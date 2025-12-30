@@ -20,6 +20,7 @@ export const Footer: React.FC = () => {
     pathname?.startsWith('/requests') ||
     pathname?.startsWith('/profile') ||
     pathname?.startsWith('/nearby-donors') ||
+    pathname?.startsWith('/achievements') ||
     pathname?.startsWith('/donations');
 
   if (isAppRoute && user) return null; // Conditional return

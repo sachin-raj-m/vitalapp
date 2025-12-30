@@ -61,14 +61,9 @@ export default function AchievementsPage() {
 
     return (
         <div className="max-w-6xl mx-auto py-8 space-y-8">
-            <div className="flex items-start gap-3">
-                <Link href="/dashboard" className="p-1 rounded-full hover:bg-slate-100 text-slate-500 transition-colors mt-1">
-                    <ArrowLeft className="w-6 h-6" />
-                </Link>
-                <div className="flex items-center gap-3">
-                    <Trophy className="w-8 h-8 text-amber-500" />
-                    <h1 className="text-3xl font-bold text-slate-900">Your Achievements</h1>
-                </div>
+            <div className="flex items-center gap-3">
+                <Trophy className="w-8 h-8 text-amber-500" />
+                <h1 className="text-3xl font-bold text-slate-900">Your Achievements</h1>
             </div>
 
             {/* Stats Overview */}
