@@ -5,7 +5,7 @@ import { notFound } from 'next/navigation';
 import DonorCard from '@/components/DonorCard';
 import { Button } from '@/components/ui/Button';
 import Link from 'next/link';
-import { Lock, Shield, ArrowLeft } from 'lucide-react';
+import { Lock, Shield, ArrowLeft, Heart } from 'lucide-react';
 import { calculateAchievements } from '@/lib/stats';
 
 // Set revalidation time to 0 for instant updates
@@ -186,54 +186,45 @@ export default async function PublicDonorPage({ params }: Props) {
     const unlockedAchievements = allAchievements.filter(a => a.unlocked);
 
     return (
-        <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4 relative overflow-hidden">
+        <div className="min-h-screen bg-slate-50 flex flex-col p-4 relative overflow-hidden">
             {/* Background Mesh */}
             <div className="absolute inset-0 pointer-events-none">
-                <div className="absolute top-[-20%] left-[-10%] w-[60%] h-[60%] bg-red-200 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob"></div>
-                <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-orange-200 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob animation-delay-2000"></div>
+                <div className="absolute top-[-20%] left-[-10%] w-[60%] h-[60%] bg-red-100 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob"></div>
+                <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-orange-100 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob animation-delay-2000"></div>
             </div>
 
-            <main className="relative z-10 w-full max-w-md flex flex-col items-center space-y-8 pb-10">
-                {/* Logo */}
-                <div className="flex items-center gap-2 mb-2">
-                    <div className="bg-red-600 rounded-lg p-2">
-                        <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.384-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
-                        </svg>
+            {/* Custom Navbar */}
+            <header className="relative z-20 w-full max-w-7xl mx-auto flex items-center justify-between py-4 px-2">
+                <Link href="/" className="flex items-center gap-2 group">
+                    <div className="bg-red-600 rounded-lg p-1.5 transition-transform group-hover:scale-105">
+                        <Heart className="w-5 h-5 text-white fill-current" />
                     </div>
-                    <span className="text-2xl font-bold text-slate-900 tracking-tight">Vital</span>
-                </div>
+                    <span className="text-xl font-bold text-slate-900 tracking-tight">Vital</span>
+                </Link>
 
-                {/* The Card */}
-                <div className="w-full transform hover:scale-105 transition-transform duration-300">
+                <Link href="/register">
+                    <Button className="bg-red-600 hover:bg-red-700 text-white shadow-md shadow-red-100 rounded-full px-6">
+                        Become a Donor
+                    </Button>
+                </Link>
+            </header>
+
+            {/* Main Content - Centered Card Only */}
+            <main className="flex-grow flex items-center justify-center relative z-10 w-full py-10">
+                <div className="w-full max-w-sm transform transition-all duration-500 hover:scale-[1.01]">
                     <DonorCard
                         user={profile}
                         showAchievements={unlockedAchievements.length > 0}
                         achievementCount={unlockedAchievements.length}
                         totalDonations={donationCount}
                         donorNumber={profile.donor_number}
-                        badges={unlockedAchievements}  // Pass badges data here
-                        className="shadow-xl"
+                        badges={unlockedAchievements}
+                        className="shadow-2xl shadow-slate-200/50"
                     />
-                </div>
-
-                {/* CTA */}
-                <div className="text-center space-y-4 max-w-xs mt-4">
-                    <h2 className="text-xl font-bold text-slate-800">
-                        Join {profile.full_name?.split(' ')[0]} in saving lives.
-                    </h2>
-                    <p className="text-slate-600 text-sm">
-                        Vital connects blood donors with people in need. Sign up today to become a hero.
-                    </p>
-                    <Link href="/register" className="block w-full">
-                        <Button size="lg" className="w-full bg-red-600 hover:bg-red-700 text-white shadow-lg shadow-red-200">
-                            Become a Donor
-                        </Button>
-                    </Link>
                 </div>
             </main>
 
-            <footer className="absolute bottom-6 text-slate-400 text-xs text-center w-full">
+            <footer className="relative z-10 text-center text-slate-400 text-xs py-6">
                 &copy; {new Date().getFullYear()} Vital App. All rights reserved.
             </footer>
         </div>
