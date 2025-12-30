@@ -9,8 +9,8 @@ import { Button } from '@/components/ui/Button';
 import { Alert } from '@/components/ui/Alert';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
-import { fetchUserStats, calculateEligibility } from '@/lib/stats';
-import { Loader2, User, MapPin, Phone, Mail, Droplet, Award, Calendar, Settings, LogOut, Edit2, Check, X, Shield, Heart, Bell, Share, Download, ChevronDown } from 'lucide-react';
+import { fetchUserStats, calculateEligibility, type UserStats } from '@/lib/stats';
+import { Loader2, User, MapPin, Phone, Mail, Droplet, Award, Calendar, Settings, LogOut, Edit2, Check, X, Shield, Heart, Bell, Share, Download, ChevronDown, Star, Trophy } from 'lucide-react';
 import html2canvas from 'html2canvas';
 
 import { PushNotificationManager } from '@/components/PushNotificationManager';
@@ -19,17 +19,10 @@ import type { BloodGroup } from '@/types';
 import { motion } from 'framer-motion';
 import DonorCard from '@/components/DonorCard';
 
-interface Stats {
-    total_donations: number;
-    total_requests: number;
-    last_donation_date: string | null;
-    achievements: string[];
-}
-
 export default function ProfilePage() {
     const router = useRouter();
     const { user, signOut, session, updateProfile } = useAuth();
-    const [stats, setStats] = useState<Stats | null>(null);
+    const [stats, setStats] = useState<UserStats | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState('');
     const [isShareOpen, setIsShareOpen] = useState(false);
@@ -264,7 +257,7 @@ export default function ProfilePage() {
                                 ref={cardRef}
                                 user={user}
                                 showAchievements={true}
-                                achievementCount={stats?.achievements?.length || 0}
+                                achievementCount={stats?.achievements?.filter(a => a.unlocked).length || 0}
                                 totalDonations={stats?.total_donations || 0}
                                 donorNumber={user?.donor_number}
                             />
@@ -333,44 +326,64 @@ export default function ProfilePage() {
 
             {/* --- BADGES & ACHIEVEMENTS --- */}
             <div className="space-y-4">
-                <h3 className="text-xl font-bold text-slate-900 flex items-center gap-2">
-                    <Award className="w-5 h-5 text-amber-500" />
-                    Your Hall of Fame
-                </h3>
+                <div className="flex items-center justify-between">
+                    <h3 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+                        <Award className="w-5 h-5 text-amber-500" />
+                        Your Legacy
+                    </h3>
+                    {stats?.total_points !== undefined && (
+                        <div className="flex items-center gap-2 px-3 py-1 bg-amber-50 border border-amber-100 rounded-full">
+                            <Trophy className="w-4 h-4 text-amber-600" />
+                            <span className="font-bold text-amber-900 text-sm">{stats.total_points} pts</span>
+                        </div>
+                    )}
+                </div>
+
                 {
-                    stats?.achievements && stats.achievements.length > 0 ? (
+                    stats?.achievements && stats.achievements.some(a => a.unlocked) ? (
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                            {stats.achievements.map((achievement, index) => {
-                                // Assign icons based on achievement name (simple heuristic)
-                                const isDonor = achievement.includes('Donor');
-                                const isLife = achievement.includes('Life');
+                            {stats.achievements.filter(a => a.unlocked).map((achievement, index) => {
+                                const getIcon = () => {
+                                    switch (achievement.icon) {
+                                        case 'droplet': return <Droplet className="text-amber-600 w-7 h-7" />;
+                                        case 'shield': return <Shield className="text-amber-600 w-7 h-7" />;
+                                        case 'star': return <Star className="text-amber-600 w-7 h-7" />;
+                                        case 'trophy': return <Trophy className="text-amber-600 w-7 h-7" />;
+                                        case 'heart': return <Heart className="text-red-500 w-7 h-7" />;
+                                        default: return <Award className="text-amber-600 w-7 h-7" />;
+                                    }
+                                };
 
                                 return (
-                                    <Link href="/achievements" key={index}>
+                                    <Link href="/achievements" key={achievement.id}>
                                         <motion.div
                                             initial={{ opacity: 0, scale: 0.9 }}
                                             animate={{ opacity: 1, scale: 1 }}
                                             transition={{ delay: 0.1 * index }}
-                                            className="relative group p-6 rounded-2xl border border-slate-200 bg-white hover:border-amber-300 hover:shadow-lg transition-all text-center flex flex-col items-center justify-center gap-3 cursor-pointer"
+                                            className="relative group p-6 rounded-2xl border border-slate-200 bg-white hover:border-amber-300 hover:shadow-lg transition-all text-center flex flex-col items-center justify-center gap-3 cursor-pointer h-full"
+                                            title={achievement.motto}
                                         >
                                             <div className="w-14 h-14 rounded-full bg-amber-50 flex items-center justify-center group-hover:bg-amber-100 transition-colors">
-                                                {isDonor ? <Droplet className="text-amber-600 w-7 h-7" /> :
-                                                    isLife ? <Heart className="text-red-500 w-7 h-7" /> :
-                                                        <Award className="text-amber-600 w-7 h-7" />}
+                                                {getIcon()}
                                             </div>
-                                            <span className="font-bold text-slate-900 group-hover:text-amber-700 transition-colors">{achievement}</span>
+                                            <div className="space-y-1">
+                                                <div className="font-bold text-slate-900 group-hover:text-amber-700 transition-colors text-sm">{achievement.name}</div>
+                                                <div className="text-xs text-slate-400 font-medium">{achievement.points} pts</div>
+                                            </div>
                                         </motion.div>
                                     </Link>
                                 )
                             })}
                         </div>
                     ) : (
-                        <div className="p-8 border-2 border-dashed border-slate-200 rounded-2xl text-center text-slate-500">
-                            <p>No badges yet. Complete your first donation to earn the "First Blood" badge!</p>
+                        <div className="p-8 border-2 border-dashed border-slate-200 rounded-2xl text-center text-slate-500 flex flex-col items-center gap-2">
+                            <Droplet className="w-8 h-8 text-slate-300 mb-2" />
+                            <p className="font-medium text-slate-900">Start Your Legacy</p>
+                            <p className="text-sm">Complete your first donation to earn the "First Drop" badge and 50 points!</p>
                         </div>
                     )
                 }
-            </div >
+            </div>
 
             {/* --- SETTINGS & CONTENT --- */}
 

@@ -1,26 +1,29 @@
 import { supabase } from './supabase';
-import { ACHIEVEMENTS, DONATION_RECOVERY_DAYS } from './constants';
+import { ACHIEVEMENTS, DONATION_RECOVERY_DAYS, POINTS_PER_DONATION } from './constants';
+
+export interface Achievement {
+    id: string;
+    name: string;
+    description: string;
+    motto: string;
+    points: number;
+    icon: string;
+    unlocked: boolean;
+    unlockedDate?: string;
+    progress: number;
+    threshold?: number;
+}
 
 export interface UserStats {
     total_donations: number;
     total_requests: number;
+    total_points: number;
     last_donation_date: string | null;
-    achievements: string[];
+    achievements: Achievement[];
 }
 
-export interface AchievementData {
-    name: string;
-    unlocked: boolean;
-    unlockedDate?: string;
-    description: string;
-    icon: string;
-}
-
-/**
- * Fetch comprehensive user statistics from database
- */
 export async function fetchUserStats(userId: string): Promise<UserStats> {
-    // Fetch donations with related request data
+    // Fetch donations
     const { data: donations, error: donationsError } = await supabase
         .from('donations')
         .select('created_at, status, blood_requests(urgency_level)')
@@ -29,7 +32,7 @@ export async function fetchUserStats(userId: string): Promise<UserStats> {
 
     if (donationsError) throw donationsError;
 
-    // Fetch blood requests posted by user
+    // Fetch requests
     const { data: requests, error: requestsError } = await supabase
         .from('blood_requests')
         .select('created_at', { count: 'exact' })
@@ -37,146 +40,80 @@ export async function fetchUserStats(userId: string): Promise<UserStats> {
 
     if (requestsError) throw requestsError;
 
-    // Calculate achievements based on actual donations
+    const completedDonations = (donations || []).filter(d => d.status === 'completed');
     const achievements = calculateAchievements(donations || []);
 
-    // Get last completed donation date
-    const completedDonations = (donations || []).filter(d => d.status === 'completed');
+    // Calculate total points
+    // Base points for donations
+    let totalPoints = completedDonations.length * POINTS_PER_DONATION;
+    // Add bonus points for unlocked achievements
+    achievements.forEach(ach => {
+        if (ach.unlocked) {
+            totalPoints += ach.points;
+        }
+    });
+
     const lastDonation = completedDonations[0];
 
     return {
         total_donations: completedDonations.length,
         total_requests: requests?.length || 0,
+        total_points: totalPoints,
         last_donation_date: lastDonation?.created_at || null,
         achievements
     };
 }
 
-/**
- * Calculate achievements based on donation history
- */
-export function calculateAchievements(donations: any[]): string[] {
-    const achievements: string[] = [];
+export function calculateAchievements(donations: any[]): Achievement[] {
     const completedDonations = donations.filter(d => d.status === 'completed');
 
-    // First Time Donor
-    if (completedDonations.length >= ACHIEVEMENTS.FIRST_TIME_DONOR.threshold) {
-        achievements.push(ACHIEVEMENTS.FIRST_TIME_DONOR.name);
-    }
+    return Object.values(ACHIEVEMENTS).map(badge => {
+        let unlocked = false;
+        let unlockedDate: string | undefined;
+        let progress = 0;
 
-    // Regular Donor
-    if (completedDonations.length >= ACHIEVEMENTS.REGULAR_DONOR.threshold) {
-        achievements.push(ACHIEVEMENTS.REGULAR_DONOR.name);
-    }
+        if (badge.type === 'count') {
+            const count = completedDonations.length;
+            const threshold = badge.threshold;
+            progress = Math.min(count, threshold);
+            unlocked = count >= threshold;
 
-    // Super Donor
-    if (completedDonations.length >= ACHIEVEMENTS.SUPER_DONOR.threshold) {
-        achievements.push(ACHIEVEMENTS.SUPER_DONOR.name);
-    }
+            if (unlocked) {
+                // Find the Nth donation (1-based index N = threshold)
+                // Array is Descending (Newest...Oldest)
+                const index = count - threshold;
+                if (index >= 0 && index < count) {
+                    unlockedDate = completedDonations[index].created_at;
+                }
+            }
+        } else if (badge.type === 'special') {
+            // For now only 'urgent_donation'
+            if ((badge as any).criteria === 'urgent_donation') {
+                const urgentDonation = completedDonations.find(d => {
+                    const request = Array.isArray(d.blood_requests) ? d.blood_requests[0] : d.blood_requests;
+                    return request?.urgency_level === 'critical' || request?.urgency_level === 'urgent';
+                });
+                if (urgentDonation) {
+                    unlocked = true;
+                    unlockedDate = urgentDonation.created_at;
+                    progress = 1;
+                }
+            }
+        }
 
-    // Life Saver - responded to urgent/critical request
-    const hasUrgentDonation = completedDonations.some(d => {
-        const request = Array.isArray(d.blood_requests) ? d.blood_requests[0] : d.blood_requests;
-        return request?.urgency_level === 'critical' || request?.urgency_level === 'urgent';
+        return {
+            id: badge.id,
+            name: badge.name,
+            description: badge.description,
+            motto: badge.motto,
+            points: badge.points,
+            icon: badge.icon,
+            unlocked,
+            unlockedDate,
+            progress,
+            threshold: badge.type === 'count' ? badge.threshold : undefined
+        };
     });
-    if (hasUrgentDonation) {
-        achievements.push(ACHIEVEMENTS.LIFE_SAVER.name);
-    }
-
-    return achievements;
-}
-
-/**
- * Get detailed achievement data with unlock dates
- */
-export async function fetchDetailedAchievements(userId: string): Promise<AchievementData[]> {
-    const { data: donations } = await supabase
-        .from('donations')
-        .select('created_at, status, blood_requests(urgency_level)')
-        .eq('donor_id', userId)
-        .eq('status', 'completed')
-        .order('created_at', { ascending: true });
-
-    const completedDonations = donations || [];
-    const achievementsList: AchievementData[] = [];
-
-    // First Time Donor
-    if (completedDonations.length > 0) {
-        achievementsList.push({
-            name: ACHIEVEMENTS.FIRST_TIME_DONOR.name,
-            unlocked: true,
-            unlockedDate: completedDonations[0].created_at,
-            description: ACHIEVEMENTS.FIRST_TIME_DONOR.description,
-            icon: ACHIEVEMENTS.FIRST_TIME_DONOR.icon
-        });
-    } else {
-        achievementsList.push({
-            name: ACHIEVEMENTS.FIRST_TIME_DONOR.name,
-            unlocked: false,
-            description: ACHIEVEMENTS.FIRST_TIME_DONOR.description,
-            icon: ACHIEVEMENTS.FIRST_TIME_DONOR.icon
-        });
-    }
-
-    // Regular Donor
-    if (completedDonations.length >= ACHIEVEMENTS.REGULAR_DONOR.threshold) {
-        achievementsList.push({
-            name: ACHIEVEMENTS.REGULAR_DONOR.name,
-            unlocked: true,
-            unlockedDate: completedDonations[ACHIEVEMENTS.REGULAR_DONOR.threshold - 1].created_at,
-            description: ACHIEVEMENTS.REGULAR_DONOR.description,
-            icon: ACHIEVEMENTS.REGULAR_DONOR.icon
-        });
-    } else {
-        achievementsList.push({
-            name: ACHIEVEMENTS.REGULAR_DONOR.name,
-            unlocked: false,
-            description: `${ACHIEVEMENTS.REGULAR_DONOR.description} (${completedDonations.length}/${ACHIEVEMENTS.REGULAR_DONOR.threshold})`,
-            icon: ACHIEVEMENTS.REGULAR_DONOR.icon
-        });
-    }
-
-    // Super Donor
-    if (completedDonations.length >= ACHIEVEMENTS.SUPER_DONOR.threshold) {
-        achievementsList.push({
-            name: ACHIEVEMENTS.SUPER_DONOR.name,
-            unlocked: true,
-            unlockedDate: completedDonations[ACHIEVEMENTS.SUPER_DONOR.threshold - 1].created_at,
-            description: ACHIEVEMENTS.SUPER_DONOR.description,
-            icon: ACHIEVEMENTS.SUPER_DONOR.icon
-        });
-    } else {
-        achievementsList.push({
-            name: ACHIEVEMENTS.SUPER_DONOR.name,
-            unlocked: false,
-            description: `${ACHIEVEMENTS.SUPER_DONOR.description} (${completedDonations.length}/${ACHIEVEMENTS.SUPER_DONOR.threshold})`,
-            icon: ACHIEVEMENTS.SUPER_DONOR.icon
-        });
-    }
-
-    // Life Saver
-    const urgentDonation = completedDonations.find(d => {
-        const request = Array.isArray(d.blood_requests) ? d.blood_requests[0] : d.blood_requests;
-        return request?.urgency_level === 'critical' || request?.urgency_level === 'urgent';
-    });
-    if (urgentDonation) {
-        achievementsList.push({
-            name: ACHIEVEMENTS.LIFE_SAVER.name,
-            unlocked: true,
-            unlockedDate: urgentDonation.created_at,
-            description: ACHIEVEMENTS.LIFE_SAVER.description,
-            icon: ACHIEVEMENTS.LIFE_SAVER.icon
-        });
-    } else {
-        achievementsList.push({
-            name: ACHIEVEMENTS.LIFE_SAVER.name,
-            unlocked: false,
-            description: ACHIEVEMENTS.LIFE_SAVER.description,
-            icon: ACHIEVEMENTS.LIFE_SAVER.icon
-        });
-    }
-
-    return achievementsList;
 }
 
 /**
