@@ -31,7 +31,7 @@ const DonorCard = forwardRef<HTMLDivElement, DonorCardProps>(({ user, className 
     return (
         <div className={`relative perspective-1000 w-full max-w-sm min-h-[280px] ${className}`} ref={ref}>
             <motion.div
-                className="w-full h-full relative preserve-3d transition-transform duration-500"
+                className="absolute inset-0 preserve-3d"
                 animate={{ rotateY: isFlipped ? 180 : 0 }}
                 transition={{ duration: 0.6, type: "spring", stiffness: 260, damping: 20 }}
                 style={{ transformStyle: 'preserve-3d' }}
