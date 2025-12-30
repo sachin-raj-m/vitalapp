@@ -43,6 +43,7 @@ export default function ProfilePage() {
         if (!cardRef.current) return;
         try {
             const canvas = await html2canvas(cardRef.current, {
+                // @ts-ignore - html2canvas types might be missing backgroundColor
                 backgroundColor: null,
                 scale: 3,
                 useCORS: true
