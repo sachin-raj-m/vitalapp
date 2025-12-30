@@ -87,9 +87,9 @@ export default function AchievementsPage() {
                 <Card className="border-slate-200">
                     <CardBody className="p-6 text-center">
                         <div className="text-4xl font-black text-slate-900 mb-2">
-                            {achievements.length}
+                            {achievements.filter(a => a.unlocked).length}/{achievements.length}
                         </div>
-                        <div className="text-sm font-medium text-slate-500">Total Badges</div>
+                        <div className="text-sm font-medium text-slate-500">Progress</div>
                     </CardBody>
                 </Card>
             </div>
