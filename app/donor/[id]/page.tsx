@@ -1,5 +1,6 @@
 
-import { supabase } from '@/lib/supabase';
+import { createServerClient } from '@supabase/ssr';
+import { cookies } from 'next/headers';
 import { notFound } from 'next/navigation';
 import DonorCard from '@/components/DonorCard';
 import { Button } from '@/components/ui/Button';
@@ -29,6 +30,20 @@ export async function generateMetadata({ params }: Props) {
 export default async function PublicDonorPage({ params }: Props) {
     const { id } = params;
     const decodedId = decodeURIComponent(id);
+
+    // Initialize authenticated Supabase client
+    const cookieStore = cookies();
+    const supabase = createServerClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+        {
+            cookies: {
+                get(name: string) {
+                    return cookieStore.get(name)?.value;
+                },
+            },
+        }
+    );
 
     // Parse ID from slug
     // Supports formats:
