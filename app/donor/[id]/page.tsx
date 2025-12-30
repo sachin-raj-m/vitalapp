@@ -51,9 +51,15 @@ export default async function PublicDonorPage({ params }: Props) {
 
     const { data: profile, error } = await supabase
         .from('profiles')
-        .select('id, full_name, blood_group, is_donor') // Adjust fields as per schema
+        .select('id, full_name, blood_group, is_donor')
         .eq('id', id)
         .single();
+
+    // Fetch donation count
+    const { count: donationCount } = await supabase
+        .from('donations')
+        .select('*', { count: 'exact', head: true })
+        .eq('donor_id', id);
 
     // If using the 'auth.users' table isn't possible directly safely without admin key.
 
@@ -94,7 +100,8 @@ export default async function PublicDonorPage({ params }: Props) {
                     <DonorCard
                         user={profile}
                         showAchievements={true}
-                        achievementCount={3} // Placeholder or fetch actual count
+                        achievementCount={3} // Placeholder for badges
+                        totalDonations={donationCount || 0}
                         className="shadow-xl"
                     />
                 </div>

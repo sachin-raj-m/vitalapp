@@ -272,6 +272,7 @@ export default function ProfilePage() {
                                 user={user}
                                 showAchievements={true}
                                 achievementCount={stats?.achievements?.length || 0}
+                                totalDonations={stats?.total_donations || 0}
                             />
                         </motion.div>
                     </div>
