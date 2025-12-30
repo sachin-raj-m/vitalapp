@@ -5,8 +5,8 @@ import DonorCard from '@/components/DonorCard';
 import { Button } from '@/components/ui/Button';
 import Link from 'next/link';
 
-// Set revalidation time (e.g., 60 seconds)
-export const revalidate = 60;
+// Set revalidation time to 0 for instant updates
+export const revalidate = 0;
 
 interface Props {
     params: {
@@ -16,42 +16,48 @@ interface Props {
 
 export async function generateMetadata({ params }: Props) {
     const { id } = params;
+    // Decode URI component to handle spaces/special chars in names
+    const decodedId = decodeURIComponent(id);
+    const displayName = decodedId.split('@')[0];
+
     return {
-        title: 'Vital Donor Card',
+        title: `Donor Profile: ${displayName}`,
         description: 'View my official Verified Donor Card on Vital.',
     };
 }
 
 export default async function PublicDonorPage({ params }: Props) {
     const { id } = params;
+    const decodedId = decodeURIComponent(id);
 
-    // Fetch user data
-    // Note: We need a way to fetch public profile data. 
-    // Assuming 'profiles' table or similar exists that is publicly readable for minimal info
-    // or using a secure RPC if direct table access is restricted.
-    // For now, attempting direct fetch from 'profiles' or 'users' (metadata).
-    // Adjusting query to fetch necessary fields for the card.
+    // Parse ID from slug
+    // Supports formats:
+    // 1. UUID (e.g., "123e4567-e89b-..." )
+    // 2. Donor Number (e.g., "1001")
+    // 3. Vanity Slug (e.g., "Sachin@1001", "1001@Sachin")
 
-    // NOTE: Supabase Auth users data isn't directly queryable from client usually, 
-    // but on server (here) we might need service role key or specific public view.
-    // For this implementation, I'll assume there is a public_profiles view or I'll try to fetch safely.
-    // If getting data fails, we show 404.
+    let lookupId = decodedId;
 
-    // Using a server-side query.
-    // Ideally we should use the admin client to fetch user metadata if it's not in a public table.
-    // But let's assume 'profiles' table exists which is a common pattern.
+    // Check if it contains an @
+    if (decodedId.includes('@')) {
+        const parts = decodedId.split('@');
+        // Try to find the numeric part or UUID part
+        // We prioritize the numeric part if found
+        const numericPart = parts.find(p => /^\d+$/.test(p));
+        const uuidPart = parts.find(p => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(p));
 
-    // Fallback: If 'profiles' table isn't set up, we might need to rely on 'blood_requests' or similar?
-    // Let's assume a 'profiles' table for now based on typical Supabase setup. 
-    // Wait, the project structure hasn't explicitly shown a 'profiles' table schema. 
-    // The previous code accessed `user` from `useAuth` which wraps `supabase.auth.getUser()`.
+        if (numericPart) {
+            lookupId = numericPart;
+        } else if (uuidPart) {
+            lookupId = uuidPart;
+        } else {
+            // Fallback: assume the part after @ is the ID based on user request "uniqueid as last"
+            lookupId = parts[parts.length - 1];
+        }
+    }
 
-    // IMPORTANT: For this to work, we need a way to look up user details by ID.
-    // I will try to fetch from 'profiles'. If that fails, I might need to ask the user or use a different method.
-
-    // Determine lookup method
-    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
-    const isDonorNumber = /^\d+$/.test(id);
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(lookupId);
+    const isDonorNumber = /^\d+$/.test(lookupId);
 
     if (!isUuid && !isDonorNumber) {
         return notFound();
@@ -59,12 +65,12 @@ export default async function PublicDonorPage({ params }: Props) {
 
     let query = supabase
         .from('profiles')
-        .select('id, full_name, blood_group, is_donor, donor_number');
+        .select('id, full_name, blood_group, is_donor, donor_number, is_public_profile'); // Added is_public_profile fetch
 
     if (isUuid) {
-        query = query.eq('id', id);
+        query = query.eq('id', lookupId);
     } else {
-        query = query.eq('donor_number', parseInt(id));
+        query = query.eq('donor_number', parseInt(lookupId));
     }
 
     const { data: profile, error } = await query.single();
