@@ -91,6 +91,9 @@ export default async function PublicDonorPage({ params }: Props) {
     const { data: profile, error } = await query.single();
 
     if (error || !profile) {
+        console.error("❌ Public Profile Error:", error);
+        console.error("❌ Profile Data:", profile);
+        console.error("❌ Lookup ID:", lookupId);
         return notFound();
     }
 
