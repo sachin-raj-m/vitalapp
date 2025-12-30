@@ -27,9 +27,9 @@ const DonorCard = forwardRef<HTMLDivElement, DonorCardProps>(({ user, className 
             whileHover={{ scale: 1.02, boxShadow: "0 30px 60px -12px rgba(220, 38, 38, 0.2)" }}
             transition={{ type: "spring", stiffness: 300, damping: 20 }}
         >
-            {/* Background Pattern */}
-            <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-red-50 to-orange-50 rounded-full -mr-20 -mt-20 opacity-60 pointer-events-none blur-2xl"></div>
-            <div className="absolute bottom-0 left-0 w-48 h-48 bg-gradient-to-tr from-red-50 to-pink-50 rounded-full -ml-16 -mb-16 opacity-60 pointer-events-none blur-xl"></div>
+            {/* Background Pattern - Simplified for reliable Canvas export */}
+            <div className="absolute top-0 right-0 w-64 h-64 bg-red-50 rounded-full -mr-20 -mt-20 opacity-60 pointer-events-none"></div>
+            <div className="absolute bottom-0 left-0 w-48 h-48 bg-orange-50 rounded-full -ml-16 -mb-16 opacity-60 pointer-events-none"></div>
 
             {/* Card Header */}
             <div className="relative flex justify-between items-center z-10 w-full">
@@ -89,19 +89,20 @@ const DonorCard = forwardRef<HTMLDivElement, DonorCardProps>(({ user, className 
             </div>
 
             {/* Card Footer */}
-            <div className="relative border-t border-slate-100/80 pt-6 mt-2 z-10 w-full">
+            <div className="relative border-t border-slate-100/80 pt-6 mt-2 z-10 w-full flex flex-col gap-2">
+                {/* Row 1: Labels */}
                 <div className="flex justify-between items-end w-full">
-                    <div className="flex-1 pr-4">
-                        <div className="text-[10px] text-slate-400 uppercase mb-2 font-bold tracking-wider">Holder Name</div>
-                        <div className="text-slate-900 font-black text-xl uppercase truncate w-full tracking-tight leading-snug">
-                            {user?.full_name || "Unknown"}
-                        </div>
+                    <div className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Holder Name</div>
+                    <div className="text-[10px] text-slate-400 uppercase font-bold tracking-wider text-right">Donor ID</div>
+                </div>
+
+                {/* Row 2: Values */}
+                <div className="flex justify-between items-end w-full">
+                    <div className="text-slate-900 font-black text-xl uppercase truncate max-w-[200px] tracking-tight leading-none">
+                        {user?.full_name || "Unknown"}
                     </div>
-                    <div className="text-right shrink-0">
-                        <div className="text-[10px] text-slate-400 uppercase mb-2 font-bold tracking-wider">Donor ID</div>
-                        <div className="font-mono text-slate-600 text-sm bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-200 font-semibold shadow-sm">
-                            {donorNumber ? `#${donorNumber}` : (user?.id?.slice(0, 8).toUpperCase() || "--------")}
-                        </div>
+                    <div className="font-mono text-slate-600 text-sm bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-200 font-semibold shadow-sm shrink-0">
+                        {donorNumber ? `#${donorNumber}` : (user?.id?.slice(0, 8).toUpperCase() || "--------")}
                     </div>
                 </div>
             </div>
