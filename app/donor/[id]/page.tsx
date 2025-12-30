@@ -49,17 +49,35 @@ export default async function PublicDonorPage({ params }: Props) {
     // IMPORTANT: For this to work, we need a way to look up user details by ID.
     // I will try to fetch from 'profiles'. If that fails, I might need to ask the user or use a different method.
 
-    const { data: profile, error } = await supabase
-        .from('profiles')
-        .select('id, full_name, blood_group, is_donor')
-        .eq('id', id)
-        .single();
+    // Determine lookup method
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+    const isDonorNumber = /^\d+$/.test(id);
 
-    // Fetch donation count
+    if (!isUuid && !isDonorNumber) {
+        return notFound();
+    }
+
+    let query = supabase
+        .from('profiles')
+        .select('id, full_name, blood_group, is_donor, donor_number');
+
+    if (isUuid) {
+        query = query.eq('id', id);
+    } else {
+        query = query.eq('donor_number', parseInt(id));
+    }
+
+    const { data: profile, error } = await query.single();
+
+    if (error || !profile) {
+        return notFound();
+    }
+
+    // Fetch donation count using the UUID we found
     const { count: donationCount } = await supabase
         .from('donations')
         .select('*', { count: 'exact', head: true })
-        .eq('donor_id', id);
+        .eq('donor_id', profile.id);
 
     // If using the 'auth.users' table isn't possible directly safely without admin key.
 
@@ -102,6 +120,7 @@ export default async function PublicDonorPage({ params }: Props) {
                         showAchievements={true}
                         achievementCount={3} // Placeholder for badges
                         totalDonations={donationCount || 0}
+                        donorNumber={profile.donor_number}
                         className="shadow-xl"
                     />
                 </div>

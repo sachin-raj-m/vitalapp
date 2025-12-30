@@ -35,7 +35,9 @@ export default function ProfilePage() {
 
     const handleLinkShare = () => {
         if (!user?.id) return;
-        const url = `${window.location.origin}/donor/${user.id}`;
+        // @ts-ignore - user type might need update
+        const shareId = user.donor_number || user.id;
+        const url = `${window.location.origin}/donor/${shareId}`;
         const text = `I'm a proud blood donor on Vital! Check out my official donor card here: ${url}`;
         window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
     };
