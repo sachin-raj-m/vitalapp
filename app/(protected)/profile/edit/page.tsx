@@ -46,25 +46,37 @@ export default function ProfileEditPage() {
         e.preventDefault();
         e.stopPropagation();
         setError('');
+        setSuccess('');
         setIsLoading(true);
 
         try {
+            console.log('Current phone:', user?.phone);
+            console.log('New phone:', editForm.phone);
+
             // Check if phone number changed
             if (editForm.phone !== user?.phone) {
+                console.log('Phone changed, initiating OTP verification...');
+
                 // Initiate Phone Verification
                 const { error: authError } = await supabase.auth.updateUser({
                     phone: editForm.phone
                 });
 
-                if (authError) throw authError;
+                if (authError) {
+                    console.error('OTP send error:', authError);
+                    throw authError;
+                }
 
+                console.log('OTP sent successfully, showing modal');
                 setPendingPhone(editForm.phone);
                 setIsVerifying(true);
-                setIsLoading(false); // Stop loading to show modal
+                setIsLoading(false);
+                setSuccess(`Verification code sent to ${editForm.phone}`);
                 return;
             }
 
             // Normal update without phone change
+            console.log('No phone change, updating profile normally');
             await updateProfile({
                 full_name: editForm.full_name,
                 is_available: editForm.is_available,
@@ -72,7 +84,8 @@ export default function ProfileEditPage() {
                 present_zip: editForm.present_zip
                 // phone is not updated here directly if not changed
             });
-            router.push('/profile');
+            setSuccess('Profile updated successfully!');
+            setTimeout(() => router.push('/profile'), 1500);
         } catch (err: any) {
             console.error('Error updating profile:', err);
             setError(err.message || 'Failed to update profile');
