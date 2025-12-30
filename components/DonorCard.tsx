@@ -11,9 +11,10 @@ interface DonorCardProps {
     showAchievements?: boolean;
     achievementCount?: number;
     totalDonations?: number;
+    donorNumber?: number | null;
 }
 
-const DonorCard = forwardRef<HTMLDivElement, DonorCardProps>(({ user, className = "", showAchievements = false, achievementCount = 0, totalDonations = 0 }, ref) => {
+const DonorCard = forwardRef<HTMLDivElement, DonorCardProps>(({ user, className = "", showAchievements = false, achievementCount = 0, totalDonations = 0, donorNumber }, ref) => {
     return (
         <div
             ref={ref}
@@ -71,7 +72,7 @@ const DonorCard = forwardRef<HTMLDivElement, DonorCardProps>(({ user, className 
                     <div className="text-right">
                         <div className="text-[10px] text-slate-400 uppercase mb-1 font-semibold">Donor ID</div>
                         <div className="font-mono text-slate-600 text-xs bg-slate-100 px-2 py-1 rounded border border-slate-200">
-                            {user?.id?.slice(0, 8).toUpperCase() || "--------"}
+                            {donorNumber ? `#${donorNumber}` : (user?.id?.slice(0, 8).toUpperCase() || "--------")}
                         </div>
                     </div>
                 </div>
