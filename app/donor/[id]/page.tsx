@@ -5,7 +5,7 @@ import { notFound } from 'next/navigation';
 import DonorCard from '@/components/DonorCard';
 import { Button } from '@/components/ui/Button';
 import Link from 'next/link';
-import { Lock, Shield, ArrowLeft, Droplet, Award, Star, Trophy, Heart } from 'lucide-react';
+import { Lock, Shield, ArrowLeft } from 'lucide-react';
 import { calculateAchievements } from '@/lib/stats';
 
 // Set revalidation time to 0 for instant updates
@@ -55,29 +55,6 @@ function parseSlugToLookupId(slug: string): { lookupId: string; isUuid: boolean;
 
     return { lookupId, isUuid, isDonorNumber };
 }
-
-// Icon mapping helper
-const getBadgeIcon = (iconName: string) => {
-    switch (iconName) {
-        case 'droplet': return <Droplet className="w-6 h-6" />;
-        case 'shield': return <Shield className="w-6 h-6" />;
-        case 'star': return <Star className="w-6 h-6" />;
-        case 'trophy': return <Trophy className="w-6 h-6" />;
-        case 'heart': return <Heart className="w-5 h-5 fill-current" />;
-        default: return <Award className="w-6 h-6" />;
-    }
-};
-
-const getBadgeColor = (iconName: string) => {
-    switch (iconName) {
-        case 'droplet': return 'text-red-500 bg-red-50 ring-red-100';
-        case 'shield': return 'text-amber-700 bg-amber-50 ring-amber-100'; // Bronze
-        case 'star': return 'text-slate-400 bg-slate-50 ring-slate-200'; // Silver
-        case 'trophy': return 'text-yellow-500 bg-yellow-50 ring-yellow-100'; // Gold
-        case 'heart': return 'text-rose-500 bg-rose-50 ring-rose-100';
-        default: return 'text-blue-500 bg-blue-50 ring-blue-100';
-    }
-};
 
 // Private Profile Component
 function PrivateProfilePage({ displayName }: { displayName: string }) {
@@ -138,12 +115,9 @@ export default async function PublicDonorPage({ params }: Props) {
     const decodedId = decodeURIComponent(id);
     const displayName = decodedId.split('@')[0] || 'This user';
 
-    console.log('🚀 PublicDonorPage: Starting with id:', id);
-
     // Parse the vanity slug
     const parsed = parseSlugToLookupId(decodedId);
     if (!parsed) {
-        console.error('❌ Invalid slug format:', decodedId);
         return notFound();
     }
     const { lookupId, isUuid, isDonorNumber } = parsed;
@@ -180,13 +154,11 @@ export default async function PublicDonorPage({ params }: Props) {
 
     // Profile not found - return 404
     if (error || !profile) {
-        console.error('❌ Profile not found. Error:', error);
         return notFound();
     }
 
     // Only show for donors
     if (!profile.is_donor) {
-        console.error('❌ Not a donor');
         return notFound();
     }
 
@@ -200,7 +172,6 @@ export default async function PublicDonorPage({ params }: Props) {
     }
 
     // Fetch Full Donation Stats for Badges
-    // NOTE: RLS must allow reading these donations!
     const { data: donations } = await supabase
         .from('donations')
         .select('created_at, status, blood_requests(urgency_level)')
@@ -241,33 +212,10 @@ export default async function PublicDonorPage({ params }: Props) {
                         achievementCount={unlockedAchievements.length}
                         totalDonations={donationCount}
                         donorNumber={profile.donor_number}
+                        badges={unlockedAchievements}  // Pass badges data here
                         className="shadow-xl"
                     />
                 </div>
-
-                {/* Badges Section */}
-                {unlockedAchievements.length > 0 && (
-                    <div className="w-full animate-in slide-in-from-bottom-5 fade-in duration-700 delay-200">
-                        <div className="flex items-center gap-2 mb-3 px-1">
-                            <Award className="w-4 h-4 text-slate-400" />
-                            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Earned Badges</h3>
-                        </div>
-                        <div className="grid grid-cols-3 gap-3">
-                            {unlockedAchievements.map((badge) => (
-                                <div
-                                    key={badge.id}
-                                    className="bg-white rounded-xl p-3 flex flex-col items-center text-center shadow-sm border border-slate-100 hover:shadow-md transition-shadow"
-                                >
-                                    <div className={`p-2 rounded-full mb-2 ring-1 ${getBadgeColor(badge.icon)}`}>
-                                        {getBadgeIcon(badge.icon)}
-                                    </div>
-                                    <span className="text-xs font-bold text-slate-800 leading-tight">{badge.name}</span>
-                                    <span className="text-[10px] text-slate-400 mt-1 line-clamp-2 leading-none">{badge.motto}</span>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                )}
 
                 {/* CTA */}
                 <div className="text-center space-y-4 max-w-xs mt-4">
