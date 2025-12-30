@@ -24,6 +24,7 @@ export function Header() {
     pathname?.startsWith('/requests') ||
     pathname?.startsWith('/profile') ||
     pathname?.startsWith('/nearby-donors') ||
+    pathname?.startsWith('/achievements') ||
     pathname?.startsWith('/donations');
 
   if (isAppRoute && user) return null;
