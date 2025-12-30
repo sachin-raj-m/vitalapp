@@ -17,7 +17,6 @@ interface Props {
 
 export async function generateMetadata({ params }: Props) {
     const { id } = params;
-    // Decode URI component to handle spaces/special chars in names
     const decodedId = decodeURIComponent(id);
     const displayName = decodedId.split('@')[0];
 
@@ -27,11 +26,46 @@ export async function generateMetadata({ params }: Props) {
     };
 }
 
+// Helper to parse the vanity URL slug
+function parseSlugToLookupId(slug: string): { lookupId: string; isUuid: boolean; isDonorNumber: boolean } | null {
+    let lookupId = slug;
+
+    if (slug.includes('@')) {
+        const parts = slug.split('@');
+        const numericPart = parts.find(p => /^\d+$/.test(p));
+        const uuidPart = parts.find(p => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(p));
+
+        if (numericPart) {
+            lookupId = numericPart;
+        } else if (uuidPart) {
+            lookupId = uuidPart;
+        } else {
+            lookupId = parts[parts.length - 1];
+        }
+    }
+
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(lookupId);
+    const isDonorNumber = /^\d+$/.test(lookupId);
+
+    if (!isUuid && !isDonorNumber) {
+        return null;
+    }
+
+    return { lookupId, isUuid, isDonorNumber };
+}
+
 export default async function PublicDonorPage({ params }: Props) {
     const { id } = params;
     const decodedId = decodeURIComponent(id);
 
-    // Initialize authenticated Supabase client
+    // Parse the vanity slug
+    const parsed = parseSlugToLookupId(decodedId);
+    if (!parsed) {
+        return notFound();
+    }
+    const { lookupId, isUuid, isDonorNumber } = parsed;
+
+    // Create Supabase client with cookies (for authenticated access)
     const cookieStore = await cookies();
     const supabase = createServerClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -45,87 +79,66 @@ export default async function PublicDonorPage({ params }: Props) {
         }
     );
 
-    // DEBUG: Check Auth status
-    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-    console.log("🔍 PublicPage Debug: Session User ID:", session?.user?.id);
-    console.log("🔍 PublicPage Debug: Session Error:", sessionError);
+    // Build the query
+    const buildQuery = (client: typeof supabase) => {
+        let query = client
+            .from('profiles')
+            .select('id, full_name, blood_group, is_donor, donor_number, is_public_profile');
 
-    // Parse ID from slug
-    // Supports formats:
-    // 1. UUID (e.g., "123e4567-e89b-..." )
-    // 2. Donor Number (e.g., "1001")
-    // 3. Vanity Slug (e.g., "Sachin@1001", "1001@Sachin")
-
-    let lookupId = decodedId;
-
-    // Check if it contains an @
-    if (decodedId.includes('@')) {
-        const parts = decodedId.split('@');
-        // Try to find the numeric part or UUID part
-        // We prioritize the numeric part if found
-        const numericPart = parts.find(p => /^\d+$/.test(p));
-        const uuidPart = parts.find(p => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(p));
-
-        if (numericPart) {
-            lookupId = numericPart;
-        } else if (uuidPart) {
-            lookupId = uuidPart;
-        } else {
-            // Fallback: assume the part after @ is the ID based on user request "uniqueid as last"
-            lookupId = parts[parts.length - 1];
+        if (isUuid) {
+            query = query.eq('id', lookupId);
+        } else if (isDonorNumber) {
+            query = query.eq('donor_number', parseInt(lookupId));
         }
+
+        return query.single();
+    };
+
+    // Try fetching the profile
+    let { data: profile, error } = await buildQuery(supabase);
+
+    // If the first attempt fails (RLS denied), try again with a fresh anonymous client.
+    // This handles the case where the server session is missing/stale.
+    if (error && error.code === 'PGRST116') { // PGRST116 = "no rows returned"
+        console.warn('⚠️ Initial query failed (likely RLS), trying anonymous fallback...');
+
+        // Create an anonymous client (no cookies)
+        const anonClient = createServerClient(
+            process.env.NEXT_PUBLIC_SUPABASE_URL!,
+            process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+            {
+                cookies: {
+                    get() { return undefined; },
+                },
+            }
+        );
+
+        const fallback = await buildQuery(anonClient);
+        profile = fallback.data;
+        error = fallback.error;
     }
 
-    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(lookupId);
-    const isDonorNumber = /^\d+$/.test(lookupId);
-
-    if (!isUuid && !isDonorNumber) {
-        return notFound();
-    }
-
-    let query = supabase
-        .from('profiles')
-        .select('id, full_name, blood_group, is_donor, donor_number, is_public_profile'); // Added is_public_profile fetch
-
-    if (isUuid) {
-        query = query.eq('id', lookupId);
-    } else {
-        query = query.eq('donor_number', parseInt(lookupId));
-    }
-
-    const { data: profile, error } = await query.single();
-
+    // Still no profile? Return 404
     if (error || !profile) {
-        console.error("❌ Public Profile Error:", error);
-        console.error("❌ Profile Data:", profile);
-        console.error("❌ Lookup ID:", lookupId);
+        console.error('❌ Public Profile Fetch Failed:', error);
+        console.error('❌ Lookup ID:', lookupId);
         return notFound();
     }
 
-    // Fetch donation count using the UUID we found
+    // Only show for donors
+    if (!profile.is_donor) {
+        return notFound();
+    }
+
+    // Fetch donation count
     const { count: donationCount } = await supabase
         .from('donations')
         .select('*', { count: 'exact', head: true })
         .eq('donor_id', profile.id);
 
-    // If using the 'auth.users' table isn't possible directly safely without admin key.
-
-    // Alternative: If we can't fetch a profile table, this page might 404.
-    // I will create a basic version. If it fails, I'll prompt the user about data access.
-
-    if (error || !profile) {
-        // If profile fetch fails, it might be because the user doesn't exist or table permissions.
-        // For the sake of the task, I will mock if needed or handle the error gracefully.
-        return notFound();
-    }
-
-    if (!profile.is_donor) {
-        return notFound(); // Only show for donors
-    }
-
     return (
         <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4 relative overflow-hidden">
-            {/* Background Mesh (similar to profile) */}
+            {/* Background Mesh */}
             <div className="absolute inset-0 pointer-events-none">
                 <div className="absolute top-[-20%] left-[-10%] w-[60%] h-[60%] bg-red-200 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob"></div>
                 <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-orange-200 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob animation-delay-2000"></div>
@@ -147,7 +160,7 @@ export default async function PublicDonorPage({ params }: Props) {
                     <DonorCard
                         user={profile}
                         showAchievements={true}
-                        achievementCount={3} // Placeholder for badges
+                        achievementCount={3}
                         totalDonations={donationCount || 0}
                         donorNumber={profile.donor_number}
                         className="shadow-xl"
