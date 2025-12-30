@@ -493,6 +493,17 @@ export default function ProfilePage() {
                         <h3 className="text-lg font-bold text-slate-900">Preferences</h3>
                         <p className="text-slate-500 text-sm">Customize your notification experience.</p>
                     </div>
+                    <Card className="hover:shadow-md transition-shadow">
+                        <CardBody className="p-0">
+                            <div className="flex items-center justify-between p-6">
+                                <div className="flex items-center space-x-4">
+                                    <div className="w-12 h-12 rounded-full bg-indigo-50 flex items-center justify-center">
+                                        <Bell className="h-6 w-6 text-indigo-600" />
+                                    </div>
+                                    <div>
+                                        <div className="font-bold text-slate-900">Push Notifications</div>
+                                        <div className="text-sm text-slate-500">Receive alerts when blood is needed nearby</div>
+                                    </div>
                                 </div>
                                 <PushNotificationManager />
                             </div>
