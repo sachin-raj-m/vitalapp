@@ -29,7 +29,7 @@ const DonorCard = forwardRef<HTMLDivElement, DonorCardProps>(({ user, className 
         : '';
 
     return (
-        <div className={`relative perspective-1000 w-full max-w-sm h-[240px] ${className}`} ref={ref}>
+        <div className={`relative perspective-1000 w-full max-w-sm ${className}`} ref={ref}>
             <motion.div
                 className="w-full h-full relative preserve-3d transition-transform duration-500"
                 animate={{ rotateY: isFlipped ? 180 : 0 }}
@@ -73,7 +73,7 @@ const DonorCard = forwardRef<HTMLDivElement, DonorCardProps>(({ user, className 
                     </div>
 
                     {/* Card Body: Blood Group & Stats */}
-                    <div className="relative flex items-center justify-between py-2 mb-4">
+                    <div className="relative flex items-center justify-between py-2 mb-6">
                         <div className="text-center">
                             <div className="text-5xl font-black text-slate-900 tracking-tighter leading-none">
                                 {user?.blood_group || "??"}
