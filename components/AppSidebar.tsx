@@ -14,7 +14,8 @@ import {
     Menu,
     X,
     HeartPulse,
-    Shield
+    Shield,
+    Award
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from './ui/Button';
@@ -35,6 +36,7 @@ export function AppSidebar() {
         { href: '/requests/my-requests', label: 'My Requests', icon: List },
         { href: '/donations', label: 'Donations', icon: HeartPulse },
         { href: '/nearby-donors', label: 'Find Donors', icon: MapPin },
+        { href: '/achievements', label: 'Achievements', icon: Award },
         { href: '/profile', label: 'Profile', icon: User },
     ];
 
@@ -62,8 +64,8 @@ export function AppSidebar() {
                 {navItems.map((item) => (
                     <Link key={item.href} href={item.href}>
                         <div className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 group ${isActive(item.href)
-                                ? 'bg-red-50 text-red-700 font-medium shadow-sm'
-                                : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                            ? 'bg-red-50 text-red-700 font-medium shadow-sm'
+                            : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
                             }`}>
                             <item.icon size={20} className={isActive(item.href) ? 'text-red-600' : 'text-gray-400 group-hover:text-gray-600'} />
                             <span>{item.label}</span>
