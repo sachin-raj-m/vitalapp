@@ -40,7 +40,7 @@ export default function ProfilePage() {
         window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
     };
 
-    const handleShare = async () => {
+    const handleDownload = async () => {
         if (!cardRef.current) return;
         try {
             const canvas = await html2canvas(cardRef.current, {
@@ -51,24 +51,13 @@ export default function ProfilePage() {
             });
 
             const dataUrl = canvas.toDataURL('image/png');
-            const blob = await (await fetch(dataUrl)).blob();
-            const file = new File([blob], 'vital-donor-card.png', { type: 'image/png' });
-
-            if (navigator.share && navigator.canShare({ files: [file] })) {
-                await navigator.share({
-                    title: 'My Vital Donor Card',
-                    text: `I'm a proud blood donor on Vital! Blood Group: ${user?.blood_group}`,
-                    files: [file]
-                });
-            } else {
-                const link = document.createElement('a');
-                link.href = dataUrl;
-                link.download = `Vital_Donor_Card_${user?.full_name || 'Member'}.png`;
-                link.click();
-            }
+            const link = document.createElement('a');
+            link.href = dataUrl;
+            link.download = `Vital_Donor_Card_${user?.full_name || 'Member'}.png`;
+            link.click();
         } catch (err) {
-            console.error('Share failed:', err);
-            alert('Could not share image. Trying to download instead...');
+            console.error('Download failed:', err);
+            alert('Could not generate image. Please try again.');
         }
     };
 
@@ -233,7 +222,7 @@ export default function ProfilePage() {
                                                 <div className="py-1">
                                                     <button
                                                         onClick={() => {
-                                                            handleShare();
+                                                            handleDownload();
                                                             setIsShareOpen(false);
                                                         }}
                                                         className="flex w-full items-center px-4 py-3 text-sm text-slate-700 hover:bg-slate-50 transition-colors gap-3"
