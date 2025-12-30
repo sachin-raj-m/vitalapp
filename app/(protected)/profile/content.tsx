@@ -480,14 +480,6 @@ export default function ProfilePage() {
                                         <ExternalLink className="w-4 h-4 mr-2" />
                                         Preview
                                     </Button>
-                                    <Button
-                                        size="sm"
-                                        onClick={handleLinkShare}
-                                        className="flex-1 md:flex-none bg-indigo-600 hover:bg-indigo-700 text-white h-10 md:h-11 shadow-sm shadow-indigo-200"
-                                    >
-                                        <Share className="w-4 h-4 mr-2" />
-                                        Share
-                                    </Button>
                                 </div>
                             </div>
                         </div>
