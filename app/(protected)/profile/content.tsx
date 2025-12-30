@@ -15,6 +15,7 @@ import { PushNotificationManager } from '@/components/PushNotificationManager';
 import { SecuritySettings } from './SecuritySettings';
 import type { BloodGroup } from '@/types';
 import { motion } from 'framer-motion';
+import DonorCard from '@/components/DonorCard';
 
 interface Stats {
     total_donations: number;
@@ -38,6 +39,13 @@ export default function ProfilePage() {
         present_zip: ''
     });
     const cardRef = useRef<HTMLDivElement>(null);
+
+    const handleLinkShare = () => {
+        if (!user?.id) return;
+        const url = `${window.location.origin}/donor/${user.id}`;
+        const text = `I'm a proud blood donor on Vital! Check out my official donor card here: ${url}`;
+        window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+    };
 
     const handleShare = async () => {
         if (!cardRef.current) return;
@@ -241,65 +249,41 @@ export default function ProfilePage() {
                                     Sign Out
                                 </Button>
                                 {user?.is_donor && (
-                                    <Button
-                                        onClick={handleShare}
-                                        className="bg-white text-red-700 font-bold hover:bg-red-50 shadow-lg border-2 border-transparent hover:border-red-100"
-                                    >
-                                        <Share className="w-4 h-4 mr-2" />
-                                        Share Impact
-                                    </Button>
+                                    <>
+                                        <Button
+                                            onClick={handleLinkShare}
+                                            className="bg-green-500 text-white font-bold hover:bg-green-600 shadow-lg border-0"
+                                        >
+                                            <Share className="w-4 h-4 mr-2" />
+                                            WhatsApp
+                                        </Button>
+                                        <Button
+                                            onClick={handleShare}
+                                            className="bg-white text-red-700 font-bold hover:bg-red-50 shadow-lg border-2 border-transparent hover:border-red-100"
+                                        >
+                                            <Download className="w-4 h-4 mr-2" />
+                                            Save Card
+                                        </Button>
+                                    </>
                                 )}
                             </div>
                         </div>
 
                         {/* RIGHT: Digital Donor Card */}
                         {/* RIGHT: Digital Donor Card */}
+                        {/* RIGHT: Digital Donor Card */}
                         <motion.div
-                            ref={cardRef}
                             initial={{ opacity: 0, rotateY: 90 }}
                             animate={{ opacity: 1, rotateY: 0 }}
                             transition={{ delay: 0.2, type: "spring" }}
-                            className="relative w-full max-w-md perspective-1000 group cursor-pointer"
+                            className="perspective-1000 group cursor-pointer"
                         >
-                            <div className="relative h-56 w-full rounded-2xl bg-white shadow-2xl overflow-hidden flex flex-col justify-between p-6">
-                                {/* Card Header */}
-                                <div className="flex justify-between items-start">
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-10 h-10 rounded-full bg-red-50 flex items-center justify-center">
-                                            <Droplet className="w-5 h-5 text-red-600 fill-current" />
-                                        </div>
-                                        <div>
-                                            <div className="text-[10px] text-slate-400 uppercase tracking-widest font-bold">Vital Member</div>
-                                            <div className="text-slate-900 font-bold text-sm">Official Donor Card</div>
-                                        </div>
-                                    </div>
-                                    {stats?.achievements && stats.achievements.length > 2 && <Award className="w-6 h-6 text-amber-500" />}
-                                </div>
-
-                                {/* Card Body */}
-                                <div className="text-center">
-                                    <div className="text-5xl font-black text-slate-900 tracking-tighter">
-                                        {user?.blood_group || "??"}
-                                    </div>
-                                    <div className="text-xs text-slate-500 font-medium mt-1">BLOOD GROUP</div>
-                                </div>
-
-                                {/* Card Footer */}
-                                <div className="flex justify-between items-end border-t border-slate-100 pt-4">
-                                    <div>
-                                        <div className="text-[10px] text-slate-400 uppercase mb-0.5">Holder Name</div>
-                                        <div className="text-slate-900 font-bold text-sm uppercase truncate max-w-[150px]">
-                                            {user?.full_name || "Unknown"}
-                                        </div>
-                                    </div>
-                                    <div className="text-right">
-                                        <div className="text-[10px] text-slate-400 uppercase mb-0.5">Donor ID</div>
-                                        <div className="font-mono text-slate-600 text-xs bg-slate-100 px-2 py-1 rounded">
-                                            {user?.id?.slice(0, 8).toUpperCase() || "--------"}
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
+                            <DonorCard
+                                ref={cardRef}
+                                user={user}
+                                showAchievements={true}
+                                achievementCount={stats?.achievements?.length || 0}
+                            />
                         </motion.div>
                     </div>
                 </div>
