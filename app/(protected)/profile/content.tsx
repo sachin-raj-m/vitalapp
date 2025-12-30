@@ -10,7 +10,7 @@ import { Alert } from '@/components/ui/Alert';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { fetchUserStats, calculateEligibility, type UserStats } from '@/lib/stats';
-import { Loader2, User, MapPin, Phone, Mail, Droplet, Award, Calendar, Settings, LogOut, Edit2, Check, X, Shield, Heart, Bell, Share, Download, ChevronDown, Star, Trophy } from 'lucide-react';
+import { Loader2, User, MapPin, Phone, Mail, Droplet, Award, Calendar, Settings, LogOut, Edit2, Check, X, Shield, Heart, Bell, Share, Download, ChevronDown, Star, Trophy, Globe, Copy, ExternalLink, Link as LinkIcon, Eye, EyeOff } from 'lucide-react';
 import html2canvas from 'html2canvas';
 
 import { PushNotificationManager } from '@/components/PushNotificationManager';
@@ -30,10 +30,22 @@ export default function ProfilePage() {
 
     const handleLinkShare = () => {
         if (!user?.id) return;
-        const shareId = user.donor_number || user.id;
-        const url = `${window.location.origin}/donor/${shareId}`;
+        const cleanName = (user?.full_name || 'User').replace(/[^a-zA-Z0-9]/g, '');
+        const uniqueId = user?.donor_number || user?.id;
+        const vanitySlug = `${cleanName}@${uniqueId}`;
+        const url = `${window.location.origin}/donor/${vanitySlug}`;
         const text = `I'm a proud blood donor on Vital! Check out my official donor card here: ${url}`;
         window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+    };
+
+    const togglePublicProfile = async (newValue: boolean) => {
+        try {
+            await updateProfile({ is_public_profile: newValue });
+            // Optimistic update if needed, but AuthContext should handle it
+        } catch (err) {
+            console.error('Failed to toggle visibility', err);
+            setError('Failed to update visibility settings');
+        }
     };
 
     const handleDownload = async () => {
@@ -386,6 +398,112 @@ export default function ProfilePage() {
             </div>
 
             {/* --- SETTINGS & CONTENT --- */}
+
+            {/* Public Identity Section - Prominent & Accessible */}
+            <div className="bg-white rounded-2xl p-6 md:p-8 shadow-sm border border-slate-100 relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-64 h-64 bg-slate-50 rounded-full -mr-20 -mt-20 pointer-events-none opacity-50"></div>
+
+                <div className="relative z-10">
+                    <div className="flex flex-col md:flex-row md:items-start justify-between gap-6 mb-6">
+                        <div>
+                            <div className="flex items-center gap-3 mb-2">
+                                <div className="p-2 bg-indigo-50 rounded-lg">
+                                    <Globe className="w-6 h-6 text-indigo-600" />
+                                </div>
+                                <h3 className="text-xl font-bold text-slate-900">Public Profile</h3>
+                            </div>
+                            <p className="text-slate-600 max-w-xl">
+                                Your public profile is your digital identity. Share it with partners like MuLearn or on social media to verify your donor status.
+                            </p>
+                        </div>
+
+                        <div className="flex items-center gap-3">
+                            <span className={`text-sm font-bold ${user?.is_public_profile ? 'text-green-600' : 'text-slate-400'}`}>
+                                {user?.is_public_profile ? 'Visible to Everyone' : 'Private'}
+                            </span>
+                            <label className="relative inline-flex items-center cursor-pointer">
+                                <input
+                                    type="checkbox"
+                                    checked={user?.is_public_profile || false}
+                                    onChange={(e) => togglePublicProfile(e.target.checked)}
+                                    className="sr-only peer"
+                                />
+                                <div className="w-14 h-8 bg-slate-200 peer-focus:outline-none ring-4 ring-transparent peer-focus:ring-indigo-100 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[4px] after:left-[4px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-indigo-600"></div>
+                            </label>
+                        </div>
+                    </div>
+
+                    {user?.is_public_profile ? (
+                        <div className="animate-in fade-in slide-in-from-top-4 duration-300">
+                            <div className="bg-slate-50 rounded-xl p-4 md:p-5 border border-slate-200 flex flex-col md:flex-row items-center gap-4">
+                                <div className="flex-1 w-full min-w-0">
+                                    <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 flex items-center gap-1">
+                                        <LinkIcon className="w-3 h-3" />
+                                        Your Public Link
+                                    </div>
+                                    <div className="font-mono text-sm md:text-base text-slate-700 truncate select-all bg-white px-3 py-2 rounded-lg border border-slate-200">
+                                        {(() => {
+                                            const cleanName = (user?.full_name || 'User').replace(/[^a-zA-Z0-9]/g, '');
+                                            const uniqueId = user?.donor_number || user?.id;
+                                            const vanitySlug = `${cleanName}@${uniqueId}`;
+                                            return typeof window !== 'undefined' ? `${window.location.origin}/donor/${vanitySlug}` : `/donor/${vanitySlug}`;
+                                        })()}
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-2 w-full md:w-auto">
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => {
+                                            const cleanName = (user?.full_name || 'User').replace(/[^a-zA-Z0-9]/g, '');
+                                            const uniqueId = user?.donor_number || user?.id;
+                                            const vanitySlug = `${cleanName}@${uniqueId}`;
+                                            navigator.clipboard.writeText(`${window.location.origin}/donor/${vanitySlug}`);
+                                            alert('Link copied to clipboard!');
+                                        }}
+                                        className="flex-1 md:flex-none h-10 md:h-11"
+                                    >
+                                        <Copy className="w-4 h-4 mr-2" />
+                                        Copy
+                                    </Button>
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => {
+                                            const cleanName = (user?.full_name || 'User').replace(/[^a-zA-Z0-9]/g, '');
+                                            const uniqueId = user?.donor_number || user?.id;
+                                            const vanitySlug = `${cleanName}@${uniqueId}`;
+                                            window.open(`/donor/${vanitySlug}`, '_blank');
+                                        }}
+                                        className="flex-1 md:flex-none h-10 md:h-11 hover:bg-indigo-50 hover:text-indigo-600 hover:border-indigo-200"
+                                    >
+                                        <ExternalLink className="w-4 h-4 mr-2" />
+                                        Preview
+                                    </Button>
+                                    <Button
+                                        size="sm"
+                                        onClick={handleLinkShare}
+                                        className="flex-1 md:flex-none bg-indigo-600 hover:bg-indigo-700 text-white h-10 md:h-11 shadow-sm shadow-indigo-200"
+                                    >
+                                        <Share className="w-4 h-4 mr-2" />
+                                        Share
+                                    </Button>
+                                </div>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="bg-amber-50 rounded-xl p-4 border border-amber-100 flex items-start gap-3">
+                            <div className="p-1.5 bg-amber-100 rounded-full mt-0.5">
+                                <EyeOff className="w-4 h-4 text-amber-600" />
+                            </div>
+                            <div>
+                                <h4 className="font-bold text-amber-900 text-sm">Profile is Private</h4>
+                                <p className="text-amber-700 text-sm mt-0.5">Your donor card is not visible to others. Enable public access to share your verified status.</p>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            </div>
 
 
             {/* --- COMPONENT SECTIONS --- */}
