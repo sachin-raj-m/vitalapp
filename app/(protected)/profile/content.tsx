@@ -160,9 +160,7 @@ export default function ProfilePage() {
             <div className="relative rounded-3xl overflow-hidden bg-white shadow-2xl">
                 {/* Aurora Mesh Background */}
                 <div className="absolute inset-0 z-0">
-                    <div className="absolute inset-0 bg-gradient-to-br from-rose-500 via-red-500 to-orange-600"></div>
-                    <div className="absolute top-[-50%] left-[-20%] w-[80%] h-[80%] rounded-full bg-purple-500 mix-blend-overlay filter blur-[100px] opacity-60 animate-pulse"></div>
-                    <div className="absolute bottom-[-20%] right-[-10%] w-[60%] h-[60%] rounded-full bg-yellow-400 mix-blend-overlay filter blur-[80px] opacity-40"></div>
+                    <div className="absolute inset-0 bg-gradient-to-r from-red-600 to-red-700"></div>
                 </div>
 
                 {/* Glassmorphism Content */}
@@ -210,48 +208,47 @@ export default function ProfilePage() {
                         </div>
 
                         {/* RIGHT: Digital Donor Card */}
+                        {/* RIGHT: Digital Donor Card */}
                         <motion.div
                             initial={{ opacity: 0, rotateY: 90 }}
                             animate={{ opacity: 1, rotateY: 0 }}
                             transition={{ delay: 0.2, type: "spring" }}
                             className="relative w-full max-w-md perspective-1000 group cursor-pointer"
                         >
-                            <div className="relative h-64 w-full rounded-2xl bg-gradient-to-br from-white/20 to-white/5 backdrop-blur-xl border border-white/30 shadow-2xl p-6 flex flex-col justify-between overflow-hidden transition-transform duration-500 group-hover:scale-[1.02]">
-                                {/* Card Shine Effect */}
-                                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000 z-0 pointer-events-none"></div>
-
+                            <div className="relative h-56 w-full rounded-2xl bg-white shadow-2xl overflow-hidden flex flex-col justify-between p-6">
                                 {/* Card Header */}
-                                <div className="flex justify-between items-start z-10">
+                                <div className="flex justify-between items-start">
                                     <div className="flex items-center gap-3">
-                                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-red-500 to-rose-600 flex items-center justify-center shadow-inner border border-white/20">
-                                            <Droplet className="w-5 h-5 text-white fill-current" />
+                                        <div className="w-10 h-10 rounded-full bg-red-50 flex items-center justify-center">
+                                            <Droplet className="w-5 h-5 text-red-600 fill-current" />
                                         </div>
                                         <div>
-                                            <div className="text-xs text-white/70 uppercase tracking-widest font-bold">Vital Membership</div>
-                                            <div className="text-white font-semibold">Standard Access</div>
+                                            <div className="text-[10px] text-slate-400 uppercase tracking-widest font-bold">Vital Member</div>
+                                            <div className="text-slate-900 font-bold text-sm">Official Donor Card</div>
                                         </div>
                                     </div>
-                                    <Award className="w-8 h-8 text-yellow-300 drop-shadow-md" />
+                                    {stats?.achievements && stats.achievements.length > 2 && <Award className="w-6 h-6 text-amber-500" />}
                                 </div>
 
                                 {/* Card Body */}
-                                <div className="z-10 text-center py-4">
-                                    <div className="text-5xl font-mono font-bold text-white tracking-widest drop-shadow-sm">
+                                <div className="text-center">
+                                    <div className="text-5xl font-black text-slate-900 tracking-tighter">
                                         {user?.blood_group || "??"}
                                     </div>
+                                    <div className="text-xs text-slate-500 font-medium mt-1">BLOOD GROUP</div>
                                 </div>
 
                                 {/* Card Footer */}
-                                <div className="flex justify-between items-end z-10">
+                                <div className="flex justify-between items-end border-t border-slate-100 pt-4">
                                     <div>
-                                        <div className="text-xs text-white/60 uppercase mb-1">Holder</div>
-                                        <div className="text-white font-medium text-lg tracking-wide uppercase truncate max-w-[200px]">
+                                        <div className="text-[10px] text-slate-400 uppercase mb-0.5">Holder Name</div>
+                                        <div className="text-slate-900 font-bold text-sm uppercase truncate max-w-[150px]">
                                             {user?.full_name || "Unknown"}
                                         </div>
                                     </div>
                                     <div className="text-right">
-                                        <div className="text-xs text-white/60 uppercase mb-1">Donor ID</div>
-                                        <div className="font-mono text-white/90 text-sm">
+                                        <div className="text-[10px] text-slate-400 uppercase mb-0.5">Donor ID</div>
+                                        <div className="font-mono text-slate-600 text-xs bg-slate-100 px-2 py-1 rounded">
                                             {user?.id?.slice(0, 8).toUpperCase() || "--------"}
                                         </div>
                                     </div>
@@ -322,115 +319,119 @@ export default function ProfilePage() {
                     <Award className="w-5 h-5 text-amber-500" />
                     Your Hall of Fame
                 </h3>
-                {stats?.achievements && stats.achievements.length > 0 ? (
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                        {stats.achievements.map((achievement, index) => {
-                            // Assign icons based on achievement name (simple heuristic)
-                            const isDonor = achievement.includes('Donor');
-                            const isLife = achievement.includes('Life');
+                {
+                    stats?.achievements && stats.achievements.length > 0 ? (
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            {stats.achievements.map((achievement, index) => {
+                                // Assign icons based on achievement name (simple heuristic)
+                                const isDonor = achievement.includes('Donor');
+                                const isLife = achievement.includes('Life');
 
-                            return (
-                                <motion.div
-                                    key={index}
-                                    initial={{ opacity: 0, scale: 0.9 }}
-                                    animate={{ opacity: 1, scale: 1 }}
-                                    transition={{ delay: 0.1 * index }}
-                                    className="relative group p-6 rounded-2xl border border-slate-200 bg-white hover:border-amber-300 hover:shadow-lg transition-all text-center flex flex-col items-center justify-center gap-3"
-                                >
-                                    <div className="w-14 h-14 rounded-full bg-amber-50 flex items-center justify-center group-hover:bg-amber-100 transition-colors">
-                                        {isDonor ? <Droplet className="text-amber-600 w-7 h-7" /> :
-                                            isLife ? <Heart className="text-red-500 w-7 h-7" /> :
-                                                <Award className="text-amber-600 w-7 h-7" />}
-                                    </div>
-                                    <span className="font-bold text-slate-900 group-hover:text-amber-700 transition-colors">{achievement}</span>
-                                </motion.div>
-                            )
-                        })}
-                    </div>
-                ) : (
-                    <div className="p-8 border-2 border-dashed border-slate-200 rounded-2xl text-center text-slate-500">
-                        <p>No badges yet. Complete your first donation to earn the "First Blood" badge!</p>
-                    </div>
-                )}
-            </div>
+                                return (
+                                    <motion.div
+                                        key={index}
+                                        initial={{ opacity: 0, scale: 0.9 }}
+                                        animate={{ opacity: 1, scale: 1 }}
+                                        transition={{ delay: 0.1 * index }}
+                                        className="relative group p-6 rounded-2xl border border-slate-200 bg-white hover:border-amber-300 hover:shadow-lg transition-all text-center flex flex-col items-center justify-center gap-3"
+                                    >
+                                        <div className="w-14 h-14 rounded-full bg-amber-50 flex items-center justify-center group-hover:bg-amber-100 transition-colors">
+                                            {isDonor ? <Droplet className="text-amber-600 w-7 h-7" /> :
+                                                isLife ? <Heart className="text-red-500 w-7 h-7" /> :
+                                                    <Award className="text-amber-600 w-7 h-7" />}
+                                        </div>
+                                        <span className="font-bold text-slate-900 group-hover:text-amber-700 transition-colors">{achievement}</span>
+                                    </motion.div>
+                                )
+                            })}
+                        </div>
+                    ) : (
+                        <div className="p-8 border-2 border-dashed border-slate-200 rounded-2xl text-center text-slate-500">
+                            <p>No badges yet. Complete your first donation to earn the "First Blood" badge!</p>
+                        </div>
+                    )
+                }
+            </div >
 
             {/* --- SETTINGS & CONTENT --- */}
-            {isEditing && (
-                <motion.div
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: 'auto' }}
-                    exit={{ opacity: 0, height: 0 }}
-                    className="overflow-hidden"
-                >
-                    <Card className="border-red-100 shadow-xl">
-                        <CardHeader className="bg-red-50/50 border-b border-red-50">
-                            <h2 className="text-xl font-semibold text-red-900">Update Your Details</h2>
-                        </CardHeader>
-                        <CardBody className="p-6">
-                            <form onSubmit={handleEdit} className="space-y-6">
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    <Input
-                                        label="Full Name"
-                                        value={editForm.full_name}
-                                        onChange={(e) => setEditForm({ ...editForm, full_name: e.target.value })}
-                                        required
-                                        className="h-11"
-                                    />
-                                    <Input
-                                        label="Phone"
-                                        value={editForm.phone}
-                                        onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
-                                        required
-                                        className="h-11"
-                                    />
-                                </div>
+            {
+                isEditing && (
+                    <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                        className="overflow-hidden"
+                    >
+                        <Card className="border-red-100 shadow-xl">
+                            <CardHeader className="bg-red-50/50 border-b border-red-50">
+                                <h2 className="text-xl font-semibold text-red-900">Update Your Details</h2>
+                            </CardHeader>
+                            <CardBody className="p-6">
+                                <form onSubmit={handleEdit} className="space-y-6">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        <Input
+                                            label="Full Name"
+                                            value={editForm.full_name}
+                                            onChange={(e) => setEditForm({ ...editForm, full_name: e.target.value })}
+                                            required
+                                            className="h-11"
+                                        />
+                                        <Input
+                                            label="Phone"
+                                            value={editForm.phone}
+                                            onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
+                                            required
+                                            className="h-11"
+                                        />
+                                    </div>
 
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    <Input
-                                        label="Permanent Zip Code"
-                                        value={editForm.permanent_zip}
-                                        onChange={(e) => setEditForm({ ...editForm, permanent_zip: e.target.value })}
-                                        required
-                                        placeholder="e.g. 560001"
-                                        className="h-11"
-                                    />
-                                    <Input
-                                        label="Present Zip Code"
-                                        value={editForm.present_zip}
-                                        onChange={(e) => setEditForm({ ...editForm, present_zip: e.target.value })}
-                                        required
-                                        placeholder="e.g. 560001"
-                                        className="h-11"
-                                    />
-                                </div>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        <Input
+                                            label="Permanent Zip Code"
+                                            value={editForm.permanent_zip}
+                                            onChange={(e) => setEditForm({ ...editForm, permanent_zip: e.target.value })}
+                                            required
+                                            placeholder="e.g. 560001"
+                                            className="h-11"
+                                        />
+                                        <Input
+                                            label="Present Zip Code"
+                                            value={editForm.present_zip}
+                                            onChange={(e) => setEditForm({ ...editForm, present_zip: e.target.value })}
+                                            required
+                                            placeholder="e.g. 560001"
+                                            className="h-11"
+                                        />
+                                    </div>
 
-                                <div className="flex items-center space-x-3 p-4 bg-gray-50 rounded-xl border border-gray-100">
-                                    <input
-                                        type="checkbox"
-                                        id="is_available"
-                                        checked={editForm.is_available}
-                                        onChange={(e) => setEditForm({ ...editForm, is_available: e.target.checked })}
-                                        className="w-5 h-5 rounded border-gray-300 text-red-600 focus:ring-red-500"
-                                    />
-                                    <label htmlFor="is_available" className="text-sm font-medium text-gray-700 cursor-pointer select-none">
-                                        I am available for blood donation
-                                    </label>
-                                </div>
+                                    <div className="flex items-center space-x-3 p-4 bg-gray-50 rounded-xl border border-gray-100">
+                                        <input
+                                            type="checkbox"
+                                            id="is_available"
+                                            checked={editForm.is_available}
+                                            onChange={(e) => setEditForm({ ...editForm, is_available: e.target.checked })}
+                                            className="w-5 h-5 rounded border-gray-300 text-red-600 focus:ring-red-500"
+                                        />
+                                        <label htmlFor="is_available" className="text-sm font-medium text-gray-700 cursor-pointer select-none">
+                                            I am available for blood donation
+                                        </label>
+                                    </div>
 
-                                <div className="flex space-x-4 pt-2">
-                                    <Button type="submit" size="lg" className="flex-1 bg-red-600 hover:bg-red-700 text-white font-bold">
-                                        <Check className="h-5 w-5 mr-2" />
-                                        Save Changes
-                                    </Button>
-                                    <Button type="button" size="lg" variant="outline" onClick={() => setIsEditing(false)}>
-                                        Cancel
-                                    </Button>
-                                </div>
-                            </form>
-                        </CardBody>
-                    </Card>
-                </motion.div>
-            )}
+                                    <div className="flex space-x-4 pt-2">
+                                        <Button type="submit" size="lg" className="flex-1 bg-red-600 hover:bg-red-700 text-white font-bold">
+                                            <Check className="h-5 w-5 mr-2" />
+                                            Save Changes
+                                        </Button>
+                                        <Button type="button" size="lg" variant="outline" onClick={() => setIsEditing(false)}>
+                                            Cancel
+                                        </Button>
+                                    </div>
+                                </form>
+                            </CardBody>
+                        </Card>
+                    </motion.div>
+                )
+            }
 
             {/* --- COMPONENT SECTIONS --- */}
             <div className="grid md:grid-cols-2 gap-8">
@@ -487,23 +488,56 @@ export default function ProfilePage() {
                 </div>
             </div>
 
-            {/* --- DANGER ZONE --- */}
-            <div className="pt-8 border-t border-slate-200">
-                <Button variant="ghost" className="text-slate-400 hover:text-red-600 hover:bg-red-50 w-full" onClick={async () => {
-                    if (confirm('Are you ABSOLUTELY sure? This action cannot be undone.')) {
-                        try {
-                            const res = await fetch('/api/auth/delete', { method: 'POST' });
-                            if (!res.ok) throw new Error('Deletion failed');
-                            await signOut();
-                            router.push('/login');
-                        } catch (e) {
-                            alert('Failed to delete account. Please try again.');
-                        }
-                    }
-                }}>
-                    <LogOut className="w-4 h-4 mr-2" />
-                    Sign Out / Delete Account
-                </Button>
+            {/* --- DANGER ZONE & SIGN OUT --- */}
+            <div className="pt-8 border-t border-slate-200 mt-12 space-y-8">
+
+                <div className="flex justify-end">
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-slate-500 hover:text-slate-900"
+                        onClick={() => signOut()}
+                    >
+                        <LogOut className="w-4 h-4 mr-2" />
+                        Sign Out
+                    </Button>
+                </div>
+
+                <div className="rounded-xl border border-red-200 bg-red-50 p-6">
+                    <div className="flex items-start gap-4">
+                        <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center shrink-0">
+                            <Shield className="w-5 h-5 text-red-600" />
+                        </div>
+                        <div className="space-y-3 flex-1">
+                            <div>
+                                <h4 className="text-base font-bold text-red-900">Danger Zone</h4>
+                                <p className="text-sm text-red-700 mt-1 leading-relaxed">
+                                    Permanently delete your account and all data. This action cannot be undone.
+                                </p>
+                            </div>
+                            <Button
+                                size="sm"
+                                className="bg-white border border-red-200 text-red-600 hover:bg-red-600 hover:text-white transition-colors shadow-sm"
+                                onClick={async () => {
+                                    if (confirm('CRITICAL WARNING: You are about to permanently delete your account.\n\nType "DELETE" to confirm.')) {
+                                        if (confirm('Are you absolutely sure? There is no going back.')) {
+                                            try {
+                                                const res = await fetch('/api/auth/delete', { method: 'POST' });
+                                                if (!res.ok) throw new Error('Deletion failed');
+                                                await signOut();
+                                                router.push('/login');
+                                            } catch (e) {
+                                                alert('Failed to delete account. Please try again.');
+                                            }
+                                        }
+                                    }
+                                }}
+                            >
+                                Delete My Account
+                            </Button>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     );
