@@ -418,14 +418,6 @@ export default function ProfilePage() {
             <div className="grid md:grid-cols-2 gap-8">
                 <div>
                     <div className="mb-4">
-                        <h3 className="text-lg font-bold text-slate-900">Account Security</h3>
-                        <p className="text-slate-500 text-sm">Manage how you access your account.</p>
-                    </div>
-                    <SecuritySettings />
-                </div>
-
-                <div>
-                    <div className="mb-4">
                         <h3 className="text-lg font-bold text-slate-900">Preferences</h3>
                         <p className="text-slate-500 text-sm">Customize your notification experience.</p>
                     </div>
