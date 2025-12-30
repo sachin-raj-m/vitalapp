@@ -35,7 +35,6 @@ export default function ProfilePage() {
 
     const handleLinkShare = () => {
         if (!user?.id) return;
-        // @ts-ignore - user type might need update
         const shareId = user.donor_number || user.id;
         const url = `${window.location.origin}/donor/${shareId}`;
         const text = `I'm a proud blood donor on Vital! Check out my official donor card here: ${url}`;
@@ -311,6 +310,7 @@ export default function ProfilePage() {
                                 showAchievements={true}
                                 achievementCount={stats?.achievements?.length || 0}
                                 totalDonations={stats?.total_donations || 0}
+                                donorNumber={user?.donor_number}
                             />
                         </motion.div>
                     </div>

@@ -28,6 +28,7 @@ export interface User {
   };
   role?: 'user' | 'admin' | string;
   donor_pin?: string;
+  donor_number?: number;
   created_at: string;
 }
 
