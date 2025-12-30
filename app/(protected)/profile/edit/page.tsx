@@ -53,12 +53,11 @@ export default function ProfileEditPage() {
         setIsLoading(true);
 
         try {
-            console.log('Current phone:', user?.phone);
-            console.log('New phone:', editForm.phone);
+
 
             // Check if phone number changed
             if (editForm.phone !== user?.phone) {
-                console.log('Phone changed, initiating OTP verification...');
+
 
                 // Initiate Phone Verification
                 const { error: authError } = await supabase.auth.updateUser({
@@ -70,7 +69,7 @@ export default function ProfileEditPage() {
                     throw authError;
                 }
 
-                console.log('OTP sent successfully, showing modal');
+
                 setPendingPhone(editForm.phone);
                 setIsVerifying(true);
                 setIsLoading(false);
@@ -79,7 +78,6 @@ export default function ProfileEditPage() {
             }
 
             // Normal update without phone change
-            console.log('No phone change, updating profile normally');
             await updateProfile({
                 full_name: editForm.full_name,
                 is_available: editForm.is_available,
