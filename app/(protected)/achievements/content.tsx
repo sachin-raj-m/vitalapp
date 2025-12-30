@@ -3,17 +3,9 @@
 import React, { useEffect, useState } from 'react';
 import { Card, CardBody } from '@/components/ui/Card';
 import { useAuth } from '@/context/AuthContext';
-import { supabase } from '@/lib/supabase';
+import { fetchUserStats, fetchDetailedAchievements, type AchievementData } from '@/lib/stats';
 import { Award, Droplet, Heart, Lock, Calendar, Trophy } from 'lucide-react';
 import { motion } from 'framer-motion';
-
-interface AchievementData {
-    name: string;
-    unlocked: boolean;
-    unlockedDate?: string;
-    description: string;
-    icon: string;
-}
 
 export default function AchievementsPage() {
     const { user } = useAuth();
@@ -25,93 +17,23 @@ export default function AchievementsPage() {
 
     useEffect(() => {
         if (user?.id) {
-            fetchAchievements();
-            fetchStats();
+            loadData();
         }
     }, [user]);
 
-    const fetchStats = async () => {
-        const { data: donations } = await supabase
-            .from('donations')
-            .select('*')
-            .eq('donor_id', user?.id);
+    const loadData = async () => {
+        if (!user?.id) return;
 
-        const { data: requests } = await supabase
-            .from('blood_requests')
-            .select('*')
-            .eq('requested_by', user?.id);
+        const [userStats, detailedAchievements] = await Promise.all([
+            fetchUserStats(user.id),
+            fetchDetailedAchievements(user.id)
+        ]);
 
         setStats({
-            total_donations: donations?.length || 0,
-            total_requests: requests?.length || 0,
+            total_donations: userStats.total_donations,
+            total_requests: userStats.total_requests,
         });
-    };
-
-    const fetchAchievements = async () => {
-        const { data: donations } = await supabase
-            .from('donations')
-            .select('*, blood_requests(*)')
-            .eq('donor_id', user?.id)
-            .order('donation_date', { ascending: true });
-
-        const achievementsList: AchievementData[] = [];
-
-        // First Time Donor
-        if (donations && donations.length > 0) {
-            achievementsList.push({
-                name: 'First Time Donor',
-                unlocked: true,
-                unlockedDate: donations[0].donation_date,
-                description: 'Completed your first blood donation',
-                icon: 'droplet'
-            });
-        } else {
-            achievementsList.push({
-                name: 'First Time Donor',
-                unlocked: false,
-                description: 'Complete your first blood donation',
-                icon: 'droplet'
-            });
-        }
-
-        // Regular Donor (5+ donations)
-        if (donations && donations.length >= 5) {
-            achievementsList.push({
-                name: 'Regular Donor',
-                unlocked: true,
-                unlockedDate: donations[4].donation_date,
-                description: 'Donated blood 5 times',
-                icon: 'droplet'
-            });
-        } else {
-            achievementsList.push({
-                name: 'Regular Donor',
-                unlocked: false,
-                description: `Donate blood 5 times (${donations?.length || 0}/5)`,
-                icon: 'droplet'
-            });
-        }
-
-        // Life Saver (urgent request)
-        const urgentDonation = donations?.find(d => d.blood_requests?.urgency_level === 'critical');
-        if (urgentDonation) {
-            achievementsList.push({
-                name: 'Life Saver',
-                unlocked: true,
-                unlockedDate: urgentDonation.donation_date,
-                description: 'Responded to an urgent request',
-                icon: 'heart'
-            });
-        } else {
-            achievementsList.push({
-                name: 'Life Saver',
-                unlocked: false,
-                description: 'Respond to an urgent blood request',
-                icon: 'heart'
-            });
-        }
-
-        setAchievements(achievementsList);
+        setAchievements(detailedAchievements);
     };
 
     const getIconComponent = (iconType: string, unlocked: boolean) => {
@@ -183,10 +105,10 @@ export default function AchievementsPage() {
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ delay: index * 0.1 }}
                         >
-                            <Card className={`border-2 ${achievement.unlocked ? 'border-amber-300 bg-amber-50/30' : 'border-slate-200 opacity-60'} transition-all hover:shadow-lg`}>
+                            <Card className={`border - 2 ${achievement.unlocked ? 'border-amber-300 bg-amber-50/30' : 'border-slate-200 opacity-60'} transition - all hover: shadow - lg`}>
                                 <CardBody className="p-6">
                                     <div className="flex items-start gap-4">
-                                        <div className={`w-16 h-16 rounded-full flex items-center justify-center ${achievement.unlocked ? 'bg-amber-100' : 'bg-slate-100'}`}>
+                                        <div className={`w - 16 h - 16 rounded - full flex items - center justify - center ${achievement.unlocked ? 'bg-amber-100' : 'bg-slate-100'} `}>
                                             {achievement.unlocked ? (
                                                 getIconComponent(achievement.icon, true)
                                             ) : (
@@ -194,7 +116,7 @@ export default function AchievementsPage() {
                                             )}
                                         </div>
                                         <div className="flex-1">
-                                            <h3 className={`font-bold text-lg mb-1 ${achievement.unlocked ? 'text-slate-900' : 'text-slate-400'}`}>
+                                            <h3 className={`font - bold text - lg mb - 1 ${achievement.unlocked ? 'text-slate-900' : 'text-slate-400'} `}>
                                                 {achievement.name}
                                             </h3>
                                             <p className="text-sm text-slate-600 mb-3">
