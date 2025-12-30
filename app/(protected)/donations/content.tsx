@@ -11,6 +11,9 @@ import { Button } from '@/components/ui/Button';
 import { Alert } from '@/components/ui/Alert';
 import { EmptyState } from '@/components/EmptyState';
 
+import { ConfirmationModal } from '@/components/ui/ConfirmationModal';
+import { toast } from 'sonner';
+
 interface DonationWithRequest {
     id: string;
     created_at: string;
@@ -28,6 +31,7 @@ export default function DonationsPage() {
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState('');
     const [withdrawingId, setWithdrawingId] = useState<string | null>(null);
+    const [donationToWithdraw, setDonationToWithdraw] = useState<string | null>(null);
     const [filter, setFilter] = useState<'all' | 'pending' | 'verified' | 'closed'>('all');
 
     useEffect(() => {
@@ -69,30 +73,32 @@ export default function DonationsPage() {
         fetchDonations();
     }, [user]);
 
-    const handleWithdraw = async (donationId: string) => {
-        if (!confirm('Are you sure you want to withdraw this donation offer?')) return;
+    const performWithdraw = async () => {
+        if (!donationToWithdraw) return;
 
-        setWithdrawingId(donationId);
+        setWithdrawingId(donationToWithdraw);
         try {
             const { error } = await supabase
                 .from('donations')
                 .update({ status: 'cancelled' })
-                .eq('id', donationId);
+                .eq('id', donationToWithdraw);
 
             if (error) throw error;
 
             // Update local state
             setDonations(prev => prev.map(d =>
-                d.id === donationId ? { ...d, status: 'cancelled' } : d
+                d.id === donationToWithdraw ? { ...d, status: 'cancelled' } : d
             ));
 
             // Refresh global context to update "Offer Sent" buttons elsewhere
             await refreshRequests();
+            toast.success("Donation offer withdrawn successfully");
         } catch (err: any) {
             console.error('Error withdrawing donation', err);
-            setError('Failed to withdraw donation');
+            toast.error('Failed to withdraw donation');
         } finally {
             setWithdrawingId(null);
+            setDonationToWithdraw(null);
         }
     };
 
@@ -256,7 +262,7 @@ export default function DonationsPage() {
                                                     variant="outline"
                                                     size="sm"
                                                     className="text-red-600 border-red-200 hover:bg-red-50"
-                                                    onClick={() => handleWithdraw(donation.id)}
+                                                    onClick={() => setDonationToWithdraw(donation.id)}
                                                     isLoading={withdrawingId === donation.id}
                                                 >
                                                     Withdraw
@@ -270,6 +276,17 @@ export default function DonationsPage() {
                     )}
                 </CardBody>
             </Card>
+
+            <ConfirmationModal
+                isOpen={!!donationToWithdraw}
+                onClose={() => setDonationToWithdraw(null)}
+                onConfirm={performWithdraw}
+                title="Withdraw Donation Offer"
+                description="Are you sure you want to withdraw this donation offer? The requester will be notified."
+                confirmText="Withdraw Offer"
+                variant="danger"
+                isLoading={!!withdrawingId}
+            />
         </div>
     );
 }
