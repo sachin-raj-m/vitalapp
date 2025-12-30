@@ -16,7 +16,7 @@ const DonorCard = forwardRef<HTMLDivElement, DonorCardProps>(({ user, className 
     return (
         <div
             ref={ref}
-            className={`relative w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col justify-between p-6 ${className}`}
+            className={`relative w-full max-w-sm aspect-[1.586/1] bg-white rounded-2xl shadow-xl overflow-hidden flex flex-col justify-between p-6 ${className}`}
         >
             {/* Card Header */}
             <div className="flex justify-between items-start">
