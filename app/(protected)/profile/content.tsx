@@ -30,15 +30,7 @@ export default function ProfilePage() {
     const [stats, setStats] = useState<Stats | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState('');
-    const [isEditing, setIsEditing] = useState(false);
     const [isShareOpen, setIsShareOpen] = useState(false);
-    const [editForm, setEditForm] = useState({
-        full_name: '',
-        phone: '',
-        is_available: false,
-        permanent_zip: '',
-        present_zip: ''
-    });
     const cardRef = useRef<HTMLDivElement>(null);
 
     const handleLinkShare = () => {
@@ -82,13 +74,6 @@ export default function ProfilePage() {
 
     useEffect(() => {
         if (user) {
-            setEditForm({
-                full_name: user.full_name || '',
-                phone: user.phone || '',
-                is_available: user.is_available || false,
-                permanent_zip: user.permanent_zip || '',
-                present_zip: user.present_zip || ''
-            });
             loadStats();
         }
     }, [user]);
@@ -135,24 +120,7 @@ export default function ProfilePage() {
         }
     };
 
-    const handleEdit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setError('');
 
-        try {
-            await updateProfile({
-                full_name: editForm.full_name,
-                phone: editForm.phone,
-                is_available: editForm.is_available,
-                permanent_zip: editForm.permanent_zip,
-                present_zip: editForm.present_zip
-            });
-            setIsEditing(false);
-        } catch (err: any) {
-            console.error('Error updating profile');
-            setError('Failed to update profile');
-        }
-    };
 
     const handleSignOut = async () => {
         try {
@@ -236,7 +204,7 @@ export default function ProfilePage() {
 
                             <div className="flex flex-wrap gap-4 justify-center lg:justify-start">
                                 <Button
-                                    onClick={() => setIsEditing(!isEditing)}
+                                    onClick={() => router.push('/profile/edit')}
                                     className="bg-white/10 hover:bg-white/25 text-white border border-white/40 backdrop-blur-md"
                                 >
                                     <Settings className="w-4 h-4 mr-2" />
@@ -416,84 +384,7 @@ export default function ProfilePage() {
             </div >
 
             {/* --- SETTINGS & CONTENT --- */}
-            {
-                isEditing && (
-                    <motion.div
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: 'auto' }}
-                        exit={{ opacity: 0, height: 0 }}
-                        className="overflow-hidden"
-                    >
-                        <Card className="border-red-100 shadow-xl">
-                            <CardHeader className="bg-red-50/50 border-b border-red-50">
-                                <h2 className="text-xl font-semibold text-red-900">Update Your Details</h2>
-                            </CardHeader>
-                            <CardBody className="p-6">
-                                <form onSubmit={handleEdit} className="space-y-6">
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                        <Input
-                                            label="Full Name"
-                                            value={editForm.full_name}
-                                            onChange={(e) => setEditForm({ ...editForm, full_name: e.target.value })}
-                                            required
-                                            className="h-11"
-                                        />
-                                        <Input
-                                            label="Phone"
-                                            value={editForm.phone}
-                                            onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
-                                            required
-                                            className="h-11"
-                                        />
-                                    </div>
 
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                        <Input
-                                            label="Permanent Zip Code"
-                                            value={editForm.permanent_zip}
-                                            onChange={(e) => setEditForm({ ...editForm, permanent_zip: e.target.value })}
-                                            required
-                                            placeholder="e.g. 560001"
-                                            className="h-11"
-                                        />
-                                        <Input
-                                            label="Present Zip Code"
-                                            value={editForm.present_zip}
-                                            onChange={(e) => setEditForm({ ...editForm, present_zip: e.target.value })}
-                                            required
-                                            placeholder="e.g. 560001"
-                                            className="h-11"
-                                        />
-                                    </div>
-
-                                    <div className="flex items-center space-x-3 p-4 bg-gray-50 rounded-xl border border-gray-100">
-                                        <input
-                                            type="checkbox"
-                                            id="is_available"
-                                            checked={editForm.is_available}
-                                            onChange={(e) => setEditForm({ ...editForm, is_available: e.target.checked })}
-                                            className="w-5 h-5 rounded border-gray-300 text-red-600 focus:ring-red-500"
-                                        />
-                                        <label htmlFor="is_available" className="text-sm font-medium text-gray-700 cursor-pointer select-none">
-                                            I am available for blood donation
-                                        </label>
-                                    </div>
-
-                                    <div className="flex space-x-4 pt-2">
-                                        <Button type="submit" size="lg" className="flex-1 bg-red-600 hover:bg-red-700 text-white font-bold">
-                                            <Check className="h-5 w-5 mr-2" />
-                                            Save Changes
-                                        </Button>
-                                        <Button type="button" size="lg" variant="outline" onClick={() => setIsEditing(false)}>
-                                            Cancel
-                                        </Button>
-                                    </div>
-                                </form>
-                            </CardBody>
-                        </Card>
-                    </motion.div>
-                )
-            }
 
             {/* --- COMPONENT SECTIONS --- */}
             <div className="grid md:grid-cols-2 gap-8">
