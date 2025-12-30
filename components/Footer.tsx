@@ -9,22 +9,31 @@ import { AuthModal } from './AuthModal';
 
 
 export const Footer: React.FC = () => {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
   const router = useRouter();
   const [showAuthModal, setShowAuthModal] = useState(false);
   const pathname = usePathname();
 
-  // Hide footer on protected app routes and public donor pages
-  const isAppRoute = pathname?.startsWith('/dashboard') ||
+  // 1. Strictly Hide on Public Profile (Custom Layout)
+  if (pathname?.startsWith('/donor')) return null;
+
+  // 2. Strictly Hide on Protected Routes (Sidebar is present)
+  const isProtectedRoute =
+    pathname?.startsWith('/dashboard') ||
     pathname?.startsWith('/admin') ||
-    pathname?.startsWith('/requests') ||
     pathname?.startsWith('/profile') ||
     pathname?.startsWith('/nearby-donors') ||
     pathname?.startsWith('/achievements') ||
-    pathname?.startsWith('/donations') ||
-    pathname?.startsWith('/donor');
+    pathname?.startsWith('/donations');
 
-  if (isAppRoute) return null; // Hide on app routes
+  if (isProtectedRoute) return null;
+
+  // 3. Hybrid Routes (e.g. Requests)
+  // If user is logged in, they see Sidebar. If guest, they see Footer.
+  const isHybridRoute = pathname?.startsWith('/requests');
+
+  if (isHybridRoute && user && !loading) return null;
+
 
   const handleRequestBlood = (e: React.MouseEvent) => {
     e.preventDefault();
