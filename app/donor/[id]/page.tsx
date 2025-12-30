@@ -11,13 +11,14 @@ import { Lock, Shield, ArrowLeft } from 'lucide-react';
 export const revalidate = 0;
 
 interface Props {
-    params: {
+    params: Promise<{
         id: string;
-    };
+    }>;
 }
 
 export async function generateMetadata({ params }: Props) {
-    const { id } = params;
+    // CRITICAL: In Next.js 15+, params is a Promise!
+    const { id } = await params;
     const decodedId = decodeURIComponent(id);
     const displayName = decodedId.split('@')[0];
 
@@ -110,9 +111,12 @@ function PrivateProfilePage({ displayName }: { displayName: string }) {
 }
 
 export default async function PublicDonorPage({ params }: Props) {
-    const { id } = params;
+    // CRITICAL: In Next.js 15+, params is a Promise!
+    const { id } = await params;
     const decodedId = decodeURIComponent(id);
     const displayName = decodedId.split('@')[0] || 'This user';
+
+    console.log('🚀 PublicDonorPage: Starting with id:', id);
 
     // Parse the vanity slug
     const parsed = parseSlugToLookupId(decodedId);
@@ -121,6 +125,8 @@ export default async function PublicDonorPage({ params }: Props) {
         return notFound();
     }
     const { lookupId, isUuid, isDonorNumber } = parsed;
+
+    console.log('🔍 Parsed:', { lookupId, isUuid, isDonorNumber });
 
     // Create Supabase client
     const cookieStore = await cookies();
@@ -153,16 +159,15 @@ export default async function PublicDonorPage({ params }: Props) {
     const { data: profile, error } = await query.single();
 
     // Debug logging
-    console.log('🔍 PublicDonorPage Debug:');
-    console.log('   - Slug:', decodedId);
-    console.log('   - Lookup ID:', lookupId);
+    console.log('🔍 Query Result:');
     console.log('   - Current User:', currentUser?.id || 'anonymous');
     console.log('   - Profile Found:', !!profile);
+    console.log('   - Profile Data:', profile);
     console.log('   - Error:', error?.message || 'none');
 
     // Profile not found - return 404
     if (error || !profile) {
-        console.error('❌ Profile not found:', error);
+        console.error('❌ Profile not found. Error:', error);
         return notFound();
     }
 
@@ -175,6 +180,8 @@ export default async function PublicDonorPage({ params }: Props) {
     // Check visibility: Is the profile public OR is the viewer the owner?
     const isOwner = currentUser?.id === profile.id;
     const isPublic = profile.is_public_profile === true;
+
+    console.log('🔐 Visibility Check:', { isOwner, isPublic, profileId: profile.id });
 
     if (!isPublic && !isOwner) {
         // Profile is private and viewer is not the owner
