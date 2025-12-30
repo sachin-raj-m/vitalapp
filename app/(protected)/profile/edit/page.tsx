@@ -256,13 +256,24 @@ export default function ProfileEditPage() {
                                         <p className="text-xs font-bold text-slate-500 uppercase mb-2">Your Public Profile Link</p>
                                         <div className="flex items-center gap-2">
                                             <div className="flex-1 bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-600 font-mono truncate select-all">
-                                                {typeof window !== 'undefined' ? `${window.location.origin}/donor/${user?.id}` : `/donor/${user?.id}`}
+                                                {(() => {
+                                                    const cleanName = (user?.full_name || 'User').replace(/[^a-zA-Z0-9]/g, '');
+                                                    const uniqueId = user?.donor_number || user?.id; // Prefer donor number
+                                                    const vanitySlug = `${cleanName}@${uniqueId}`;
+                                                    const url = typeof window !== 'undefined' ? `${window.location.origin}/donor/${vanitySlug}` : `/donor/${vanitySlug}`;
+                                                    return url;
+                                                })()}
                                             </div>
                                             <Button
                                                 type="button"
                                                 size="sm"
                                                 variant="outline"
-                                                onClick={() => window.open(`/donor/${user?.id}`, '_blank')}
+                                                onClick={() => {
+                                                    const cleanName = (user?.full_name || 'User').replace(/[^a-zA-Z0-9]/g, '');
+                                                    const uniqueId = user?.donor_number || user?.id;
+                                                    const vanitySlug = `${cleanName}@${uniqueId}`;
+                                                    window.open(`/donor/${vanitySlug}`, '_blank');
+                                                }}
                                                 className="shrink-0"
                                             >
                                                 Open
