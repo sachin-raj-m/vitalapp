@@ -18,16 +18,17 @@ export function Header() {
   const closeMenu = () => setIsMenuOpen(false);
 
   // Hide header on protected app routes where Sidebar is used
-  // Adjust this list as needed to match exact Sidebar scope
+  // Also hide on public donor profile pages for clean display
   const isAppRoute = pathname?.startsWith('/dashboard') ||
     pathname?.startsWith('/admin') ||
     pathname?.startsWith('/requests') ||
     pathname?.startsWith('/profile') ||
     pathname?.startsWith('/nearby-donors') ||
     pathname?.startsWith('/achievements') ||
-    pathname?.startsWith('/donations');
+    pathname?.startsWith('/donations') ||
+    pathname?.startsWith('/donor');
 
-  if (isAppRoute && user) return null;
+  if (isAppRoute) return null;
 
   return (
     <header className="bg-white border-b border-gray-200 sticky top-0 z-50">
