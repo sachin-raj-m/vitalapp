@@ -5,12 +5,23 @@ import { useAuth } from '@/context/AuthContext';
 import { AppSidebar } from '@/components/AppSidebar';
 import { VerificationBanner } from '@/components/VerificationBanner';
 
+import { Header } from '@/components/Header';
+import { Footer } from '@/components/Footer';
+
 export function SidebarWrapper({ children }: { children: React.ReactNode }) {
     const { user, loading } = useAuth();
 
-    // If not logged in, render children normally (RootLayout handles Header/Footer)
+    // If not logged in, render with Public Header/Footer (since RootLayout no longer provides them)
     if (loading || !user) {
-        return <div className="container mx-auto px-4 py-8">{children}</div>;
+        return (
+            <>
+                <Header />
+                <main className="flex-grow">
+                    <div className="container mx-auto px-4 py-8">{children}</div>
+                </main>
+                <Footer />
+            </>
+        );
     }
 
     // If logged in, wrap in Sidebar Layout

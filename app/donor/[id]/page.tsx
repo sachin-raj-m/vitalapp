@@ -5,7 +5,7 @@ import { notFound } from 'next/navigation';
 import DonorCard from '@/components/DonorCard';
 import { Button } from '@/components/ui/Button';
 import Link from 'next/link';
-import { Lock, Shield, ArrowLeft, Heart, HeartPulse } from 'lucide-react';
+import { Lock, Shield, ArrowLeft, HeartPulse } from 'lucide-react';
 import { calculateAchievements } from '@/lib/stats';
 
 // Set revalidation time to 0 for instant updates
@@ -59,7 +59,7 @@ function parseSlugToLookupId(slug: string): { lookupId: string; isUuid: boolean;
 // Private Profile Component
 function PrivateProfilePage({ displayName }: { displayName: string }) {
     return (
-        <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4 relative overflow-hidden">
+        <div className="h-screen w-screen bg-slate-50 flex flex-col items-center justify-center p-4 relative overflow-hidden">
             <div className="absolute inset-0 pointer-events-none">
                 <div className="absolute top-[-20%] left-[-10%] w-[60%] h-[60%] bg-slate-200 rounded-full mix-blend-multiply filter blur-3xl opacity-30"></div>
                 <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-slate-300 rounded-full mix-blend-multiply filter blur-3xl opacity-30"></div>
@@ -75,18 +75,6 @@ function PrivateProfilePage({ displayName }: { displayName: string }) {
                 <p className="text-slate-600">
                     <span className="font-semibold">{displayName}</span> has chosen to keep their donor profile private.
                 </p>
-
-                <div className="bg-white p-4 rounded-xl border border-slate-200 text-left w-full">
-                    <div className="flex items-start gap-3">
-                        <Shield className="w-5 h-5 text-green-500 mt-0.5 flex-shrink-0" />
-                        <div>
-                            <h3 className="font-semibold text-slate-800 text-sm">Privacy Protected</h3>
-                            <p className="text-slate-500 text-xs mt-1">
-                                Vital respects donor privacy. Profile owners control who can see their information.
-                            </p>
-                        </div>
-                    </div>
-                </div>
 
                 <div className="pt-4 space-y-3 w-full">
                     <Link href="/register" className="block w-full">
@@ -186,42 +174,41 @@ export default async function PublicDonorPage({ params }: Props) {
     const unlockedAchievements = allAchievements.filter(a => a.unlocked);
 
     return (
-        <div className="min-h-screen bg-slate-50 flex flex-col p-4 relative overflow-hidden">
+        <div className="h-screen w-screen bg-slate-50 flex flex-col p-6 overflow-hidden relative">
             {/* Background Mesh */}
             <div className="absolute inset-0 pointer-events-none">
                 <div className="absolute top-[-20%] left-[-10%] w-[60%] h-[60%] bg-red-100 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob"></div>
                 <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-orange-100 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob animation-delay-2000"></div>
             </div>
 
-            {/* Custom Navbar */}
-            <header className="relative z-20 w-full max-w-7xl mx-auto flex items-center justify-between py-6 px-4">
-                <Link href="/" className="flex items-center group">
-                    <HeartPulse className="h-8 w-8 mr-2 text-red-600 animate-pulse-slow" />
-                    <span className="text-2xl font-bold text-slate-900 tracking-tight">Vital</span>
+            {/* Custom Navbar - Extreme Edges */}
+            <header className="relative z-20 w-full flex items-center justify-between">
+                <Link href="/" className="flex items-center gap-2 group hover:opacity-80 transition-opacity">
+                    <HeartPulse className="h-6 w-6 text-red-600" />
+                    <span className="text-lg font-bold text-slate-900 tracking-tight">Vital</span>
                 </Link>
 
                 <Link href="/register">
-                    <Button className="bg-red-600 hover:bg-red-700 text-white shadow-lg shadow-red-200 rounded-full px-8 py-6 text-lg font-semibold transition-all hover:scale-105">
+                    <Button size="sm" className="bg-slate-900 hover:bg-slate-800 text-white rounded-full px-5 h-9 font-medium shadow-sm text-sm transition-transform hover:scale-105">
                         Become a Donor
                     </Button>
                 </Link>
             </header>
 
             {/* Main Content - Centered Card with Pulse Effect */}
-            <main className="flex-grow flex flex-col items-center justify-center relative z-10 w-full py-10 px-4">
+            <main className="flex-grow flex flex-col items-center justify-center relative z-10 w-full pb-10">
 
                 {/* Visual Connection / Tagline */}
                 <div className="mb-8 text-center animate-in fade-in slide-in-from-bottom-4 duration-700">
-                    <h2 className="text-slate-500 font-medium text-lg tracking-wide uppercase text-xs mb-2">Join the Circle of Life</h2>
-                    <p className="text-slate-900 font-bold text-2xl md:text-3xl">
+                    <h2 className="text-slate-400 font-medium tracking-widest uppercase text-[10px] mb-2">The Circle of Life</h2>
+                    <p className="text-slate-900 font-bold text-xl md:text-2xl">
                         {profile.full_name?.split(' ')[0]} is making a difference.
                     </p>
                 </div>
 
                 <div className="relative w-full max-w-sm group">
                     {/* Living Pulse Effect around the card */}
-                    <div className="absolute -inset-4 bg-red-500/20 rounded-[2.5rem] blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-1000 animate-pulse"></div>
-                    <div className="absolute -inset-1 bg-gradient-to-br from-red-100 to-orange-100 rounded-[2rem] blur opacity-50"></div>
+                    <div className="absolute -inset-4 bg-red-500/10 rounded-[2.5rem] blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-1000 animate-pulse"></div>
 
                     <div className="transform transition-all duration-500 hover:scale-[1.02] relative">
                         <DonorCard
@@ -236,15 +223,10 @@ export default async function PublicDonorPage({ params }: Props) {
                     </div>
                 </div>
 
-                <p className="mt-8 text-slate-400 text-sm max-w-xs text-center">
-                    Every donation can save up to three lives. <br />
-                    <Link href="/how-it-works" className="text-red-600 hover:underline font-medium">See how it works &rarr;</Link>
+                <p className="mt-8 text-slate-400 text-xs max-w-xs text-center animate-in fade-in duration-1000 delay-500">
+                    Valid Donor Card • Verifiable on Vital Network
                 </p>
             </main>
-
-            <footer className="relative z-10 text-center text-slate-400 text-xs py-6">
-                &copy; {new Date().getFullYear()} Vital App. All rights reserved.
-            </footer>
         </div>
     );
 }
