@@ -14,6 +14,7 @@ export default function ProfileEditPage() {
     const router = useRouter();
     const { user, updateProfile } = useAuth();
     const [error, setError] = useState('');
+    const [success, setSuccess] = useState('');
     const [isLoading, setIsLoading] = useState(false);
 
     const [editForm, setEditForm] = useState({
@@ -85,8 +86,6 @@ export default function ProfileEditPage() {
         setError('');
         setIsLoading(true);
 
-        console.log('Verifying OTP for phone:', pendingPhone);
-
         try {
             const { data, error: verifyError } = await supabase.auth.verifyOtp({
                 phone: pendingPhone,
@@ -94,27 +93,23 @@ export default function ProfileEditPage() {
                 type: 'phone_change'
             });
 
-            if (verifyError) {
-                console.error('Supabase verifyOtp error:', verifyError);
-                throw verifyError;
-            }
-
-            console.log('OTP verified successfully:', data);
+            if (verifyError) throw verifyError;
 
             // Update remaining profile details
             await updateProfile({
                 full_name: editForm.full_name,
-                phone: pendingPhone, // Explicitly set new phone in profiles table
+                phone: pendingPhone,
                 is_available: editForm.is_available,
                 permanent_zip: editForm.permanent_zip,
                 present_zip: editForm.present_zip
             });
 
-            console.log('Profile updated successfully, redirecting...');
-            alert('Phone number verified and profile updated successfully!');
-            router.push('/profile');
+            setSuccess('Phone number verified successfully!');
+            setIsVerifying(false);
+
+            // Redirect after brief delay to show success message
+            setTimeout(() => router.push('/profile'), 1500);
         } catch (err: any) {
-            console.error('Error verifying OTP/Profile:', err);
             setError(err.message || 'Invalid verification code');
             setIsLoading(false);
         }
@@ -139,6 +134,12 @@ export default function ProfileEditPage() {
             {error && (
                 <Alert variant="error" className="mb-6">
                     {error}
+                </Alert>
+            )}
+
+            {success && (
+                <Alert variant="success" className="mb-6">
+                    {success}
                 </Alert>
             )}
 
