@@ -111,21 +111,25 @@ const DonorCard = forwardRef<HTMLDivElement, DonorCardProps>(({ user, className 
                 </div>
             </div>
 
-            {/* Badges Section (Internal) */}
+            {/* Badges Section (Detailed List) */}
             {badges.length > 0 && (
-                <div className="relative z-10 w-full my-1">
-                    <div className="text-[9px] text-slate-400 uppercase font-bold tracking-wider mb-2 text-center">Earned Badges</div>
-                    <div className="flex justify-center gap-2 flex-wrap">
-                        {badges.slice(0, 4).map((badge) => (
-                            <div key={badge.id} className={`p-1.5 rounded-full ring-1 ${getBadgeColor(badge.icon)}`} title={badge.name}>
-                                {getBadgeIcon(badge.icon)}
+                <div className="relative z-10 w-full mt-2 mb-1 bg-slate-50/80 rounded-2xl p-4 border border-slate-100">
+                    <div className="flex items-center gap-2 mb-3">
+                        <Award className="w-4 h-4 text-slate-400" />
+                        <div className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Achievements</div>
+                    </div>
+                    <div className="flex flex-col gap-3">
+                        {badges.map((badge) => (
+                            <div key={badge.id} className="flex items-start gap-3 group">
+                                <div className={`p-2 rounded-full ring-1 shrink-0 ${getBadgeColor(badge.icon)} group-hover:scale-110 transition-transform`}>
+                                    {getBadgeIcon(badge.icon)}
+                                </div>
+                                <div className="flex flex-col pt-0.5">
+                                    <span className="text-xs font-bold text-slate-800 leading-none mb-1 group-hover:text-red-600 transition-colors">{badge.name}</span>
+                                    <span className="text-[10px] text-slate-500 leading-tight">{badge.motto}</span>
+                                </div>
                             </div>
                         ))}
-                        {badges.length > 4 && (
-                            <div className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center text-[10px] font-bold text-slate-500 ring-1 ring-slate-100">
-                                +{badges.length - 4}
-                            </div>
-                        )}
                     </div>
                 </div>
             )}
