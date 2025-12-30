@@ -5,6 +5,7 @@ import { notFound } from 'next/navigation';
 import DonorCard from '@/components/DonorCard';
 import { Button } from '@/components/ui/Button';
 import Link from 'next/link';
+import { Lock, Shield, ArrowLeft } from 'lucide-react';
 
 // Set revalidation time to 0 for instant updates
 export const revalidate = 0;
@@ -54,18 +55,74 @@ function parseSlugToLookupId(slug: string): { lookupId: string; isUuid: boolean;
     return { lookupId, isUuid, isDonorNumber };
 }
 
+// Private Profile Component
+function PrivateProfilePage({ displayName }: { displayName: string }) {
+    return (
+        <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4 relative overflow-hidden">
+            <div className="absolute inset-0 pointer-events-none">
+                <div className="absolute top-[-20%] left-[-10%] w-[60%] h-[60%] bg-slate-200 rounded-full mix-blend-multiply filter blur-3xl opacity-30"></div>
+                <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-slate-300 rounded-full mix-blend-multiply filter blur-3xl opacity-30"></div>
+            </div>
+
+            <main className="relative z-10 w-full max-w-md flex flex-col items-center text-center space-y-6 p-8">
+                <div className="p-4 bg-slate-100 rounded-full">
+                    <Lock className="w-12 h-12 text-slate-400" />
+                </div>
+
+                <h1 className="text-2xl font-bold text-slate-800">Profile is Private</h1>
+
+                <p className="text-slate-600">
+                    <span className="font-semibold">{displayName}</span> has chosen to keep their donor profile private.
+                </p>
+
+                <div className="bg-white p-4 rounded-xl border border-slate-200 text-left w-full">
+                    <div className="flex items-start gap-3">
+                        <Shield className="w-5 h-5 text-green-500 mt-0.5 flex-shrink-0" />
+                        <div>
+                            <h3 className="font-semibold text-slate-800 text-sm">Privacy Protected</h3>
+                            <p className="text-slate-500 text-xs mt-1">
+                                Vital respects donor privacy. Profile owners control who can see their information.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="pt-4 space-y-3 w-full">
+                    <Link href="/register" className="block w-full">
+                        <Button size="lg" className="w-full bg-red-600 hover:bg-red-700 text-white">
+                            Become a Donor
+                        </Button>
+                    </Link>
+                    <Link href="/" className="block w-full">
+                        <Button size="lg" variant="outline" className="w-full">
+                            <ArrowLeft className="w-4 h-4 mr-2" />
+                            Go to Home
+                        </Button>
+                    </Link>
+                </div>
+            </main>
+
+            <footer className="absolute bottom-6 text-slate-400 text-xs">
+                &copy; {new Date().getFullYear()} Vital App. All rights reserved.
+            </footer>
+        </div>
+    );
+}
+
 export default async function PublicDonorPage({ params }: Props) {
     const { id } = params;
     const decodedId = decodeURIComponent(id);
+    const displayName = decodedId.split('@')[0] || 'This user';
 
     // Parse the vanity slug
     const parsed = parseSlugToLookupId(decodedId);
     if (!parsed) {
+        console.error('❌ Invalid slug format:', decodedId);
         return notFound();
     }
     const { lookupId, isUuid, isDonorNumber } = parsed;
 
-    // Create Supabase client with cookies (for authenticated access)
+    // Create Supabase client
     const cookieStore = await cookies();
     const supabase = createServerClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -79,55 +136,49 @@ export default async function PublicDonorPage({ params }: Props) {
         }
     );
 
-    // Build the query
-    const buildQuery = (client: typeof supabase) => {
-        let query = client
-            .from('profiles')
-            .select('id, full_name, blood_group, is_donor, donor_number, is_public_profile');
+    // Get current user (if logged in)
+    const { data: { user: currentUser } } = await supabase.auth.getUser();
 
-        if (isUuid) {
-            query = query.eq('id', lookupId);
-        } else if (isDonorNumber) {
-            query = query.eq('donor_number', parseInt(lookupId));
-        }
+    // Build and execute query
+    let query = supabase
+        .from('profiles')
+        .select('id, full_name, blood_group, is_donor, donor_number, is_public_profile');
 
-        return query.single();
-    };
-
-    // Try fetching the profile
-    let { data: profile, error } = await buildQuery(supabase);
-
-    // If the first attempt fails (RLS denied), try again with a fresh anonymous client.
-    // This handles the case where the server session is missing/stale.
-    if (error && error.code === 'PGRST116') { // PGRST116 = "no rows returned"
-        console.warn('⚠️ Initial query failed (likely RLS), trying anonymous fallback...');
-
-        // Create an anonymous client (no cookies)
-        const anonClient = createServerClient(
-            process.env.NEXT_PUBLIC_SUPABASE_URL!,
-            process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-            {
-                cookies: {
-                    get() { return undefined; },
-                },
-            }
-        );
-
-        const fallback = await buildQuery(anonClient);
-        profile = fallback.data;
-        error = fallback.error;
+    if (isUuid) {
+        query = query.eq('id', lookupId);
+    } else if (isDonorNumber) {
+        query = query.eq('donor_number', parseInt(lookupId));
     }
 
-    // Still no profile? Return 404
+    const { data: profile, error } = await query.single();
+
+    // Debug logging
+    console.log('🔍 PublicDonorPage Debug:');
+    console.log('   - Slug:', decodedId);
+    console.log('   - Lookup ID:', lookupId);
+    console.log('   - Current User:', currentUser?.id || 'anonymous');
+    console.log('   - Profile Found:', !!profile);
+    console.log('   - Error:', error?.message || 'none');
+
+    // Profile not found - return 404
     if (error || !profile) {
-        console.error('❌ Public Profile Fetch Failed:', error);
-        console.error('❌ Lookup ID:', lookupId);
+        console.error('❌ Profile not found:', error);
         return notFound();
     }
 
     // Only show for donors
     if (!profile.is_donor) {
+        console.error('❌ Not a donor');
         return notFound();
+    }
+
+    // Check visibility: Is the profile public OR is the viewer the owner?
+    const isOwner = currentUser?.id === profile.id;
+    const isPublic = profile.is_public_profile === true;
+
+    if (!isPublic && !isOwner) {
+        // Profile is private and viewer is not the owner
+        return <PrivateProfilePage displayName={displayName} />;
     }
 
     // Fetch donation count
