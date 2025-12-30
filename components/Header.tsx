@@ -17,18 +17,28 @@ export function Header() {
   const toggleMenu = () => setIsMenuOpen(!isMenuOpen);
   const closeMenu = () => setIsMenuOpen(false);
 
-  // Hide header on protected app routes where Sidebar is used
-  // Also hide on public donor profile pages for clean display
-  const isAppRoute = pathname?.startsWith('/dashboard') ||
+  // 1. Strictly Hide on Public Profile (Custom Layout)
+  if (pathname?.startsWith('/donor')) return null;
+
+  // 2. Strictly Hide on Protected Routes (Sidebar is present)
+  // These routes are guarded, so if user is here, they are logged in (or redirecting).
+  const isProtectedRoute =
+    pathname?.startsWith('/dashboard') ||
     pathname?.startsWith('/admin') ||
-    pathname?.startsWith('/requests') ||
     pathname?.startsWith('/profile') ||
     pathname?.startsWith('/nearby-donors') ||
     pathname?.startsWith('/achievements') ||
-    pathname?.startsWith('/donations') ||
-    pathname?.startsWith('/donor');
+    pathname?.startsWith('/donations');
 
-  if (isAppRoute) return null;
+  if (isProtectedRoute) return null;
+
+  // 3. Hybrid Routes (e.g. Requests)
+  // If user is logged in, they see Sidebar. If guest, they see Header.
+  const isHybridRoute = pathname?.startsWith('/requests');
+
+  if (isHybridRoute && user) return null;
+
+  // For other routes (Home, Login, Register), show Header.
 
   return (
     <header className="bg-white border-b border-gray-200 sticky top-0 z-50">

@@ -5,7 +5,7 @@ import { notFound } from 'next/navigation';
 import DonorCard from '@/components/DonorCard';
 import { Button } from '@/components/ui/Button';
 import Link from 'next/link';
-import { Lock, Shield, ArrowLeft, Heart } from 'lucide-react';
+import { Lock, Shield, ArrowLeft, Heart, HeartPulse } from 'lucide-react';
 import { calculateAchievements } from '@/lib/stats';
 
 // Set revalidation time to 0 for instant updates
@@ -194,34 +194,52 @@ export default async function PublicDonorPage({ params }: Props) {
             </div>
 
             {/* Custom Navbar */}
-            <header className="relative z-20 w-full max-w-7xl mx-auto flex items-center justify-between py-4 px-2">
-                <Link href="/" className="flex items-center gap-2 group">
-                    <div className="bg-red-600 rounded-lg p-1.5 transition-transform group-hover:scale-105">
-                        <Heart className="w-5 h-5 text-white fill-current" />
-                    </div>
-                    <span className="text-xl font-bold text-slate-900 tracking-tight">Vital</span>
+            <header className="relative z-20 w-full max-w-7xl mx-auto flex items-center justify-between py-6 px-4">
+                <Link href="/" className="flex items-center group">
+                    <HeartPulse className="h-8 w-8 mr-2 text-red-600 animate-pulse-slow" />
+                    <span className="text-2xl font-bold text-slate-900 tracking-tight">Vital</span>
                 </Link>
 
                 <Link href="/register">
-                    <Button className="bg-red-600 hover:bg-red-700 text-white shadow-md shadow-red-100 rounded-full px-6">
+                    <Button className="bg-red-600 hover:bg-red-700 text-white shadow-lg shadow-red-200 rounded-full px-8 py-6 text-lg font-semibold transition-all hover:scale-105">
                         Become a Donor
                     </Button>
                 </Link>
             </header>
 
-            {/* Main Content - Centered Card Only */}
-            <main className="flex-grow flex items-center justify-center relative z-10 w-full py-10">
-                <div className="w-full max-w-sm transform transition-all duration-500 hover:scale-[1.01]">
-                    <DonorCard
-                        user={profile}
-                        showAchievements={unlockedAchievements.length > 0}
-                        achievementCount={unlockedAchievements.length}
-                        totalDonations={donationCount}
-                        donorNumber={profile.donor_number}
-                        badges={unlockedAchievements}
-                        className="shadow-2xl shadow-slate-200/50"
-                    />
+            {/* Main Content - Centered Card with Pulse Effect */}
+            <main className="flex-grow flex flex-col items-center justify-center relative z-10 w-full py-10 px-4">
+
+                {/* Visual Connection / Tagline */}
+                <div className="mb-8 text-center animate-in fade-in slide-in-from-bottom-4 duration-700">
+                    <h2 className="text-slate-500 font-medium text-lg tracking-wide uppercase text-xs mb-2">Join the Circle of Life</h2>
+                    <p className="text-slate-900 font-bold text-2xl md:text-3xl">
+                        {profile.full_name?.split(' ')[0]} is making a difference.
+                    </p>
                 </div>
+
+                <div className="relative w-full max-w-sm group">
+                    {/* Living Pulse Effect around the card */}
+                    <div className="absolute -inset-4 bg-red-500/20 rounded-[2.5rem] blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-1000 animate-pulse"></div>
+                    <div className="absolute -inset-1 bg-gradient-to-br from-red-100 to-orange-100 rounded-[2rem] blur opacity-50"></div>
+
+                    <div className="transform transition-all duration-500 hover:scale-[1.02] relative">
+                        <DonorCard
+                            user={profile}
+                            showAchievements={unlockedAchievements.length > 0}
+                            achievementCount={unlockedAchievements.length}
+                            totalDonations={donationCount}
+                            donorNumber={profile.donor_number}
+                            badges={unlockedAchievements}
+                            className="shadow-2xl shadow-slate-200/50"
+                        />
+                    </div>
+                </div>
+
+                <p className="mt-8 text-slate-400 text-sm max-w-xs text-center">
+                    Every donation can save up to three lives. <br />
+                    <Link href="/how-it-works" className="text-red-600 hover:underline font-medium">See how it works &rarr;</Link>
+                </p>
             </main>
 
             <footer className="relative z-10 text-center text-slate-400 text-xs py-6">
