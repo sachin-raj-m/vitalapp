@@ -51,12 +51,8 @@ export const VerificationBanner = () => {
     };
 
     const handleVerifyPhone = async () => {
-        // Phone verification via OTP usually requires a more complex UI (modal to enter code)
-        // For this banner, we might just trigger the OTP send
-        // But without an input field, user can't verify.
-        // So maybe this button should redirect to profile?
-        // Let's make it redirect to profile for now.
-        window.location.href = '/profile';
+        // Redirect to profile edit page where user can update and verify phone
+        window.location.href = '/profile/edit';
     };
 
     return (
