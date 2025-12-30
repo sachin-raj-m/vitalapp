@@ -5,19 +5,19 @@ import { notFound } from 'next/navigation';
 import DonorCard from '@/components/DonorCard';
 import { Button } from '@/components/ui/Button';
 import Link from 'next/link';
-import { Lock, Shield, ArrowLeft } from 'lucide-react';
+import { Lock, Shield, ArrowLeft, Droplet, Award, Star, Trophy, Heart } from 'lucide-react';
+import { calculateAchievements } from '@/lib/stats';
 
 // Set revalidation time to 0 for instant updates
 export const revalidate = 0;
 
 interface Props {
     params: Promise<{
-        id: string;
+        id: string; // Next.js 15+ params are Promises
     }>;
 }
 
 export async function generateMetadata({ params }: Props) {
-    // CRITICAL: In Next.js 15+, params is a Promise!
     const { id } = await params;
     const decodedId = decodeURIComponent(id);
     const displayName = decodedId.split('@')[0];
@@ -55,6 +55,29 @@ function parseSlugToLookupId(slug: string): { lookupId: string; isUuid: boolean;
 
     return { lookupId, isUuid, isDonorNumber };
 }
+
+// Icon mapping helper
+const getBadgeIcon = (iconName: string) => {
+    switch (iconName) {
+        case 'droplet': return <Droplet className="w-6 h-6" />;
+        case 'shield': return <Shield className="w-6 h-6" />;
+        case 'star': return <Star className="w-6 h-6" />;
+        case 'trophy': return <Trophy className="w-6 h-6" />;
+        case 'heart': return <Heart className="w-5 h-5 fill-current" />;
+        default: return <Award className="w-6 h-6" />;
+    }
+};
+
+const getBadgeColor = (iconName: string) => {
+    switch (iconName) {
+        case 'droplet': return 'text-red-500 bg-red-50 ring-red-100';
+        case 'shield': return 'text-amber-700 bg-amber-50 ring-amber-100'; // Bronze
+        case 'star': return 'text-slate-400 bg-slate-50 ring-slate-200'; // Silver
+        case 'trophy': return 'text-yellow-500 bg-yellow-50 ring-yellow-100'; // Gold
+        case 'heart': return 'text-rose-500 bg-rose-50 ring-rose-100';
+        default: return 'text-blue-500 bg-blue-50 ring-blue-100';
+    }
+};
 
 // Private Profile Component
 function PrivateProfilePage({ displayName }: { displayName: string }) {
@@ -111,7 +134,6 @@ function PrivateProfilePage({ displayName }: { displayName: string }) {
 }
 
 export default async function PublicDonorPage({ params }: Props) {
-    // CRITICAL: In Next.js 15+, params is a Promise!
     const { id } = await params;
     const decodedId = decodeURIComponent(id);
     const displayName = decodedId.split('@')[0] || 'This user';
@@ -125,8 +147,6 @@ export default async function PublicDonorPage({ params }: Props) {
         return notFound();
     }
     const { lookupId, isUuid, isDonorNumber } = parsed;
-
-    console.log('🔍 Parsed:', { lookupId, isUuid, isDonorNumber });
 
     // Create Supabase client
     const cookieStore = await cookies();
@@ -158,13 +178,6 @@ export default async function PublicDonorPage({ params }: Props) {
 
     const { data: profile, error } = await query.single();
 
-    // Debug logging
-    console.log('🔍 Query Result:');
-    console.log('   - Current User:', currentUser?.id || 'anonymous');
-    console.log('   - Profile Found:', !!profile);
-    console.log('   - Profile Data:', profile);
-    console.log('   - Error:', error?.message || 'none');
-
     // Profile not found - return 404
     if (error || !profile) {
         console.error('❌ Profile not found. Error:', error);
@@ -181,26 +194,25 @@ export default async function PublicDonorPage({ params }: Props) {
     const isOwner = currentUser?.id === profile.id;
     const isPublic = profile.is_public_profile === true;
 
-    console.log('🔐 Visibility Check:', { isOwner, isPublic, profileId: profile.id });
-
     if (!isPublic && !isOwner) {
         // Profile is private and viewer is not the owner
         return <PrivateProfilePage displayName={displayName} />;
     }
 
-    // Fetch donations with details for stats
+    // Fetch Full Donation Stats for Badges
+    // NOTE: RLS must allow reading these donations!
     const { data: donations } = await supabase
         .from('donations')
-        .select('id, status, created_at')
-        .eq('donor_id', profile.id);
+        .select('created_at, status, blood_requests(urgency_level)')
+        .eq('donor_id', profile.id)
+        .order('created_at', { ascending: false });
 
     const completedDonations = (donations || []).filter(d => d.status === 'completed');
     const donationCount = completedDonations.length;
 
-    // Calculate achievements based on donation count
-    // Badge thresholds: 1 (First Drop), 3 (Bronze), 5 (Silver), 10 (Gold), 25 (Platinum), 50 (Diamond), 100 (Legend)
-    const badgeThresholds = [1, 3, 5, 10, 25, 50, 100];
-    const achievementCount = badgeThresholds.filter(t => donationCount >= t).length;
+    // Calculate Achievements safely
+    const allAchievements = calculateAchievements(donations || []);
+    const unlockedAchievements = allAchievements.filter(a => a.unlocked);
 
     return (
         <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4 relative overflow-hidden">
@@ -210,9 +222,9 @@ export default async function PublicDonorPage({ params }: Props) {
                 <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-orange-200 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob animation-delay-2000"></div>
             </div>
 
-            <main className="relative z-10 w-full max-w-md flex flex-col items-center space-y-8">
+            <main className="relative z-10 w-full max-w-md flex flex-col items-center space-y-8 pb-10">
                 {/* Logo */}
-                <div className="flex items-center gap-2 mb-4">
+                <div className="flex items-center gap-2 mb-2">
                     <div className="bg-red-600 rounded-lg p-2">
                         <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.384-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
@@ -225,16 +237,40 @@ export default async function PublicDonorPage({ params }: Props) {
                 <div className="w-full transform hover:scale-105 transition-transform duration-300">
                     <DonorCard
                         user={profile}
-                        showAchievements={achievementCount > 0}
-                        achievementCount={achievementCount}
+                        showAchievements={unlockedAchievements.length > 0}
+                        achievementCount={unlockedAchievements.length}
                         totalDonations={donationCount}
                         donorNumber={profile.donor_number}
                         className="shadow-xl"
                     />
                 </div>
 
+                {/* Badges Section */}
+                {unlockedAchievements.length > 0 && (
+                    <div className="w-full animate-in slide-in-from-bottom-5 fade-in duration-700 delay-200">
+                        <div className="flex items-center gap-2 mb-3 px-1">
+                            <Award className="w-4 h-4 text-slate-400" />
+                            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Earned Badges</h3>
+                        </div>
+                        <div className="grid grid-cols-3 gap-3">
+                            {unlockedAchievements.map((badge) => (
+                                <div
+                                    key={badge.id}
+                                    className="bg-white rounded-xl p-3 flex flex-col items-center text-center shadow-sm border border-slate-100 hover:shadow-md transition-shadow"
+                                >
+                                    <div className={`p-2 rounded-full mb-2 ring-1 ${getBadgeColor(badge.icon)}`}>
+                                        {getBadgeIcon(badge.icon)}
+                                    </div>
+                                    <span className="text-xs font-bold text-slate-800 leading-tight">{badge.name}</span>
+                                    <span className="text-[10px] text-slate-400 mt-1 line-clamp-2 leading-none">{badge.motto}</span>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
                 {/* CTA */}
-                <div className="text-center space-y-4 max-w-xs">
+                <div className="text-center space-y-4 max-w-xs mt-4">
                     <h2 className="text-xl font-bold text-slate-800">
                         Join {profile.full_name?.split(' ')[0]} in saving lives.
                     </h2>
@@ -249,7 +285,7 @@ export default async function PublicDonorPage({ params }: Props) {
                 </div>
             </main>
 
-            <footer className="absolute bottom-6 text-slate-400 text-xs">
+            <footer className="absolute bottom-6 text-slate-400 text-xs text-center w-full">
                 &copy; {new Date().getFullYear()} Vital App. All rights reserved.
             </footer>
         </div>
