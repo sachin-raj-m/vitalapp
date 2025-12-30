@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/Button';
 import { Alert } from '@/components/ui/Alert';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
-import { Loader2, User, MapPin, Phone, Mail, Droplet, Award, Calendar, Settings, LogOut, Edit2, Check, X, Shield, Heart, Bell } from 'lucide-react';
+import { Loader2, User, MapPin, Phone, Mail, Droplet, Award, Calendar, Settings, LogOut, Edit2, Check, X, Shield, Heart, Bell, Share } from 'lucide-react';
 import { PushNotificationManager } from '@/components/PushNotificationManager';
 import { SecuritySettings } from './SecuritySettings';
 import type { BloodGroup } from '@/types';
@@ -119,134 +119,254 @@ export default function ProfilePage() {
         }
     };
 
+    // Eligibility Logic
+    const getEligibilityStatus = (lastDate: string | null) => {
+        if (!lastDate) return { isEligible: true, daysRemaining: 0, distinctText: "You are eligible to donate today!" };
+
+        const last = new Date(lastDate);
+        const nextDate = new Date(last);
+        nextDate.setDate(last.getDate() + 90); // Approx 3 months
+
+        const today = new Date();
+        const diffTime = nextDate.getTime() - today.getTime();
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+        if (diffDays <= 0) {
+            return { isEligible: true, daysRemaining: 0, distinctText: "You represent a ready hope for someone in need." };
+        } else {
+            return { isEligible: false, daysRemaining: diffDays, distinctText: `Next eligibility in ${diffDays} days.` };
+        }
+    };
+
+    const eligibility = getEligibilityStatus(stats?.last_donation_date || null);
+
     if (isLoading) {
         return (
             <div className="flex justify-center items-center min-h-[60vh]">
-                <Loader2 className="h-8 w-8 animate-spin text-primary-500" />
+                <Loader2 className="h-8 w-8 animate-spin text-red-500" />
             </div>
         );
     }
 
     return (
-        <div className="max-w-6xl mx-auto space-y-6 pb-8">
+        <div className="max-w-6xl mx-auto space-y-8 pb-12">
             {error && (
                 <Alert variant="error" className="mb-4">
                     {error}
                 </Alert>
             )}
 
-            {/* Hero Header with Gradient */}
-            <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-red-500 via-red-600 to-pink-600 p-8 text-white shadow-xl"
-            >
-                <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl -mr-32 -mt-32"></div>
-                <div className="absolute bottom-0 left-0 w-48 h-48 bg-white/10 rounded-full blur-3xl -ml-24 -mb-24"></div>
+            {/* --- HERO SECTION: MESH GRADIENT & DIGITAL CARD --- */}
+            <div className="relative rounded-3xl overflow-hidden bg-white shadow-2xl">
+                {/* Aurora Mesh Background */}
+                <div className="absolute inset-0 z-0">
+                    <div className="absolute inset-0 bg-gradient-to-br from-rose-500 via-red-500 to-orange-600"></div>
+                    <div className="absolute top-[-50%] left-[-20%] w-[80%] h-[80%] rounded-full bg-purple-500 mix-blend-overlay filter blur-[100px] opacity-60 animate-pulse"></div>
+                    <div className="absolute bottom-[-20%] right-[-10%] w-[60%] h-[60%] rounded-full bg-yellow-400 mix-blend-overlay filter blur-[80px] opacity-40"></div>
+                </div>
 
-                <div className="relative flex items-start justify-between">
-                    <div className="flex items-center space-x-6">
-                        <div className="relative">
-                            <div className="h-24 w-24 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center ring-4 ring-white/30">
-                                <User className="h-12 w-12 text-white" />
-                            </div>
-                            {user?.is_donor && (
-                                <div className="absolute -bottom-2 -right-2 bg-white rounded-full p-2 shadow-lg">
-                                    <Droplet className="h-4 w-4 text-red-500" />
+                {/* Glassmorphism Content */}
+                <div className="relative z-10 p-8 md:p-12">
+                    <div className="flex flex-col lg:flex-row items-center justify-between gap-12">
+
+                        {/* LEFT: Welcome & Eligibility */}
+                        <div className="text-center lg:text-left space-y-6 flex-1">
+                            <motion.div
+                                initial={{ opacity: 0, y: 20 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                className="space-y-2"
+                            >
+                                <div className="inline-flex items-center px-4 py-1.5 rounded-full bg-white/20 backdrop-blur-md border border-white/30 text-white text-sm font-medium shadow-sm">
+                                    <span className="relative flex h-2 w-2 mr-2">
+                                        <span className={`animate-ping absolute inline-flex h-full w-full rounded-full ${eligibility.isEligible ? 'bg-green-400' : 'bg-orange-400'} opacity-75`}></span>
+                                        <span className={`relative inline-flex rounded-full h-2 w-2 ${eligibility.isEligible ? 'bg-green-500' : 'bg-orange-500'}`}></span>
+                                    </span>
+                                    {eligibility.isEligible ? 'Ready to Donate' : 'Recovering'}
                                 </div>
-                            )}
-                        </div>
-                        <div>
-                            <h1 className="text-3xl font-bold mb-2">{user?.full_name}</h1>
-                            <div className="flex items-center space-x-4 text-white/90">
-                                <div className="flex items-center space-x-2">
-                                    <Droplet className="h-4 w-4" />
-                                    <span className="font-semibold">{user?.blood_group || 'N/A'}</span>
-                                </div>
+                                <h1 className="text-4xl md:text-5xl font-bold text-white tracking-tight">
+                                    Hello, {user?.full_name?.split(' ')[0] || 'Hero'}.
+                                </h1>
+                                <p className="text-lg text-white/90 max-w-lg leading-relaxed">
+                                    {eligibility.distinctText}
+                                    {!eligibility.isEligible && " Thank you for your recent gift of life."}
+                                </p>
+                            </motion.div>
+
+                            <div className="flex flex-wrap gap-4 justify-center lg:justify-start">
+                                <Button
+                                    onClick={() => setIsEditing(!isEditing)}
+                                    className="bg-white/10 hover:bg-white/25 text-white border border-white/40 backdrop-blur-md"
+                                >
+                                    <Settings className="w-4 h-4 mr-2" />
+                                    Settings
+                                </Button>
                                 {user?.is_donor && (
-                                    <div className="flex items-center space-x-2 bg-white/20 px-3 py-1 rounded-full">
-                                        <Heart className="h-4 w-4" />
-                                        <span className="text-sm font-medium">Active Donor</span>
-                                    </div>
+                                    <Button className="bg-white text-red-600 hover:bg-red-50 shadow-lg border-0">
+                                        <Share className="w-4 h-4 mr-2" />
+                                        Share Impact
+                                    </Button>
                                 )}
                             </div>
                         </div>
+
+                        {/* RIGHT: Digital Donor Card */}
+                        <motion.div
+                            initial={{ opacity: 0, rotateY: 90 }}
+                            animate={{ opacity: 1, rotateY: 0 }}
+                            transition={{ delay: 0.2, type: "spring" }}
+                            className="relative w-full max-w-md perspective-1000 group cursor-pointer"
+                        >
+                            <div className="relative h-64 w-full rounded-2xl bg-gradient-to-br from-white/20 to-white/5 backdrop-blur-xl border border-white/30 shadow-2xl p-6 flex flex-col justify-between overflow-hidden transition-transform duration-500 group-hover:scale-[1.02]">
+                                {/* Card Shine Effect */}
+                                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000 z-0 pointer-events-none"></div>
+
+                                {/* Card Header */}
+                                <div className="flex justify-between items-start z-10">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-red-500 to-rose-600 flex items-center justify-center shadow-inner border border-white/20">
+                                            <Droplet className="w-5 h-5 text-white fill-current" />
+                                        </div>
+                                        <div>
+                                            <div className="text-xs text-white/70 uppercase tracking-widest font-bold">Vital Membership</div>
+                                            <div className="text-white font-semibold">Standard Access</div>
+                                        </div>
+                                    </div>
+                                    <Award className="w-8 h-8 text-yellow-300 drop-shadow-md" />
+                                </div>
+
+                                {/* Card Body */}
+                                <div className="z-10 text-center py-4">
+                                    <div className="text-5xl font-mono font-bold text-white tracking-widest drop-shadow-sm">
+                                        {user?.blood_group || "??"}
+                                    </div>
+                                </div>
+
+                                {/* Card Footer */}
+                                <div className="flex justify-between items-end z-10">
+                                    <div>
+                                        <div className="text-xs text-white/60 uppercase mb-1">Holder</div>
+                                        <div className="text-white font-medium text-lg tracking-wide uppercase truncate max-w-[200px]">
+                                            {user?.full_name || "Unknown"}
+                                        </div>
+                                    </div>
+                                    <div className="text-right">
+                                        <div className="text-xs text-white/60 uppercase mb-1">Donor ID</div>
+                                        <div className="font-mono text-white/90 text-sm">
+                                            {user?.id?.slice(0, 8).toUpperCase() || "--------"}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </motion.div>
                     </div>
-
-                    <Button
-                        variant="ghost"
-                        onClick={() => setIsEditing(!isEditing)}
-                        className="text-white hover:bg-white/20 border border-white/30"
-                    >
-                        {isEditing ? (
-                            <>
-                                <X className="h-4 w-4 mr-2" />
-                                Cancel
-                            </>
-                        ) : (
-                            <>
-                                <Edit2 className="h-4 w-4 mr-2" />
-                                Edit Profile
-                            </>
-                        )}
-                    </Button>
                 </div>
-            </motion.div>
+            </div>
 
-            {/* Stats Grid */}
-            <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.1 }}
-                className="grid grid-cols-1 md:grid-cols-3 gap-6"
-            >
-                <Card className="hover:shadow-lg transition-shadow">
-                    <CardBody className="text-center p-6">
-                        <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-red-100 mb-4">
-                            <Droplet className="h-6 w-6 text-red-600" />
-                        </div>
-                        <div className="text-3xl font-bold text-gray-900 mb-1">{stats?.total_donations || 0}</div>
-                        <div className="text-sm text-gray-600">Total Donations</div>
-                    </CardBody>
-                </Card>
+            {/* --- STATS & ELIGIBILITY GRID --- */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                {/* Visual Eligibility Ring */}
+                <div className="col-span-1 md:col-span-2 bg-white rounded-2xl p-6 shadow-sm border border-slate-100 flex items-center gap-6 relative overflow-hidden group hover:border-red-100 transition-colors">
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-red-50 rounded-full -mr-16 -mt-16 pointer-events-none"></div>
 
-                <Card className="hover:shadow-lg transition-shadow">
-                    <CardBody className="text-center p-6">
-                        <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-blue-100 mb-4">
-                            <Calendar className="h-6 w-6 text-blue-600" />
+                    <div className="relative w-24 h-24 flex-shrink-0">
+                        <svg className="w-full h-full transform -rotate-90">
+                            <circle cx="48" cy="48" r="40" stroke="currentColor" strokeWidth="8" fill="transparent" className="text-slate-100" />
+                            <circle
+                                cx="48" cy="48" r="40" stroke="currentColor" strokeWidth="8" fill="transparent"
+                                strokeDasharray={251.2}
+                                strokeDashoffset={eligibility.isEligible ? 0 : (251.2 * (eligibility.daysRemaining / 90))}
+                                className={`transition-all duration-1000 ${eligibility.isEligible ? 'text-green-500' : 'text-amber-500'}`}
+                            />
+                        </svg>
+                        <div className="absolute inset-0 flex items-center justify-center font-bold text-xl text-slate-800">
+                            {eligibility.isEligible ? <Check className="w-8 h-8 text-green-500" /> : <span>{eligibility.daysRemaining}d</span>}
                         </div>
-                        <div className="text-3xl font-bold text-gray-900 mb-1">
-                            {stats?.last_donation_date
-                                ? new Date(stats.last_donation_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-                                : 'Never'}
-                        </div>
-                        <div className="text-sm text-gray-600">Last Donation</div>
-                    </CardBody>
-                </Card>
+                    </div>
+                    <div>
+                        <h3 className="text-lg font-bold text-slate-900 mb-1">Donation Status</h3>
+                        <p className="text-slate-600 text-sm leading-relaxed">
+                            {eligibility.isEligible
+                                ? "You're fully recharged! Your help is needed nearby."
+                                : `Recovering well. You'll be ready to save lives again on ${new Date(Date.now() + eligibility.daysRemaining * 86400000).toLocaleDateString()}.`
+                            }
+                        </p>
+                    </div>
+                </div>
 
-                <Card className="hover:shadow-lg transition-shadow">
-                    <CardBody className="text-center p-6">
-                        <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-amber-100 mb-4">
-                            <Award className="h-6 w-6 text-amber-600" />
+                <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 hover:shadow-md transition-all group">
+                    <div className="flex justify-between items-start mb-4">
+                        <div className="bg-red-50 text-red-600 p-3 rounded-xl group-hover:scale-110 transition-transform">
+                            <Heart className="w-6 h-6 fill-current" />
                         </div>
-                        <div className="text-3xl font-bold text-gray-900 mb-1">{stats?.achievements.length || 0}</div>
-                        <div className="text-sm text-gray-600">Achievements</div>
-                    </CardBody>
-                </Card>
-            </motion.div>
+                    </div>
+                    <div className="text-3xl font-bold text-slate-900 mb-1">{stats?.total_donations || 0}</div>
+                    <div className="text-sm font-medium text-slate-500">Lives Impacted (Appx)</div>
+                </div>
 
-            {/* Edit Form */}
+                <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 hover:shadow-md transition-all group">
+                    <div className="flex justify-between items-start mb-4">
+                        <div className="bg-blue-50 text-blue-600 p-3 rounded-xl group-hover:scale-110 transition-transform">
+                            <Calendar className="w-6 h-6" />
+                        </div>
+                    </div>
+                    <div className="text-3xl font-bold text-slate-900 mb-1">
+                        {stats?.total_requests || 0}
+                    </div>
+                    <div className="text-sm font-medium text-slate-500">Requests Posted</div>
+                </div>
+            </div>
+
+            {/* --- BADGES & ACHIEVEMENTS --- */}
+            <div className="space-y-4">
+                <h3 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+                    <Award className="w-5 h-5 text-amber-500" />
+                    Your Hall of Fame
+                </h3>
+                {stats?.achievements && stats.achievements.length > 0 ? (
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        {stats.achievements.map((achievement, index) => {
+                            // Assign icons based on achievement name (simple heuristic)
+                            const isDonor = achievement.includes('Donor');
+                            const isLife = achievement.includes('Life');
+
+                            return (
+                                <motion.div
+                                    key={index}
+                                    initial={{ opacity: 0, scale: 0.9 }}
+                                    animate={{ opacity: 1, scale: 1 }}
+                                    transition={{ delay: 0.1 * index }}
+                                    className="relative group p-6 rounded-2xl border border-slate-200 bg-white hover:border-amber-300 hover:shadow-lg transition-all text-center flex flex-col items-center justify-center gap-3"
+                                >
+                                    <div className="w-14 h-14 rounded-full bg-amber-50 flex items-center justify-center group-hover:bg-amber-100 transition-colors">
+                                        {isDonor ? <Droplet className="text-amber-600 w-7 h-7" /> :
+                                            isLife ? <Heart className="text-red-500 w-7 h-7" /> :
+                                                <Award className="text-amber-600 w-7 h-7" />}
+                                    </div>
+                                    <span className="font-bold text-slate-900 group-hover:text-amber-700 transition-colors">{achievement}</span>
+                                </motion.div>
+                            )
+                        })}
+                    </div>
+                ) : (
+                    <div className="p-8 border-2 border-dashed border-slate-200 rounded-2xl text-center text-slate-500">
+                        <p>No badges yet. Complete your first donation to earn the "First Blood" badge!</p>
+                    </div>
+                )}
+            </div>
+
+            {/* --- SETTINGS & CONTENT --- */}
             {isEditing && (
                 <motion.div
                     initial={{ opacity: 0, height: 0 }}
                     animate={{ opacity: 1, height: 'auto' }}
                     exit={{ opacity: 0, height: 0 }}
+                    className="overflow-hidden"
                 >
-                    <Card>
-                        <CardHeader>
-                            <h2 className="text-xl font-semibold">Edit Profile Information</h2>
+                    <Card className="border-red-100 shadow-xl">
+                        <CardHeader className="bg-red-50/50 border-b border-red-50">
+                            <h2 className="text-xl font-semibold text-red-900">Update Your Details</h2>
                         </CardHeader>
-                        <CardBody>
+                        <CardBody className="p-6">
                             <form onSubmit={handleEdit} className="space-y-6">
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                     <Input
@@ -254,12 +374,14 @@ export default function ProfilePage() {
                                         value={editForm.full_name}
                                         onChange={(e) => setEditForm({ ...editForm, full_name: e.target.value })}
                                         required
+                                        className="h-11"
                                     />
                                     <Input
                                         label="Phone"
                                         value={editForm.phone}
                                         onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
                                         required
+                                        className="h-11"
                                     />
                                 </div>
 
@@ -270,6 +392,7 @@ export default function ProfilePage() {
                                         onChange={(e) => setEditForm({ ...editForm, permanent_zip: e.target.value })}
                                         required
                                         placeholder="e.g. 560001"
+                                        className="h-11"
                                     />
                                     <Input
                                         label="Present Zip Code"
@@ -277,10 +400,11 @@ export default function ProfilePage() {
                                         onChange={(e) => setEditForm({ ...editForm, present_zip: e.target.value })}
                                         required
                                         placeholder="e.g. 560001"
+                                        className="h-11"
                                     />
                                 </div>
 
-                                <div className="flex items-center space-x-3 p-4 bg-gray-50 rounded-lg">
+                                <div className="flex items-center space-x-3 p-4 bg-gray-50 rounded-xl border border-gray-100">
                                     <input
                                         type="checkbox"
                                         id="is_available"
@@ -288,17 +412,17 @@ export default function ProfilePage() {
                                         onChange={(e) => setEditForm({ ...editForm, is_available: e.target.checked })}
                                         className="w-5 h-5 rounded border-gray-300 text-red-600 focus:ring-red-500"
                                     />
-                                    <label htmlFor="is_available" className="text-sm font-medium text-gray-700 cursor-pointer">
+                                    <label htmlFor="is_available" className="text-sm font-medium text-gray-700 cursor-pointer select-none">
                                         I am available for blood donation
                                     </label>
                                 </div>
 
-                                <div className="flex space-x-4">
-                                    <Button type="submit" variant="primary" className="flex-1">
-                                        <Check className="h-4 w-4 mr-2" />
+                                <div className="flex space-x-4 pt-2">
+                                    <Button type="submit" size="lg" className="flex-1 bg-red-600 hover:bg-red-700 text-white font-bold">
+                                        <Check className="h-5 w-5 mr-2" />
                                         Save Changes
                                     </Button>
-                                    <Button type="button" variant="secondary" onClick={() => setIsEditing(false)}>
+                                    <Button type="button" size="lg" variant="outline" onClick={() => setIsEditing(false)}>
                                         Cancel
                                     </Button>
                                 </div>
@@ -308,197 +432,79 @@ export default function ProfilePage() {
                 </motion.div>
             )}
 
-            {/* Security Settings */}
-            <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.12 }}
-            >
-                <SecuritySettings />
-            </motion.div>
+            {/* --- COMPONENT SECTIONS --- */}
+            <div className="grid md:grid-cols-2 gap-8">
+                <div>
+                    <div className="mb-4">
+                        <h3 className="text-lg font-bold text-slate-900">Account Security</h3>
+                        <p className="text-slate-500 text-sm">Manage how you access your account.</p>
+                    </div>
+                    <SecuritySettings />
+                </div>
 
-            {/* Preferences */}
-            <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.15 }}
-            >
-                <Card>
-                    <CardHeader>
-                        <h2 className="text-xl font-semibold">Preferences</h2>
-                    </CardHeader>
-                    <CardBody>
-                        <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                            <div className="flex items-center space-x-3">
-                                <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center">
-                                    <Bell className="h-5 w-5 text-indigo-600" />
-                                </div>
-                                <div>
-                                    <div className="font-medium text-gray-900">Push Notifications</div>
-                                    <div className="text-sm text-gray-500">Receive alerts when blood is needed nearby</div>
-                                </div>
-                            </div>
-                            <PushNotificationManager />
-                        </div>
-                    </CardBody>
-                </Card>
-            </motion.div>
-
-            {/* Contact Information */}
-            <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.2 }}
-            >
-                <Card>
-                    <CardHeader>
-                        <h2 className="text-xl font-semibold">Contact Information</h2>
-                    </CardHeader>
-                    <CardBody>
-                        <div className="space-y-4">
-                            <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                                <div className="flex items-center space-x-3">
-                                    <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
-                                        <Mail className="h-5 w-5 text-blue-600" />
+                <div>
+                    <div className="mb-4">
+                        <h3 className="text-lg font-bold text-slate-900">Preferences</h3>
+                        <p className="text-slate-500 text-sm">Customize your notification experience.</p>
+                    </div>
+                    <Card className="hover:shadow-md transition-shadow">
+                        <CardBody className="p-0">
+                            <div className="flex items-center justify-between p-6">
+                                <div className="flex items-center space-x-4">
+                                    <div className="w-12 h-12 rounded-full bg-indigo-50 flex items-center justify-center">
+                                        <Bell className="h-6 w-6 text-indigo-600" />
                                     </div>
                                     <div>
-                                        <div className="text-sm text-gray-500">Email</div>
-                                        <div className="font-medium">{user?.email}</div>
+                                        <div className="font-bold text-slate-900">Push Notifications</div>
+                                        <div className="text-sm text-slate-500">Receive alerts when blood is needed nearby</div>
                                     </div>
                                 </div>
-                                {session?.user && !session.user.email_confirmed_at && (
-                                    <Button
-                                        size="sm"
-                                        variant="outline"
-                                        onClick={async () => {
-                                            try {
-                                                const { error } = await supabase.auth.resend({
-                                                    type: 'signup',
-                                                    email: session.user.email!,
-                                                    options: {
-                                                        emailRedirectTo: `${window.location.origin}/dashboard`
-                                                    }
-                                                });
-                                                if (error) throw error;
-                                                alert('Verification email sent!');
-                                            } catch (err: any) {
-                                                console.error('Verification error');
-                                                alert('Failed to send verification email');
-                                            }
-                                        }}
-                                    >
-                                        Verify Email
-                                    </Button>
-                                )}
-                            </div>
-
-                            <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                                <div className="flex items-center space-x-3">
-                                    <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center">
-                                        <Phone className="h-5 w-5 text-green-600" />
-                                    </div>
-                                    <div>
-                                        <div className="text-sm text-gray-500">Phone</div>
-                                        <div className="font-medium">{user?.phone || 'Not provided'}</div>
-                                    </div>
-                                </div>
-                                {session?.user && (!session.user.phone_confirmed_at && user?.phone) && (
-                                    <span className="text-xs text-amber-600 bg-amber-100 px-3 py-1 rounded-full font-medium">
-                                        Unverified
-                                    </span>
-                                )}
-                            </div>
-
-                            <div className="flex items-center p-4 bg-gray-50 rounded-lg">
-                                <div className="flex items-center space-x-3">
-                                    <div className="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center">
-                                        <MapPin className="h-5 w-5 text-purple-600" />
-                                    </div>
-                                    <div>
-                                        <div className="text-sm text-gray-500">Location</div>
-                                        <div className="font-medium">
-                                            {user?.permanent_zip && user?.present_zip
-                                                ? `${user.permanent_zip} (Permanent) • ${user.present_zip} (Present)`
-                                                : 'Not provided'}
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </CardBody>
-                </Card>
-            </motion.div>
-
-            {/* Achievements */}
-            {stats?.achievements && stats.achievements.length > 0 && (
-                <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.3 }}
-                >
-                    <Card>
-                        <CardHeader>
-                            <h2 className="text-xl font-semibold">Achievements</h2>
-                        </CardHeader>
-                        <CardBody>
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                {stats.achievements.map((achievement, index) => (
-                                    <motion.div
-                                        key={index}
-                                        initial={{ opacity: 0, scale: 0.9 }}
-                                        animate={{ opacity: 1, scale: 1 }}
-                                        transition={{ delay: 0.4 + index * 0.1 }}
-                                        className="text-center p-6 bg-gradient-to-br from-amber-50 to-orange-50 rounded-xl border border-amber-200 hover:shadow-md transition-shadow"
-                                    >
-                                        <Award className="h-8 w-8 text-amber-600 mx-auto mb-3" />
-                                        <div className="text-sm font-semibold text-gray-900">{achievement}</div>
-                                    </motion.div>
-                                ))}
+                                <PushNotificationManager />
                             </div>
                         </CardBody>
                     </Card>
-                </motion.div>
-            )}
 
-            {/* Sign Out Button */}
-            <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.4 }}
-                className="flex flex-col items-center pt-8 space-y-4"
-            >
-                <div className="w-full max-w-2xl border-t border-gray-200 pt-8">
-                    <div className="rounded-lg border border-red-100 bg-red-50 p-6">
-                        <h3 className="text-lg font-medium text-red-800 mb-2 flex items-center">
-                            <Shield className="h-5 w-5 mr-2" />
-                            Danger Zone
-                        </h3>
-                        <p className="text-sm text-red-600 mb-4">
-                            Deleting your account is permanent. All your data including donation history and personal details will be wiped immediately.
-                        </p>
-                        <Button
-                            variant="primary"
-                            className="bg-red-600 hover:bg-red-700 text-white w-full sm:w-auto"
-                            onClick={async () => {
-                                if (confirm('Are you ABSOLUTELY sure? This action cannot be undone.')) {
-                                    try {
-                                        const res = await fetch('/api/auth/delete', { method: 'POST' });
-                                        if (!res.ok) throw new Error('Deletion failed');
-                                        await signOut();
-                                        router.push('/login');
-                                    } catch (e) {
-                                        alert('Failed to delete account. Please try again.');
-                                    }
-                                }
-                            }}
-                        >
-                            <User className="h-4 w-4 mr-2" />
-                            Delete My Account
-                        </Button>
+                    {/* Contact Info (Compact) */}
+                    <div className="mt-8">
+                        <div className="mb-4">
+                            <h3 className="text-lg font-bold text-slate-900">My Info</h3>
+                        </div>
+                        <Card className="divide-y divide-slate-100">
+                            <div className="p-4 flex justify-between items-center hover:bg-slate-50 transition-colors">
+                                <span className="text-slate-500 text-sm">Email</span>
+                                <span className="font-medium text-slate-900">{user?.email}</span>
+                            </div>
+                            <div className="p-4 flex justify-between items-center hover:bg-slate-50 transition-colors">
+                                <span className="text-slate-500 text-sm">Phone</span>
+                                <span className="font-medium text-slate-900">{user?.phone || '--'}</span>
+                            </div>
+                            <div className="p-4 flex justify-between items-center hover:bg-slate-50 transition-colors">
+                                <span className="text-slate-500 text-sm">Location</span>
+                                <span className="font-medium text-slate-900 truncate max-w-[200px]">{user?.present_zip || '--'}</span>
+                            </div>
+                        </Card>
                     </div>
                 </div>
+            </div>
 
-            </motion.div>
+            {/* --- DANGER ZONE --- */}
+            <div className="pt-8 border-t border-slate-200">
+                <Button variant="ghost" className="text-slate-400 hover:text-red-600 hover:bg-red-50 w-full" onClick={async () => {
+                    if (confirm('Are you ABSOLUTELY sure? This action cannot be undone.')) {
+                        try {
+                            const res = await fetch('/api/auth/delete', { method: 'POST' });
+                            if (!res.ok) throw new Error('Deletion failed');
+                            await signOut();
+                            router.push('/login');
+                        } catch (e) {
+                            alert('Failed to delete account. Please try again.');
+                        }
+                    }
+                }}>
+                    <LogOut className="w-4 h-4 mr-2" />
+                    Sign Out / Delete Account
+                </Button>
+            </div>
         </div>
     );
 }
