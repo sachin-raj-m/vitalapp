@@ -43,6 +43,7 @@ export default function ProfileEditPage() {
 
     const handleSave = async (e: React.FormEvent) => {
         e.preventDefault();
+        e.stopPropagation();
         setError('');
         setIsLoading(true);
 
@@ -80,30 +81,40 @@ export default function ProfileEditPage() {
 
     const handleVerifyOtp = async (e: React.FormEvent) => {
         e.preventDefault();
+        e.stopPropagation();
         setError('');
         setIsLoading(true);
 
+        console.log('Verifying OTP for phone:', pendingPhone);
+
         try {
-            const { error: verifyError } = await supabase.auth.verifyOtp({
+            const { data, error: verifyError } = await supabase.auth.verifyOtp({
                 phone: pendingPhone,
                 token: otp,
                 type: 'phone_change'
             });
 
-            if (verifyError) throw verifyError;
+            if (verifyError) {
+                console.error('Supabase verifyOtp error:', verifyError);
+                throw verifyError;
+            }
+
+            console.log('OTP verified successfully:', data);
 
             // Update remaining profile details
             await updateProfile({
                 full_name: editForm.full_name,
-                phone: pendingPhone, // Explicitly set new phone
+                phone: pendingPhone, // Explicitly set new phone in profiles table
                 is_available: editForm.is_available,
                 permanent_zip: editForm.permanent_zip,
                 present_zip: editForm.present_zip
             });
 
+            console.log('Profile updated successfully, redirecting...');
+            alert('Phone number verified and profile updated successfully!');
             router.push('/profile');
         } catch (err: any) {
-            console.error('Error verifying OTP:', err);
+            console.error('Error verifying OTP/Profile:', err);
             setError(err.message || 'Invalid verification code');
             setIsLoading(false);
         }
