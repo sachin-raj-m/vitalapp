@@ -1,124 +1,230 @@
 "use client";
 
-import React from 'react';
-import { AchievementDisplay } from '@/components/AchievementDisplay';
-import { Card, CardHeader, CardBody } from '@/components/ui/Card';
-import { Badge } from '@/components/ui/Badge';
-import type { Achievement, Badge as BadgeType } from '@/types';
+import React, { useEffect, useState } from 'react';
+import { Card, CardBody } from '@/components/ui/Card';
+import { useAuth } from '@/context/AuthContext';
+import { supabase } from '@/lib/supabase';
+import { Award, Droplet, Heart, Lock, Calendar, Trophy } from 'lucide-react';
+import { motion } from 'framer-motion';
+
+interface AchievementData {
+    name: string;
+    unlocked: boolean;
+    unlockedDate?: string;
+    description: string;
+    icon: string;
+}
 
 export default function AchievementsPage() {
-    const achievements: Achievement[] = [
-        {
-            id: '1',
-            user_id: '1',
-            badge_id: '1',
-            earned_date: '2024-03-15',
-            badge: {
-                id: '1',
-                name: 'First Time Donor',
-                description: 'Completed your first blood donation',
-                image_url: 'https://example.com/badge1.png',
-                points: 100,
-                criteria: 'Complete first donation'
-            }
-        }
-    ];
+    const { user } = useAuth();
+    const [achievements, setAchievements] = useState<AchievementData[]>([]);
+    const [stats, setStats] = useState({
+        total_donations: 0,
+        total_requests: 0,
+    });
 
-    const allBadges: BadgeType[] = [
-        {
-            id: '1',
-            name: 'First Time Donor',
-            description: 'Completed your first blood donation',
-            image_url: 'https://example.com/badge1.png',
-            points: 100,
-            criteria: 'Complete first donation'
-        },
-        {
-            id: '2',
-            name: 'Regular Donor',
-            description: 'Donated blood 5 times',
-            image_url: 'https://example.com/badge2.png',
-            points: 500,
-            criteria: 'Complete 5 donations'
-        },
-        {
-            id: '3',
-            name: 'Life Saver',
-            description: 'Responded to an urgent request',
-            image_url: 'https://example.com/badge3.png',
-            points: 300,
-            criteria: 'Complete urgent donation'
+    useEffect(() => {
+        if (user?.id) {
+            fetchAchievements();
+            fetchStats();
         }
-    ];
+    }, [user]);
+
+    const fetchStats = async () => {
+        const { data: donations } = await supabase
+            .from('donations')
+            .select('*')
+            .eq('donor_id', user?.id);
+
+        const { data: requests } = await supabase
+            .from('blood_requests')
+            .select('*')
+            .eq('requested_by', user?.id);
+
+        setStats({
+            total_donations: donations?.length || 0,
+            total_requests: requests?.length || 0,
+        });
+    };
+
+    const fetchAchievements = async () => {
+        const { data: donations } = await supabase
+            .from('donations')
+            .select('*, blood_requests(*)')
+            .eq('donor_id', user?.id)
+            .order('donation_date', { ascending: true });
+
+        const achievementsList: AchievementData[] = [];
+
+        // First Time Donor
+        if (donations && donations.length > 0) {
+            achievementsList.push({
+                name: 'First Time Donor',
+                unlocked: true,
+                unlockedDate: donations[0].donation_date,
+                description: 'Completed your first blood donation',
+                icon: 'droplet'
+            });
+        } else {
+            achievementsList.push({
+                name: 'First Time Donor',
+                unlocked: false,
+                description: 'Complete your first blood donation',
+                icon: 'droplet'
+            });
+        }
+
+        // Regular Donor (5+ donations)
+        if (donations && donations.length >= 5) {
+            achievementsList.push({
+                name: 'Regular Donor',
+                unlocked: true,
+                unlockedDate: donations[4].donation_date,
+                description: 'Donated blood 5 times',
+                icon: 'droplet'
+            });
+        } else {
+            achievementsList.push({
+                name: 'Regular Donor',
+                unlocked: false,
+                description: `Donate blood 5 times (${donations?.length || 0}/5)`,
+                icon: 'droplet'
+            });
+        }
+
+        // Life Saver (urgent request)
+        const urgentDonation = donations?.find(d => d.blood_requests?.urgency_level === 'critical');
+        if (urgentDonation) {
+            achievementsList.push({
+                name: 'Life Saver',
+                unlocked: true,
+                unlockedDate: urgentDonation.donation_date,
+                description: 'Responded to an urgent request',
+                icon: 'heart'
+            });
+        } else {
+            achievementsList.push({
+                name: 'Life Saver',
+                unlocked: false,
+                description: 'Respond to an urgent blood request',
+                icon: 'heart'
+            });
+        }
+
+        setAchievements(achievementsList);
+    };
+
+    const getIconComponent = (iconType: string, unlocked: boolean) => {
+        const className = unlocked ? "w-8 h-8 text-amber-600" : "w-8 h-8 text-slate-300";
+        switch (iconType) {
+            case 'droplet':
+                return <Droplet className={className} />;
+            case 'heart':
+                return <Heart className={className} />;
+            default:
+                return <Award className={className} />;
+        }
+    };
 
     return (
-        <div className="space-y-8">
-            <h1 className="text-3xl font-bold text-gray-900">Achievements</h1>
+        <div className="max-w-6xl mx-auto py-8 space-y-8">
+            <div className="flex items-center gap-3">
+                <Trophy className="w-8 h-8 text-amber-500" />
+                <h1 className="text-3xl font-bold text-slate-900">Your Achievements</h1>
+            </div>
 
-            <div className="grid md:grid-cols-3 gap-6">
-                <Card>
-                    <CardHeader>
-                        <h3 className="text-lg font-medium text-gray-900">Total Points</h3>
-                    </CardHeader>
-                    <CardBody>
-                        <div className="text-3xl font-bold text-primary-500">350</div>
-                        <p className="text-sm text-gray-500">Points earned</p>
+            {/* Stats Overview */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                <Card className="border-slate-200">
+                    <CardBody className="p-6 text-center">
+                        <div className="text-4xl font-black text-amber-600 mb-2">
+                            {achievements.filter(a => a.unlocked).length}
+                        </div>
+                        <div className="text-sm font-medium text-slate-500">Badges Earned</div>
                     </CardBody>
                 </Card>
 
-                <Card>
-                    <CardHeader>
-                        <h3 className="text-lg font-medium text-gray-900">Badges Earned</h3>
-                    </CardHeader>
-                    <CardBody>
-                        <div className="text-3xl font-bold text-secondary-500">3/10</div>
-                        <p className="text-sm text-gray-500">Progress</p>
+                <Card className="border-slate-200">
+                    <CardBody className="p-6 text-center">
+                        <div className="text-4xl font-black text-red-600 mb-2">
+                            {stats.total_donations}
+                        </div>
+                        <div className="text-sm font-medium text-slate-500">Total Donations</div>
                     </CardBody>
                 </Card>
 
-                <Card>
-                    <CardHeader>
-                        <h3 className="text-lg font-medium text-gray-900">Rank</h3>
-                    </CardHeader>
-                    <CardBody>
-                        <div className="text-3xl font-bold text-accent-500">Silver</div>
-                        <p className="text-sm text-gray-500">Current tier</p>
+                <Card className="border-slate-200">
+                    <CardBody className="p-6 text-center">
+                        <div className="text-4xl font-black text-blue-600 mb-2">
+                            {stats.total_requests}
+                        </div>
+                        <div className="text-sm font-medium text-slate-500">Requests Posted</div>
+                    </CardBody>
+                </Card>
+
+                <Card className="border-slate-200">
+                    <CardBody className="p-6 text-center">
+                        <div className="text-4xl font-black text-slate-900 mb-2">
+                            {achievements.length}
+                        </div>
+                        <div className="text-sm font-medium text-slate-500">Total Badges</div>
                     </CardBody>
                 </Card>
             </div>
 
-            <AchievementDisplay
-                achievements={achievements}
-                allBadges={allBadges}
-            />
-
-            <Card>
-                <CardHeader>
-                    <h3 className="text-lg font-medium text-gray-900">Available Rewards</h3>
-                </CardHeader>
-                <CardBody>
-                    <div className="grid md:grid-cols-2 gap-4">
-                        <div className="p-4 border rounded-lg">
-                            <div className="flex justify-between items-start">
-                                <div>
-                                    <h4 className="font-medium">Coffee Shop Voucher</h4>
-                                    <p className="text-sm text-gray-500">Get a free coffee at any branch</p>
-                                </div>
-                                <Badge variant="primary">200 pts</Badge>
-                            </div>
-                        </div>
-                        <div className="p-4 border rounded-lg">
-                            <div className="flex justify-between items-start">
-                                <div>
-                                    <h4 className="font-medium">Movie Tickets</h4>
-                                    <p className="text-sm text-gray-500">Two free movie tickets</p>
-                                </div>
-                                <Badge variant="primary">500 pts</Badge>
-                            </div>
-                        </div>
-                    </div>
-                </CardBody>
-            </Card>
+            {/* Achievements Grid */}
+            <div>
+                <h2 className="text-2xl font-bold text-slate-900 mb-6">Hall of Fame</h2>
+                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {achievements.map((achievement, index) => (
+                        <motion.div
+                            key={achievement.name}
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: index * 0.1 }}
+                        >
+                            <Card className={`border-2 ${achievement.unlocked ? 'border-amber-300 bg-amber-50/30' : 'border-slate-200 opacity-60'} transition-all hover:shadow-lg`}>
+                                <CardBody className="p-6">
+                                    <div className="flex items-start gap-4">
+                                        <div className={`w-16 h-16 rounded-full flex items-center justify-center ${achievement.unlocked ? 'bg-amber-100' : 'bg-slate-100'}`}>
+                                            {achievement.unlocked ? (
+                                                getIconComponent(achievement.icon, true)
+                                            ) : (
+                                                <Lock className="w-8 h-8 text-slate-300" />
+                                            )}
+                                        </div>
+                                        <div className="flex-1">
+                                            <h3 className={`font-bold text-lg mb-1 ${achievement.unlocked ? 'text-slate-900' : 'text-slate-400'}`}>
+                                                {achievement.name}
+                                            </h3>
+                                            <p className="text-sm text-slate-600 mb-3">
+                                                {achievement.description}
+                                            </p>
+                                            {achievement.unlocked && achievement.unlockedDate && (
+                                                <div className="flex items-center gap-2 text-xs text-amber-700 bg-amber-100 px-3 py-1.5 rounded-full w-fit">
+                                                    <Calendar className="w-3 h-3" />
+                                                    <span className="font-medium">
+                                                        Unlocked: {new Date(achievement.unlockedDate).toLocaleDateString('en-US', {
+                                                            month: 'short',
+                                                            day: 'numeric',
+                                                            year: 'numeric'
+                                                        })}
+                                                    </span>
+                                                </div>
+                                            )}
+                                            {!achievement.unlocked && (
+                                                <div className="text-xs text-slate-400 italic">
+                                                    🔒 Locked
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                </CardBody>
+                            </Card>
+                        </motion.div>
+                    ))}
+                </div>
+            </div>
         </div>
     );
 }
