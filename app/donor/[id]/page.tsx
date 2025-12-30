@@ -45,6 +45,11 @@ export default async function PublicDonorPage({ params }: Props) {
         }
     );
 
+    // DEBUG: Check Auth status
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    console.log("🔍 PublicPage Debug: Session User ID:", session?.user?.id);
+    console.log("🔍 PublicPage Debug: Session Error:", sessionError);
+
     // Parse ID from slug
     // Supports formats:
     // 1. UUID (e.g., "123e4567-e89b-..." )
