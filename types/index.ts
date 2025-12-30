@@ -16,6 +16,7 @@ export interface User {
   present_zip?: string;
   is_donor: boolean;
   is_available: boolean;
+  is_public_profile?: boolean; // New Visibility Toggle
   willingness_to_travel?: number;
   last_donation_date?: string;
   next_eligible_date?: string; // New NBTC Field

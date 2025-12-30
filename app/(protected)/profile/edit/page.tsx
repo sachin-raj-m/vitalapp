@@ -23,7 +23,8 @@ export default function ProfileEditPage() {
         phone: '',
         is_available: false,
         permanent_zip: '',
-        present_zip: ''
+        present_zip: '',
+        is_public_profile: false
     });
 
     // OTP Verification State
@@ -38,7 +39,8 @@ export default function ProfileEditPage() {
                 phone: user.phone || '',
                 is_available: user.is_available || false,
                 permanent_zip: user.permanent_zip || '',
-                present_zip: user.present_zip || ''
+                present_zip: user.present_zip || '',
+                is_public_profile: user.is_public_profile || false
             });
         }
     }, [user]);
@@ -82,7 +84,8 @@ export default function ProfileEditPage() {
                 full_name: editForm.full_name,
                 is_available: editForm.is_available,
                 permanent_zip: editForm.permanent_zip,
-                present_zip: editForm.present_zip
+                present_zip: editForm.present_zip,
+                is_public_profile: editForm.is_public_profile
                 // phone is not updated here directly if not changed
             });
             setSuccess('Profile updated successfully!');
@@ -115,7 +118,8 @@ export default function ProfileEditPage() {
                 phone: pendingPhone,
                 is_available: editForm.is_available,
                 permanent_zip: editForm.permanent_zip,
-                present_zip: editForm.present_zip
+                present_zip: editForm.present_zip,
+                is_public_profile: editForm.is_public_profile
             });
 
             setSuccess('Phone number verified successfully!');
@@ -222,6 +226,50 @@ export default function ProfileEditPage() {
                                 <label htmlFor="is_available" className="text-sm font-medium text-gray-700 cursor-pointer select-none flex-1">
                                     I am currently available for blood donation requests
                                 </label>
+                            </div>
+                        </div>
+
+                        <div className="h-px bg-slate-100" />
+
+                        {/* Public Identity */}
+                        <div className="space-y-6">
+                            <h3 className="text-sm font-bold uppercase tracking-wider text-slate-400">Public Identity</h3>
+                            <div className="p-5 bg-slate-50 rounded-xl border border-slate-200">
+                                <div className="flex items-center justify-between gap-4">
+                                    <div>
+                                        <h4 className="font-bold text-slate-900">Make Profile Public</h4>
+                                        <p className="text-sm text-slate-500 mt-1">Allow anyone with the link to view your verified donor card. Essential for partner integrations.</p>
+                                    </div>
+                                    <label className="relative inline-flex items-center cursor-pointer">
+                                        <input
+                                            type="checkbox"
+                                            checked={editForm.is_public_profile}
+                                            onChange={(e) => setEditForm({ ...editForm, is_public_profile: e.target.checked })}
+                                            className="sr-only peer"
+                                        />
+                                        <div className="w-11 h-6 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                                    </label>
+                                </div>
+
+                                {editForm.is_public_profile && (
+                                    <div className="mt-4 pt-4 border-t border-slate-200 animate-in fade-in slide-in-from-top-2">
+                                        <p className="text-xs font-bold text-slate-500 uppercase mb-2">Your Public Profile Link</p>
+                                        <div className="flex items-center gap-2">
+                                            <div className="flex-1 bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-600 font-mono truncate select-all">
+                                                {typeof window !== 'undefined' ? `${window.location.origin}/donor/${user?.id}` : `/donor/${user?.id}`}
+                                            </div>
+                                            <Button
+                                                type="button"
+                                                size="sm"
+                                                variant="outline"
+                                                onClick={() => window.open(`/donor/${user?.id}`, '_blank')}
+                                                className="shrink-0"
+                                            >
+                                                Open
+                                            </Button>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         </div>
 
