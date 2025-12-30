@@ -188,11 +188,19 @@ export default async function PublicDonorPage({ params }: Props) {
         return <PrivateProfilePage displayName={displayName} />;
     }
 
-    // Fetch donation count
-    const { count: donationCount } = await supabase
+    // Fetch donations with details for stats
+    const { data: donations } = await supabase
         .from('donations')
-        .select('*', { count: 'exact', head: true })
+        .select('id, status, created_at')
         .eq('donor_id', profile.id);
+
+    const completedDonations = (donations || []).filter(d => d.status === 'completed');
+    const donationCount = completedDonations.length;
+
+    // Calculate achievements based on donation count
+    // Badge thresholds: 1 (First Drop), 3 (Bronze), 5 (Silver), 10 (Gold), 25 (Platinum), 50 (Diamond), 100 (Legend)
+    const badgeThresholds = [1, 3, 5, 10, 25, 50, 100];
+    const achievementCount = badgeThresholds.filter(t => donationCount >= t).length;
 
     return (
         <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4 relative overflow-hidden">
@@ -217,9 +225,9 @@ export default async function PublicDonorPage({ params }: Props) {
                 <div className="w-full transform hover:scale-105 transition-transform duration-300">
                     <DonorCard
                         user={profile}
-                        showAchievements={true}
-                        achievementCount={3}
-                        totalDonations={donationCount || 0}
+                        showAchievements={achievementCount > 0}
+                        achievementCount={achievementCount}
+                        totalDonations={donationCount}
                         donorNumber={profile.donor_number}
                         className="shadow-xl"
                     />

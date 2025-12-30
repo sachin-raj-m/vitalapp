@@ -14,16 +14,17 @@ export const Footer: React.FC = () => {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const pathname = usePathname();
 
-  // Hide footer on protected app routes
+  // Hide footer on protected app routes and public donor pages
   const isAppRoute = pathname?.startsWith('/dashboard') ||
     pathname?.startsWith('/admin') ||
     pathname?.startsWith('/requests') ||
     pathname?.startsWith('/profile') ||
     pathname?.startsWith('/nearby-donors') ||
     pathname?.startsWith('/achievements') ||
-    pathname?.startsWith('/donations');
+    pathname?.startsWith('/donations') ||
+    pathname?.startsWith('/donor');
 
-  if (isAppRoute && user) return null; // Conditional return
+  if (isAppRoute) return null; // Hide on app routes
 
   const handleRequestBlood = (e: React.MouseEvent) => {
     e.preventDefault();
