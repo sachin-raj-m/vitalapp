@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/Button';
 import { Alert } from '@/components/ui/Alert';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
-import { Loader2, User, MapPin, Phone, Mail, Droplet, Award, Calendar, Settings, LogOut, Edit2, Check, X, Shield, Heart, Bell, Share, Download } from 'lucide-react';
+import { Loader2, User, MapPin, Phone, Mail, Droplet, Award, Calendar, Settings, LogOut, Edit2, Check, X, Shield, Heart, Bell, Share, Download, ChevronDown } from 'lucide-react';
 import html2canvas from 'html2canvas';
 
 import { PushNotificationManager } from '@/components/PushNotificationManager';
@@ -31,6 +31,7 @@ export default function ProfilePage() {
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState('');
     const [isEditing, setIsEditing] = useState(false);
+    const [isShareOpen, setIsShareOpen] = useState(false);
     const [editForm, setEditForm] = useState({
         full_name: '',
         phone: '',
@@ -241,30 +242,61 @@ export default function ProfilePage() {
                                     <Settings className="w-4 h-4 mr-2" />
                                     Settings
                                 </Button>
-                                <Button
-                                    onClick={() => signOut()}
-                                    className="bg-white/10 hover:bg-white/25 text-white border border-white/40 backdrop-blur-md"
-                                >
-                                    <LogOut className="w-4 h-4 mr-2" />
-                                    Sign Out
-                                </Button>
                                 {user?.is_donor && (
-                                    <>
-                                        <Button
-                                            onClick={handleLinkShare}
-                                            className="bg-green-500 text-white font-bold hover:bg-green-600 shadow-lg border-0"
-                                        >
-                                            <Share className="w-4 h-4 mr-2" />
-                                            WhatsApp
-                                        </Button>
-                                        <Button
-                                            onClick={handleShare}
-                                            className="bg-white text-red-700 font-bold hover:bg-red-50 shadow-lg border-2 border-transparent hover:border-red-100"
-                                        >
-                                            <Download className="w-4 h-4 mr-2" />
-                                            Save Card
-                                        </Button>
-                                    </>
+                                    <div className="relative inline-block text-left">
+                                        <div className="inline-flex rounded-lg shadow-sm isolate">
+                                            <button
+                                                onClick={handleLinkShare}
+                                                className="relative inline-flex items-center gap-x-2 rounded-l-lg bg-white px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50 border border-slate-200 transition-colors"
+                                            >
+                                                <Share className="h-4 w-4 text-green-600" />
+                                                Share Link
+                                            </button>
+                                            <button
+                                                onClick={() => setIsShareOpen(!isShareOpen)}
+                                                className="relative -ml-px inline-flex items-center rounded-r-lg bg-white px-2 py-2 text-slate-500 hover:bg-slate-50 border border-slate-200 transition-colors"
+                                            >
+                                                <ChevronDown className="h-4 w-4" />
+                                            </button>
+                                        </div>
+
+                                        {isShareOpen && (
+                                            <div className="absolute right-0 z-20 mt-2 w-56 origin-top-right rounded-xl bg-white shadow-xl ring-1 ring-black ring-opacity-5 focus:outline-none overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                                                <div className="py-1">
+                                                    <button
+                                                        onClick={() => {
+                                                            handleShare();
+                                                            setIsShareOpen(false);
+                                                        }}
+                                                        className="flex w-full items-center px-4 py-3 text-sm text-slate-700 hover:bg-slate-50 transition-colors gap-3"
+                                                    >
+                                                        <div className="w-8 h-8 rounded-full bg-red-50 flex items-center justify-center">
+                                                            <Download className="h-4 w-4 text-red-600" />
+                                                        </div>
+                                                        <div className="text-left">
+                                                            <div className="font-semibold">Save Image</div>
+                                                            <div className="text-xs text-slate-500">Download card as PNG</div>
+                                                        </div>
+                                                    </button>
+                                                    <button
+                                                        onClick={() => {
+                                                            handleLinkShare();
+                                                            setIsShareOpen(false);
+                                                        }}
+                                                        className="flex w-full items-center px-4 py-3 text-sm text-slate-700 hover:bg-slate-50 transition-colors gap-3 md:hidden"
+                                                    >
+                                                        <div className="w-8 h-8 rounded-full bg-green-50 flex items-center justify-center">
+                                                            <Share className="h-4 w-4 text-green-600" />
+                                                        </div>
+                                                        <div className="text-left">
+                                                            <div className="font-semibold">WhatsApp</div>
+                                                            <div className="text-xs text-slate-500">Share public link</div>
+                                                        </div>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
                                 )}
                             </div>
                         </div>
