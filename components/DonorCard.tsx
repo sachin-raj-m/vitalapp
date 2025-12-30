@@ -1,5 +1,6 @@
 import React, { forwardRef } from 'react';
 import { Droplet, Award, Heart } from 'lucide-react';
+import Link from 'next/link';
 
 interface DonorCardProps {
     user: {
@@ -36,10 +37,10 @@ const DonorCard = forwardRef<HTMLDivElement, DonorCardProps>(({ user, className 
                     </div>
                 </div>
                 {showAchievements && achievementCount > 0 && (
-                    <div className="flex items-center gap-1 bg-amber-50 px-2 py-1 rounded-full border border-amber-100">
+                    <Link href="/achievements" className="flex items-center gap-1 bg-amber-50 px-2 py-1 rounded-full border border-amber-100 hover:bg-amber-100 transition-colors cursor-pointer" onClick={(e) => e.stopPropagation()}>
                         <Award className="w-4 h-4 text-amber-500" />
                         <span className="text-xs font-bold text-amber-700">{achievementCount} Badges</span>
-                    </div>
+                    </Link>
                 )}
             </div>
 
