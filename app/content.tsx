@@ -419,11 +419,11 @@ export default function HomePage() {
                 <div className="container mx-auto px-4 md:px-6">
                     <div className="max-w-3xl mx-auto space-y-8">
                         <h2 className="text-3xl md:text-5xl font-bold text-slate-900 leading-tight">
-                            You're not just donating blood. <br />
-                            <span className="text-slate-600">You're shortening someone's longest night.</span>
+                            Be the lifeline for someone fighting to survive. <br />
+                            <span className="text-slate-600">Give the gift that costs nothing but means everything.</span>
                         </h2>
                         <p className="text-xl text-slate-500">
-                            Join a community of everyday heroes who stand ready to help their neighbors when it matters most.
+                            Somewhere, a family is praying for a miracle. You can be the answer. Join the community of everyday heroes giving their neighbors a second chance at life.
                         </p>
                         <div className="flex flex-col sm:flex-row items-center gap-4 justify-center pt-8">
                             <Link href="/register">
@@ -438,7 +438,7 @@ export default function HomePage() {
                                 className="rounded-md px-10 py-6 text-lg font-bold border-red-200 text-red-600 hover:bg-red-50 flex items-center gap-2"
                             >
                                 <Share className="w-5 h-5" />
-                                I want to help spread the word
+                                Spread the Mission
                             </Button>
                         </div>
                     </div>
