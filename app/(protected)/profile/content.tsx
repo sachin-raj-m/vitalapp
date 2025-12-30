@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { Card, CardHeader, CardBody } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
@@ -348,27 +349,31 @@ export default function ProfilePage() {
                     </div>
                 </div>
 
-                <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 hover:shadow-md transition-all group">
-                    <div className="flex justify-between items-start mb-4">
-                        <div className="bg-red-50 text-red-600 p-3 rounded-xl group-hover:scale-110 transition-transform">
-                            <Heart className="w-6 h-6 fill-current" />
+                <Link href="/donations" className="block">
+                    <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 hover:shadow-md transition-all group cursor-pointer">
+                        <div className="flex justify-between items-start mb-4">
+                            <div className="bg-red-50 text-red-600 p-3 rounded-xl group-hover:scale-110 transition-transform">
+                                <Heart className="w-6 h-6 fill-current" />
+                            </div>
                         </div>
+                        <div className="text-3xl font-bold text-slate-900 mb-1">{stats?.total_donations || 0}</div>
+                        <div className="text-sm font-medium text-slate-500">Lives Impacted (Appx)</div>
                     </div>
-                    <div className="text-3xl font-bold text-slate-900 mb-1">{stats?.total_donations || 0}</div>
-                    <div className="text-sm font-medium text-slate-500">Lives Impacted (Appx)</div>
-                </div>
+                </Link>
 
-                <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 hover:shadow-md transition-all group">
-                    <div className="flex justify-between items-start mb-4">
-                        <div className="bg-blue-50 text-blue-600 p-3 rounded-xl group-hover:scale-110 transition-transform">
-                            <Calendar className="w-6 h-6" />
+                <Link href="/requests/my-requests" className="block">
+                    <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 hover:shadow-md transition-all group cursor-pointer">
+                        <div className="flex justify-between items-start mb-4">
+                            <div className="bg-blue-50 text-blue-600 p-3 rounded-xl group-hover:scale-110 transition-transform">
+                                <Calendar className="w-6 h-6" />
+                            </div>
                         </div>
+                        <div className="text-3xl font-bold text-slate-900 mb-1">
+                            {stats?.total_requests || 0}
+                        </div>
+                        <div className="text-sm font-medium text-slate-500">Requests Posted</div>
                     </div>
-                    <div className="text-3xl font-bold text-slate-900 mb-1">
-                        {stats?.total_requests || 0}
-                    </div>
-                    <div className="text-sm font-medium text-slate-500">Requests Posted</div>
-                </div>
+                </Link>
             </div>
 
             {/* --- BADGES & ACHIEVEMENTS --- */}
