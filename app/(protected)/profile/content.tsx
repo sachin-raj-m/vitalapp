@@ -44,13 +44,45 @@ export default function ProfilePage() {
 
     const handleDownload = async () => {
         if (!cardRef.current) return;
+
+        // Save original styles
+        const originalStyle = cardRef.current.style.cssText;
+        const originalClass = cardRef.current.className;
+
         try {
-            const canvas = await html2canvas(cardRef.current, {
-                // @ts-ignore - html2canvas types might be missing backgroundColor
+            // Apply capture-friendly styles to prevent overflow/clipping
+            // We force a specific width and remove transforms/margins during capture
+            cardRef.current.style.transform = 'none';
+            cardRef.current.style.margin = '0';
+            cardRef.current.style.boxShadow = 'none'; // Shadow sometimes clips
+
+            // Create a temporary container for clean capture
+            const container = document.createElement('div');
+            container.style.position = 'fixed';
+            container.style.top = '-9999px';
+            container.style.left = '-9999px';
+            container.style.width = '420px'; // Slightly larger to fit card comfortably
+            container.style.padding = '20px'; // Padding to capture shadow if needed (though we disabled it)
+            container.style.background = '#ffffff'; // White background for clean alpha
+            document.body.appendChild(container);
+
+            // Clone the card into the container
+            const clone = cardRef.current.cloneNode(true) as HTMLElement;
+            clone.style.transform = 'none';
+            clone.style.width = '100%';
+            clone.style.maxWidth = 'none';
+            container.appendChild(clone);
+
+            const canvas = await html2canvas(clone, {
                 backgroundColor: null,
-                scale: 3,
-                useCORS: true
-            });
+                scale: 3, // High resolution
+                logging: false,
+                useCORS: true,
+                allowTaint: true
+            } as any);
+
+            // Cleanup
+            document.body.removeChild(container);
 
             const dataUrl = canvas.toDataURL('image/png');
             const link = document.createElement('a');
@@ -60,6 +92,10 @@ export default function ProfilePage() {
         } catch (err) {
             console.error('Download failed:', err);
             alert('Could not generate image. Please try again.');
+        } finally {
+            // Restore styles (though we mostly used a clone, it's good practice)
+            cardRef.current.style.cssText = originalStyle;
+            cardRef.current.className = originalClass;
         }
     };
 
@@ -152,7 +188,7 @@ export default function ProfilePage() {
     }
 
     return (
-        <div className="max-w-6xl mx-auto space-y-8 pb-12">
+        <div className="max-w-6xl mx-auto space-y-12 pb-12">
             {error && (
                 <Alert variant="error" className="mb-4">
                     {error}
