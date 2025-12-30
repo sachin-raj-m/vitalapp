@@ -234,7 +234,7 @@ export default function ProfilePage() {
                                     className="bg-white/10 hover:bg-white/25 text-white border border-white/40 backdrop-blur-md"
                                 >
                                     <Settings className="w-4 h-4 mr-2" />
-                                    Settings
+                                    Edit Profile
                                 </Button>
                                 {user?.is_donor && (
                                     <div className="relative inline-block text-left">

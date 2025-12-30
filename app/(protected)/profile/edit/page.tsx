@@ -9,6 +9,7 @@ import { Alert } from '@/components/ui/Alert';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { ArrowLeft, Check, Lock } from 'lucide-react';
+import { SecuritySettings } from '@/app/(protected)/profile/SecuritySettings';
 
 export default function ProfileEditPage() {
     const router = useRouter();
@@ -249,6 +250,17 @@ export default function ProfileEditPage() {
                             </Button>
                         </div>
                     </form>
+                </CardBody>
+            </Card>
+
+            {/* Account Security Section */}
+            <Card className="border-slate-200 shadow-lg mt-8">
+                <CardBody className="p-8">
+                    <div className="mb-6">
+                        <h3 className="text-lg font-bold text-slate-900">Account Security</h3>
+                        <p className="text-slate-500 text-sm">Manage how you access your account.</p>
+                    </div>
+                    <SecuritySettings />
                 </CardBody>
             </Card>
 
