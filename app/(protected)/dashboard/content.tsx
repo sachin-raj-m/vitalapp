@@ -3,57 +3,43 @@
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Activity, Users, AlertCircle, TrendingUp, Calendar, Heart, Shield, Award, CheckCircle } from 'lucide-react';
-import { Card, CardBody, CardHeader } from '@/components/ui/Card';
+import { Activity, Users, TrendingUp, Calendar, Heart, Shield, Award, CheckCircle, Trophy, Target, Star, Lock } from 'lucide-react';
+import { Card, CardBody } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
-import { Badge } from '@/components/ui/Badge';
 import { BloodRequestCard } from '@/components/BloodRequestCard';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
 import type { BloodRequest } from '@/types';
 import { isBloodCompatible } from '@/lib/blood-compatibility';
-import { formatDistanceToNow, addDays, differenceInDays } from 'date-fns';
+import { addDays, differenceInDays } from 'date-fns';
 import { DashboardSkeleton } from '@/components/skeletons/DashboardSkeleton';
 import { EmptyState } from '@/components/EmptyState';
-
 import { useRequests } from '@/context/RequestsContext';
 import { NotificationBanner } from '@/components/NotificationBanner';
-
-// ... (other imports remain, remove BloodRequest type import if unused or keep)
+import { fetchUserStats, calculateEligibility, type UserStats } from '@/lib/stats';
 
 export default function DashboardPage() {
     const { user } = useAuth();
     const router = useRouter();
-    const { requests, myDonations, loading: requestsLoading } = useRequests(); // Use global state
+    const { requests, myDonations, loading: requestsLoading } = useRequests();
 
-    // Local state for user-specific stats only
-    const [stats, setStats] = useState({
-        completedDonations: 0,
-        livesImpacted: 0
-    });
+    const [stats, setStats] = useState<UserStats | null>(null);
     const [smartMatches, setSmartMatches] = useState<BloodRequest[]>([]);
-    const [lastDonationDate, setLastDonationDate] = useState<Date | null>(null);
-    const [userStatsLoading, setUserStatsLoading] = useState(true);
+    const [isLoadingStats, setIsLoadingStats] = useState(true);
 
     useEffect(() => {
         if (user) {
-            fetchUserStats();
+            loadStats();
         }
     }, [user]);
 
-    // Recalculate smart matches whenever requests or user changes
+    // Recalculate smart matches
     useEffect(() => {
         if (requests.length > 0 && user?.blood_group) {
             const matches = requests.filter(req => {
-                // 1. Own Request Filter
                 if (req.user_id === user.id) return false;
-
-                // 2. Compatibility Filter
                 if (!user.blood_group || !req.blood_group) return false;
-
                 if (!isBloodCompatible(user.blood_group, req.blood_group)) return false;
-
-                // 3. Show all compatible matches, even if already offered (handled by card UI)
                 return true;
             });
             setSmartMatches(matches);
@@ -62,83 +48,56 @@ export default function DashboardPage() {
         }
     }, [requests, user, myDonations]);
 
-    const fetchUserStats = async () => {
+    const loadStats = async () => {
         if (!user) return;
         try {
-            setUserStatsLoading(true);
-
-            // Fetch User's Donation History for Eligibility & Gamification
-            const { data: donations } = await supabase
-                .from('donations')
-                .select('*')
-                .eq('donor_id', user.id)
-                .eq('status', 'completed')
-                .order('created_at', { ascending: false });
-
-            // Calculate Stats
-            const completedCount = donations?.length || 0;
-            const lastDonation = donations?.[0] ? new Date(donations[0].created_at) : null;
-
-            setStats({
-                completedDonations: completedCount,
-                livesImpacted: completedCount * 3
-            });
-
-            setLastDonationDate(lastDonation);
-
+            setIsLoadingStats(true);
+            const data = await fetchUserStats(user.id);
+            setStats(data);
         } catch (error) {
-            console.error('Error fetching dashboard user stats', error);
+            console.error('Error fetching stats', error);
         } finally {
-            setUserStatsLoading(false);
+            setIsLoadingStats(false);
         }
     };
 
-    const isLoading = requestsLoading || userStatsLoading;
+    const isLoading = requestsLoading || isLoadingStats;
 
-
-    // Helper: Determine Donor Level
-    const getDonorLevel = (count: number) => {
-        if (count >= 10) return { name: 'Gold Donor', color: 'text-yellow-600 bg-yellow-100', icon: Shield };
-        if (count >= 5) return { name: 'Silver Donor', color: 'text-gray-600 bg-gray-100', icon: Shield };
-        if (count >= 1) return { name: 'Bronze Donor', color: 'text-orange-700 bg-orange-100', icon: Award };
-        return { name: 'New Donor', color: 'text-blue-600 bg-blue-100', icon: Heart };
+    // Get Highest Unlocked Badge for Rank
+    const currentRank = stats?.achievements?.filter(a => a.unlocked).pop() || {
+        name: 'New Hero',
+        icon: 'heart',
+        motto: 'Ready to save lives',
+        unlocked: true
     };
 
-    const donorLevel = getDonorLevel(stats.completedDonations);
-    const LevelIcon = donorLevel.icon;
+    // Calculate Next Milestone
+    // Find the first locked count-based badge
+    const nextBadge = stats?.achievements?.find(a => !a.unlocked && a.type === 'count');
 
-    // Helper: Eligibility logic
-    const getEligibilityStatus = () => {
-        if (!lastDonationDate) return { isReady: true, message: "You are ready to donate today!" };
+    // Helper: Next Eligibility
+    const eligibility = calculateEligibility(stats?.last_donation_date || null);
 
-        const nextDate = addDays(lastDonationDate, 56);
-        const today = new Date();
-
-        if (today >= nextDate) {
-            return { isReady: true, message: "You are ready to donate again!" };
-        } else {
-            const daysLeft = differenceInDays(nextDate, today);
-            return { isReady: false, message: `Eligible in ${daysLeft} days`, nextDate };
+    const getRankIcon = (iconName: string) => {
+        switch (iconName) {
+            case 'droplet': return DropletIcon;
+            case 'shield': return Shield;
+            case 'star': return Star;
+            case 'trophy': return Trophy;
+            default: return Heart;
         }
     };
 
-    const eligibility = getEligibilityStatus();
+    const RankIcon = getRankIcon(currentRank.icon || 'heart');
 
-    // Helper to show PIN for pending donations
+    // Helper to show PIN for pending donations (Redirects to requests)
     const handlePendingClick = (request: BloodRequest) => {
-        // For dashboard, we might not have the PIN modal logic readily available without duplicating code.
-        // Option 1: Redirect to /requests where the modal exists.
-        // Option 2: Simple alert (not great).
-        // Option 3: Lift modal state (too complex for now).
-        // Decision: Redirect to main requests page for "Complete Donation", which feels natural as "Next Step".
         router.push('/requests');
     };
 
     if (isLoading) {
         return <DashboardSkeleton />;
     }
-
-    // ...
 
     return (
         <div className="space-y-8">
@@ -149,30 +108,40 @@ export default function DashboardPage() {
                     <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
                     <p className="text-gray-600">Overview of your impact and matches</p>
                 </div>
-                <div className={`flex items-center space-x-2 px-4 py-2 rounded-full ${donorLevel.color}`}>
-                    <LevelIcon className="h-5 w-5" />
-                    <span className="font-semibold">{donorLevel.name}</span>
+                <div className={`flex items-center space-x-2 px-4 py-2 rounded-full ${stats?.total_points ? 'bg-amber-100 text-amber-800' : 'bg-gray-100 text-gray-700'}`}>
+                    <RankIcon className="h-5 w-5" />
+                    <div className="flex flex-col leading-tight">
+                        <span className="font-bold text-sm">{currentRank.name}</span>
+                        {stats?.total_points !== undefined && (
+                            <span className="text-xs opacity-80">{stats.total_points} Points</span>
+                        )}
+                    </div>
                 </div>
             </div>
 
-            {/* Smart Status Section */}
+            {/* Stats Section */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {/* 1. Eligibility Card */}
-                <Card className={eligibility.isReady ? "border-l-4 border-l-success-500" : "border-l-4 border-l-orange-500"}>
+                <Card className={eligibility.isEligible ? "border-l-4 border-l-green-500" : "border-l-4 border-l-orange-500"}>
                     <CardBody className="flex flex-col h-full justify-between">
                         <div>
                             <div className="flex items-center justify-between mb-4">
                                 <h3 className="font-semibold text-gray-700">Donation Status</h3>
-                                <Calendar className={eligibility.isReady ? "text-success-500" : "text-orange-500"} />
+                                <Calendar className={eligibility.isEligible ? "text-green-500" : "text-orange-500"} />
                             </div>
-                            <p className={`text-xl font-bold ${eligibility.isReady ? "text-success-600" : "text-orange-600"}`}>
-                                {eligibility.isReady ? "Ready to Donate" : "Recovery Period"}
+                            <p className={`text-xl font-bold ${eligibility.isEligible ? "text-green-600" : "text-orange-600"}`}>
+                                {eligibility.isEligible ? "Ready to Donate" : "Recovery Period"}
                             </p>
-                            <p className="text-sm text-gray-500 mt-1">{eligibility.message}</p>
+                            <p className="text-sm text-gray-500 mt-1">
+                                {eligibility.isEligible
+                                    ? "You can save a life today!"
+                                    : `Eligible in ${eligibility.daysRemaining} days`
+                                }
+                            </p>
                         </div>
-                        {eligibility.isReady && (
+                        {eligibility.isEligible && (
                             <Link href="/requests" className="mt-4">
-                                <Button size="sm" variant="outline" className="w-full text-success-600 border-success-200 hover:bg-success-50">
+                                <Button size="sm" variant="outline" className="w-full text-green-600 border-green-200 hover:bg-green-50">
                                     Find a Match
                                 </Button>
                             </Link>
@@ -180,43 +149,75 @@ export default function DashboardPage() {
                     </CardBody>
                 </Card>
 
-                {/* 2. Impact Card */}
+                {/* 2. Impact Score Card */}
                 <Card>
                     <CardBody>
                         <div className="flex items-center justify-between mb-4">
-                            <h3 className="font-semibold text-gray-700">Your Impact</h3>
-                            <Activity className="text-primary-500" />
+                            <h3 className="font-semibold text-gray-700">Impact Score</h3>
+                            <Trophy className="text-amber-500" />
                         </div>
                         <div className="space-y-4">
                             <div>
-                                <p className="text-3xl font-bold text-gray-900">{stats.livesImpacted}</p>
-                                <p className="text-sm text-gray-500">Estimated lives saved</p>
+                                <p className="text-3xl font-bold text-gray-900">{stats?.total_points || 0}</p>
+                                <p className="text-sm text-gray-500">Current Points</p>
                             </div>
                             <div className="pt-4 border-t border-gray-100 flex justify-between text-sm">
-                                <span className="text-gray-600">Donations made</span>
-                                <span className="font-medium">{stats.completedDonations}</span>
+                                <span className="text-gray-600">Lifetime Donations</span>
+                                <span className="font-medium">{stats?.total_donations || 0}</span>
                             </div>
                         </div>
                     </CardBody>
                 </Card>
 
-                {/* 3. Quick Action / Pulse */}
-                <Card className="bg-gradient-to-br from-primary-600 to-primary-700 text-white">
-                    <CardBody className="flex flex-col h-full justify-between text-white">
-                        <div>
-                            <h3 className="font-semibold text-primary-100 mb-2">Community Needs</h3>
-                            <p className="text-2xl font-bold mb-1">{requests.length} Active Requests</p>
-                            <p className="text-sm text-primary-100 opacity-90">
-                                {smartMatches.length > 0
-                                    ? <span className="font-bold bg-white/20 px-2 py-0.5 rounded text-white">{smartMatches.length} Matches For You</span>
-                                    : "No compatible requests right now"}
-                            </p>
-                        </div>
-                        <Link href="/requests/new" className="mt-4">
-                            <Button variant="ghost" className="w-full bg-white text-primary-700 hover:bg-gray-100">
-                                Request Blood
-                            </Button>
-                        </Link>
+                {/* 3. Next Milestone Card */}
+                <Card className="bg-gradient-to-br from-indigo-600 to-indigo-700 text-white overflow-hidden relative">
+                    {/* Decorative bg circle */}
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16 pointer-events-none"></div>
+
+                    <CardBody className="flex flex-col h-full justify-between text-white relative z-10">
+                        {nextBadge ? (
+                            <>
+                                <div>
+                                    <h3 className="font-semibold text-indigo-100 mb-2 flex items-center gap-2">
+                                        <Target className="w-4 h-4" />
+                                        Next Goal
+                                    </h3>
+                                    <div className="flex justify-between items-end mb-1">
+                                        <p className="text-xl font-bold">{nextBadge.name}</p>
+                                        <p className="text-sm font-medium text-indigo-200">
+                                            {nextBadge.progress} / {nextBadge.threshold}
+                                        </p>
+                                    </div>
+
+                                    {/* Progress Bar */}
+                                    <div className="h-2 w-full bg-black/20 rounded-full overflow-hidden mb-2">
+                                        <div
+                                            className="h-full bg-white/90 rounded-full transition-all duration-1000"
+                                            style={{ width: `${Math.min(100, (nextBadge.progress! / nextBadge.threshold!) * 100)}%` }}
+                                        />
+                                    </div>
+                                    <p className="text-xs text-indigo-200">
+                                        {nextBadge.threshold! - nextBadge.progress!} more donation(s) to unlock {nextBadge.points} pts
+                                    </p>
+                                </div>
+                                <Link href="/achievements" className="mt-3">
+                                    <Button variant="ghost" size="sm" className="w-full bg-white/10 text-white hover:bg-white/20 border-0 text-xs h-8">
+                                        View All Badges
+                                    </Button>
+                                </Link>
+                            </>
+                        ) : (
+                            <div className="flex flex-col items-center justify-center h-full text-center py-2">
+                                <Trophy className="w-10 h-10 text-yellow-300 mb-2" />
+                                <p className="font-bold text-lg">Legend Status</p>
+                                <p className="text-sm text-indigo-200">You've reached the top!</p>
+                                <Link href="/achievements" className="mt-3 w-full">
+                                    <Button variant="ghost" size="sm" className="w-full bg-white/10 text-white hover:bg-white/20 border-0 text-xs h-8">
+                                        View Legacy
+                                    </Button>
+                                </Link>
+                            </div>
+                        )}
                     </CardBody>
                 </Card>
             </div>
@@ -239,17 +240,11 @@ export default function DashboardPage() {
                             <BloodRequestCard
                                 key={request.id}
                                 request={request}
-                                // Simple view only, detailed interaction happens on click or reuse existing logic if needed
-                                // Passing props to enable interaction if we want "Quick Donate"
-                                onRespond={() => router.push('/requests')} // Redirect to main page for full flow or keep it simple
+                                onRespond={() => router.push('/requests')}
                                 onPendingClick={() => handlePendingClick(request)}
                                 userBloodGroup={user?.blood_group}
                                 hasOffered={myDonations.has(request.id)}
-                                isOwnRequest={request.user_id === user?.id} // Defensive: Ensure own requests are marked
-                            // We don't fetch 'offered' state here to keep dashboard light, so maybe just link to details?
-                            // Let's use a simpler "View" action or assume redirection.
-                            // Actually better to render it fully but disable complex tailored logic to avoid overhead?
-                            // Let's pass a dummy onRespond that navigates to requests page to be safe
+                                isOwnRequest={request.user_id === user?.id}
                             />
                         ))}
                     </div>
@@ -267,3 +262,18 @@ export default function DashboardPage() {
         </div>
     );
 }
+
+const DropletIcon = ({ className }: { className?: string }) => (
+    <svg
+        xmlns="http://www.w3.org/2000/svg"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className={className}
+    >
+        <path d="M12 22a7 7 0 0 0 7-7c0-2-2-3-2-3L12 2l-7 10s-2 1-2 3a7 7 0 0 0 7 7z" />
+    </svg>
+);

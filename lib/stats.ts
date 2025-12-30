@@ -12,6 +12,7 @@ export interface Achievement {
     unlockedDate?: string;
     progress: number;
     threshold?: number;
+    type: 'count' | 'special';
 }
 
 export interface UserStats {
@@ -111,7 +112,8 @@ export function calculateAchievements(donations: any[]): Achievement[] {
             unlocked,
             unlockedDate,
             progress,
-            threshold: badge.type === 'count' ? badge.threshold : undefined
+            threshold: badge.type === 'count' ? badge.threshold : undefined,
+            type: badge.type
         };
     });
 }

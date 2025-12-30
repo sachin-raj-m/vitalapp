@@ -1,6 +1,6 @@
 import React from 'react';
 import { formatDistanceToNow } from 'date-fns';
-import { MapPin, Clock, Activity, Droplet, Calendar } from 'lucide-react';
+import { MapPin, Clock, Activity, Droplet, Calendar, Trophy } from 'lucide-react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { Card, CardBody } from './ui/Card';
@@ -156,13 +156,19 @@ export const BloodRequestCard: React.FC<BloodRequestCardProps> = ({ request, onR
                         Incompatible ({userBloodGroup})
                       </Button>
                     ) : (
-                      <Button
-                        variant="primary"
-                        size="sm"
-                        onClick={onRespond}
-                      >
-                        I can donate
-                      </Button>
+                      <div className="flex items-center gap-2">
+                        <div className="hidden sm:flex items-center gap-1 text-xs font-bold text-amber-600 bg-amber-50 px-2 py-1 rounded-full border border-amber-100">
+                          <Trophy className="w-3 h-3" />
+                          <span>+50 Pts</span>
+                        </div>
+                        <Button
+                          variant="primary"
+                          size="sm"
+                          onClick={onRespond}
+                        >
+                          I can donate
+                        </Button>
+                      </div>
                     )}
                   </>
                 )}
@@ -170,7 +176,7 @@ export const BloodRequestCard: React.FC<BloodRequestCardProps> = ({ request, onR
             </div>
           </div>
         </CardBody>
-      </Card>
-    </motion.div>
+      </Card >
+    </motion.div >
   );
 };
