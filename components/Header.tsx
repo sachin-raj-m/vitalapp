@@ -61,19 +61,6 @@ export function Header() {
           <nav className="hidden md:flex items-center space-x-6">
             {user ? (
               <div className="flex items-center space-x-6">
-                <Link href="/requests" className="text-gray-600 hover:text-gray-900">Requests</Link>
-                <Link href="/requests/my-requests" className="text-gray-600 hover:text-gray-900">My Requests</Link>
-                <Link href="/donations" className="text-gray-600 hover:text-gray-900">Donations</Link>
-                <Link href="/nearby-donors" className="text-gray-600 hover:text-gray-900">Find Donors</Link>
-                {user.role === 'admin' && (
-                  <Link href="/admin" className="text-red-600 font-medium hover:text-red-700">Admin Console</Link>
-                )}
-                <NotificationBell />
-                <Link href="/profile">
-                  <Button variant="ghost" className="p-2">
-                    <User className="h-5 w-5" />
-                  </Button>
-                </Link>
                 <Link href="/dashboard">
                   <Button variant="primary" className="flex items-center space-x-2">
                     <LayoutDashboard className="h-4 w-4" />
@@ -102,17 +89,8 @@ export function Header() {
           <div className="md:hidden mt-4 pb-4 border-t border-gray-100 pt-4 space-y-4">
             {user ? (
               <div className="flex flex-col space-y-3">
-                <Link href="/dashboard" onClick={closeMenu} className="block px-2 py-1 text-gray-600 hover:text-primary-600 hover:bg-gray-50 rounded-md">Dashboard</Link>
-                <Link href="/requests" onClick={closeMenu} className="block px-2 py-1 text-gray-600 hover:text-primary-600 hover:bg-gray-50 rounded-md">Requests</Link>
-                <Link href="/requests/my-requests" onClick={closeMenu} className="block px-2 py-1 text-gray-600 hover:text-primary-600 hover:bg-gray-50 rounded-md">My Requests</Link>
-                <Link href="/donations" onClick={closeMenu} className="block px-2 py-1 text-gray-600 hover:text-primary-600 hover:bg-gray-50 rounded-md">Donations</Link>
-                <Link href="/nearby-donors" onClick={closeMenu} className="block px-2 py-1 text-gray-600 hover:text-primary-600 hover:bg-gray-50 rounded-md">Find Donors</Link>
-                {user.role === 'admin' && (
-                  <Link href="/admin" onClick={closeMenu} className="block px-2 py-1 text-red-600 font-medium hover:bg-red-50 rounded-md">Admin Console</Link>
-                )}
-                <Link href="/profile" onClick={closeMenu} className="flex items-center space-x-2 px-2 py-1 text-gray-600 hover:text-primary-600 hover:bg-gray-50 rounded-md">
-                  <User className="h-5 w-5" />
-                  <span>Profile</span>
+                <Link href="/dashboard" onClick={closeMenu} className="block px-2 py-1 text-primary-600 font-medium hover:bg-gray-50 rounded-md">
+                  Go to Dashboard
                 </Link>
               </div>
             ) : (
