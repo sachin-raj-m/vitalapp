@@ -515,8 +515,10 @@ export default function ProfilePage() {
 
 
             {/* --- COMPONENT SECTIONS --- */}
-            <div className="grid md:grid-cols-2 gap-8">
-                <div>
+            {/* --- PREFERENCES & INFO GRID --- */}
+            <div className="grid md:grid-cols-2 gap-6 md:gap-8">
+                {/* Left Column: Preferences */}
+                <div className="space-y-4">
                     <div className="mb-4">
                         <h3 className="text-lg font-bold text-slate-900">Preferences</h3>
                         <p className="text-slate-500 text-sm">Customize your notification experience.</p>
@@ -537,27 +539,34 @@ export default function ProfilePage() {
                             </div>
                         </CardBody>
                     </Card>
+                </div>
 
-                    {/* Contact Info (Compact) */}
-                    <div className="mt-8">
-                        <div className="mb-4">
-                            <h3 className="text-lg font-bold text-slate-900">My Info</h3>
-                        </div>
-                        <Card className="divide-y divide-slate-100">
-                            <div className="p-4 flex justify-between items-center hover:bg-slate-50 transition-colors">
-                                <span className="text-slate-500 text-sm">Email</span>
-                                <span className="font-medium text-slate-900">{user?.email}</span>
-                            </div>
-                            <div className="p-4 flex justify-between items-center hover:bg-slate-50 transition-colors">
-                                <span className="text-slate-500 text-sm">Phone</span>
-                                <span className="font-medium text-slate-900">{user?.phone || '--'}</span>
-                            </div>
-                            <div className="p-4 flex justify-between items-center hover:bg-slate-50 transition-colors">
-                                <span className="text-slate-500 text-sm">Location</span>
-                                <span className="font-medium text-slate-900 truncate max-w-[200px]">{user?.present_zip || '--'}</span>
-                            </div>
-                        </Card>
+                {/* Right Column: Contact Info */}
+                <div className="space-y-4">
+                    <div className="mb-4">
+                        <h3 className="text-lg font-bold text-slate-900">My Info</h3>
+                        <p className="text-slate-500 text-sm">Your private contact details.</p>
                     </div>
+                    <Card className="divide-y divide-slate-100 h-full">
+                        <div className="p-4 flex justify-between items-center hover:bg-slate-50 transition-colors">
+                            <span className="text-slate-500 text-sm flex items-center gap-2">
+                                <Mail className="w-4 h-4" /> Email
+                            </span>
+                            <span className="font-medium text-slate-900">{user?.email}</span>
+                        </div>
+                        <div className="p-4 flex justify-between items-center hover:bg-slate-50 transition-colors">
+                            <span className="text-slate-500 text-sm flex items-center gap-2">
+                                <Phone className="w-4 h-4" /> Phone
+                            </span>
+                            <span className="font-medium text-slate-900">{user?.phone || '--'}</span>
+                        </div>
+                        <div className="p-4 flex justify-between items-center hover:bg-slate-50 transition-colors">
+                            <span className="text-slate-500 text-sm flex items-center gap-2">
+                                <MapPin className="w-4 h-4" /> ZIP Code
+                            </span>
+                            <span className="font-medium text-slate-900 truncate max-w-[200px]">{user?.present_zip || '--'}</span>
+                        </div>
+                    </Card>
                 </div>
             </div>
 
