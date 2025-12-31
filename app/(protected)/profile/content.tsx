@@ -164,7 +164,7 @@ export default function ProfilePage() {
     }
 
     return (
-        <div className="max-w-6xl mx-auto space-y-12 pb-12">
+        <div className="max-w-7xl mx-auto space-y-8 pb-8">
             {error && (
                 <Alert variant="error" className="mb-4">
                     {error}

@@ -161,7 +161,7 @@ export default function CreateRequestPage() {
     };
 
     return (
-        <div className="max-w-2xl mx-auto">
+        <div className="max-w-4xl mx-auto">
             <Card>
                 <CardHeader>
                     <h1 className="text-2xl font-bold text-gray-900">Create Blood Request</h1>
