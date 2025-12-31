@@ -26,9 +26,9 @@ export const Input: React.FC<InputProps> = ({
       <input
         id={id}
         className={`
-          w-full px-3 py-2 border rounded-md shadow-sm placeholder-gray-400 
+          w-full px-3 py-2 border rounded-lg shadow-sm placeholder-slate-400 
           focus:outline-none focus:ring-2 
-          ${error ? 'border-error-300 focus:border-error-500 focus:ring-error-500' : 'border-gray-300 focus:border-secondary-500 focus:ring-secondary-500'}
+          ${error ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : 'border-slate-200 focus:border-primary-500 focus:ring-primary-500'}
           ${className}
         `}
         {...props}
@@ -68,9 +68,9 @@ export const Select: React.FC<SelectProps> = ({
       <select
         id={id}
         className={`
-          w-full px-3 py-2 border rounded-md shadow-sm placeholder-gray-400 
+          w-full px-3 py-2 border rounded-lg shadow-sm placeholder-slate-400 
           focus:outline-none focus:ring-2 
-          ${error ? 'border-error-300 focus:border-error-500 focus:ring-error-500' : 'border-gray-300 focus:border-secondary-500 focus:ring-secondary-500'}
+          ${error ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : 'border-slate-200 focus:border-primary-500 focus:ring-primary-500'}
           ${className}
         `}
         {...props}
@@ -113,9 +113,9 @@ export const Textarea: React.FC<TextareaProps> = ({
       <textarea
         id={id}
         className={`
-          w-full px-3 py-2 border rounded-md shadow-sm placeholder-gray-400 
+          w-full px-3 py-2 border rounded-lg shadow-sm placeholder-slate-400 
           focus:outline-none focus:ring-2 
-          ${error ? 'border-error-300 focus:border-error-500 focus:ring-error-500' : 'border-gray-300 focus:border-secondary-500 focus:ring-secondary-500'}
+          ${error ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : 'border-slate-200 focus:border-primary-500 focus:ring-primary-500'}
           ${className}
         `}
         {...props}
