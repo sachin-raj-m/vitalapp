@@ -30,11 +30,8 @@ export default function HomePage() {
     });
 
     useEffect(() => {
-        if (user) {
-            router.push('/dashboard');
-        }
         fetchStats();
-    }, [user, router]);
+    }, []);
 
     const fetchStats = async () => {
         try {
@@ -73,7 +70,7 @@ export default function HomePage() {
         }
     };
 
-    if (user) return null;
+    // if (user) return null; // Logic removed to allow logged-in users to see Home
 
     return (
         <div className="bg-white text-slate-900 font-sans selection:bg-red-100 selection:text-red-900">
