@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { Button } from './ui/Button';
 import { useAuth } from '../context/AuthContext';
-import { LogIn, User, HeartPulse, Menu, X } from 'lucide-react';
+import { LogIn, User, HeartPulse, Menu, X, LayoutDashboard } from 'lucide-react';
 import { NotificationBell } from './NotificationBell';
 
 import { usePathname } from 'next/navigation';
@@ -44,7 +44,7 @@ export function Header() {
     <header className="bg-white border-b border-gray-200 sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 py-4">
         <div className="flex items-center justify-between">
-          <Link href="/" className="text-2xl font-bold text-primary-600 flex items-center" onClick={closeMenu}>
+          <Link href={user ? "/dashboard" : "/"} className="text-2xl font-bold text-primary-600 flex items-center" onClick={closeMenu}>
             <HeartPulse className="h-8 w-8 mr-2" />
             Vital
           </Link>
@@ -61,7 +61,6 @@ export function Header() {
           <nav className="hidden md:flex items-center space-x-6">
             {user ? (
               <div className="flex items-center space-x-6">
-                <Link href="/dashboard" className="text-gray-600 hover:text-gray-900">Dashboard</Link>
                 <Link href="/requests" className="text-gray-600 hover:text-gray-900">Requests</Link>
                 <Link href="/requests/my-requests" className="text-gray-600 hover:text-gray-900">My Requests</Link>
                 <Link href="/donations" className="text-gray-600 hover:text-gray-900">Donations</Link>
@@ -73,6 +72,12 @@ export function Header() {
                 <Link href="/profile">
                   <Button variant="ghost" className="p-2">
                     <User className="h-5 w-5" />
+                  </Button>
+                </Link>
+                <Link href="/dashboard">
+                  <Button variant="primary" className="flex items-center space-x-2">
+                    <LayoutDashboard className="h-4 w-4" />
+                    <span>Dashboard</span>
                   </Button>
                 </Link>
               </div>

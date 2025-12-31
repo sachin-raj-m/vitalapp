@@ -48,14 +48,14 @@ export function AppSidebar() {
 
     const SidebarContent = () => (
         <div className="flex flex-col h-full bg-white border-r border-gray-200 shadow-sm">
-            <div className="p-6 flex items-center gap-3 border-b border-gray-100">
+            <Link href="/" className="p-6 flex items-center gap-3 border-b border-gray-100 hover:bg-gray-50 transition-colors">
                 <div className="bg-red-50 p-2 rounded-lg">
                     <HeartPulse className="h-6 w-6 text-red-600" />
                 </div>
                 <span className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-red-600 to-red-900">
                     VitalApp
                 </span>
-            </div>
+            </Link>
 
             <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
                 <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4 px-2">
@@ -109,14 +109,13 @@ export function AppSidebar() {
                 <SidebarContent />
             </div>
 
-            {/* Mobile Header */}
             <div className="md:hidden sticky top-0 z-40 bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between shadow-sm">
-                <div className="flex items-center gap-2">
+                <Link href="/dashboard" className="flex items-center gap-2">
                     <div className="bg-red-50 p-1.5 rounded-lg">
                         <HeartPulse className="h-5 w-5 text-red-600" />
                     </div>
                     <span className="font-bold text-lg text-gray-900">VitalApp</span>
-                </div>
+                </Link>
                 <button
                     onClick={() => setIsMobileOpen(true)}
                     className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
