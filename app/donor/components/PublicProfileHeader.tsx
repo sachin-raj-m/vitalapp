@@ -21,7 +21,7 @@ export default function PublicProfileHeader() {
     // However, "Become a Donor" is the safe default.
 
     return (
-        <header className="relative z-20 w-full flex items-center justify-between">
+        <header className="relative z-20 w-full flex items-center justify-between px-4 md:px-8 py-4">
             <Link href="/" className="flex items-center gap-2 group hover:opacity-80 transition-opacity">
                 <HeartPulse className="h-6 w-6 text-red-600" />
                 <span className="text-lg font-bold text-slate-900 tracking-tight">Vital</span>
