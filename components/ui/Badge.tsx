@@ -23,7 +23,7 @@ export const Badge: React.FC<BadgeProps> = ({
     success: 'bg-success-100 text-success-800',
     warning: 'bg-warning-100 text-warning-800',
     error: 'bg-error-100 text-error-800',
-    neutral: 'bg-gray-100 text-gray-800',
+    neutral: 'bg-slate-100 text-slate-700',
   };
 
   const sizeStyles = {

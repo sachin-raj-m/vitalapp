@@ -281,7 +281,7 @@ export default function AdminDashboard() {
             {error && <Alert variant="error" onClose={() => setError('')}>{error}</Alert>}
 
             {/* Stats Overview */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
                 <Card className="bg-blue-50 border-blue-100">
                     <CardBody className="p-4 flex items-center space-x-4">
                         <div className="p-3 bg-blue-100 rounded-full text-blue-600"><Users size={24} /></div>
@@ -326,7 +326,7 @@ export default function AdminDashboard() {
                     <button
                         key={tab}
                         onClick={() => setActiveTab(tab as any)}
-                        className={`px-4 py-2 capitalize font-medium text-sm transition-colors relative ${activeTab === tab ? 'text-red-600' : 'text-gray-500 hover:text-gray-700'
+                        className={`px-4 py-2 capitalize font-medium text-sm transition-colors relative ${activeTab === tab ? 'text-red-600' : 'text-slate-500 hover:text-slate-700'
                             }`}
                     >
                         {tab}
@@ -349,8 +349,8 @@ export default function AdminDashboard() {
                                         key={filter}
                                         onClick={() => setActivityFilter(filter)} // Needs state
                                         className={`px-3 py-1 text-xs font-medium rounded-full capitalize transition-colors ${activityFilter === filter
-                                            ? 'bg-gray-900 text-white'
-                                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                            ? 'bg-slate-900 text-white'
+                                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                                             }`}
                                     >
                                         {filter}
@@ -369,7 +369,7 @@ export default function AdminDashboard() {
                                 .slice(0, 20) // Increased limit
                                 .map((item, i) => {
                                     return (
-                                        <div key={i} className="flex items-start space-x-3 p-3 bg-white rounded-lg border border-gray-100 hover:shadow-sm transition-shadow">
+                                        <div key={i} className="flex items-start space-x-3 p-3 bg-white rounded-lg border border-slate-100 hover:shadow-sm transition-shadow">
                                             <div className={`p-2 rounded-full ${item.type === 'user' ? 'bg-blue-100 text-blue-600' :
                                                 item.type === 'request' ? 'bg-red-100 text-red-600' :
                                                     'bg-green-100 text-green-600'
@@ -379,7 +379,7 @@ export default function AdminDashboard() {
                                                 {item.type === 'donation' && <HeartPulse size={16} />}
                                             </div>
                                             <div>
-                                                <p className="text-sm text-gray-900">
+                                                <p className="text-sm text-slate-900">
                                                     {item.type === 'user' && (
                                                         <span>New user <span className="font-semibold">{(item.data as any).full_name}</span> joined.</span>
                                                     )}
@@ -390,7 +390,7 @@ export default function AdminDashboard() {
                                                         <span>New donation offer for request #{(item.data as any).request_id?.slice(0, 8)}.</span>
                                                     )}
                                                 </p>
-                                                <p className="text-xs text-gray-500 mt-1">
+                                                <p className="text-xs text-slate-500 mt-1">
                                                     {new Date(item.date).toLocaleString()}
                                                 </p>
                                             </div>
@@ -399,7 +399,7 @@ export default function AdminDashboard() {
                                 })}
 
                             {users.length === 0 && requests.length === 0 && (
-                                <div className="text-center py-8 text-gray-500">
+                                <div className="text-center py-8 text-slate-500">
                                     No activity recorded yet.
                                 </div>
                             )}
@@ -409,8 +409,8 @@ export default function AdminDashboard() {
 
                 <div className={activeTab === 'users' ? 'block' : 'hidden'}>
                     <div className="space-y-4">
-                        <div className="flex items-center space-x-2 bg-white border border-gray-300 rounded-md px-3 py-2 w-full max-w-sm">
-                            <Search className="h-4 w-4 text-gray-400" />
+                        <div className="flex items-center space-x-2 bg-white border border-slate-300 rounded-md px-3 py-2 w-full max-w-sm">
+                            <Search className="h-4 w-4 text-slate-400" />
                             <input
                                 type="text"
                                 placeholder="Search users by name or email..."

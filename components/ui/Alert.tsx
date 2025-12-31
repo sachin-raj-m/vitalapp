@@ -16,15 +16,15 @@ export const Alert: React.FC<AlertProps> = ({
   onClose,
   className = '',
 }) => {
-  const baseStyles = 'rounded-md p-4';
-  
+  const baseStyles = 'rounded-lg p-4';
+
   const variantStyles = {
     info: 'bg-blue-50 text-blue-800',
     success: 'bg-green-50 text-green-800',
     warning: 'bg-yellow-50 text-yellow-800',
     error: 'bg-red-50 text-red-800',
   };
-  
+
   const icons = {
     info: <Info className="h-5 w-5 text-blue-400" />,
     success: <CheckCircle className="h-5 w-5 text-green-400" />,

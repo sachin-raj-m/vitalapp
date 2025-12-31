@@ -19,17 +19,17 @@ export const Button: React.FC<ButtonProps> = ({
   disabled,
   ...props
 }) => {
-  const baseStyles = 'inline-flex items-center justify-center font-medium rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2';
+  const baseStyles = 'inline-flex items-center justify-center font-medium rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2';
 
   const variantStyles = {
-    primary: 'bg-primary-400 text-white hover:bg-primary-500 focus:ring-primary-500',
-    secondary: 'bg-secondary-400 text-white hover:bg-secondary-500 focus:ring-secondary-500',
-    accent: 'bg-accent-400 text-white hover:bg-accent-500 focus:ring-accent-500',
-    success: 'bg-success-500 text-white hover:bg-success-600 focus:ring-success-500',
+    primary: 'bg-primary-600 text-white hover:bg-primary-700 focus:ring-primary-500',
+    secondary: 'bg-secondary-600 text-white hover:bg-secondary-700 focus:ring-secondary-500',
+    accent: 'bg-accent-600 text-white hover:bg-accent-700 focus:ring-accent-500',
+    success: 'bg-success-600 text-white hover:bg-success-700 focus:ring-success-500',
     warning: 'bg-warning-500 text-white hover:bg-warning-600 focus:ring-warning-500',
-    error: 'bg-error-500 text-white hover:bg-error-600 focus:ring-error-500',
-    ghost: 'bg-transparent text-gray-700 hover:bg-gray-100 focus:ring-gray-500',
-    outline: 'bg-transparent border border-gray-300 text-gray-700 hover:bg-gray-50 focus:ring-primary-500',
+    error: 'bg-red-600 text-white hover:bg-red-700 focus:ring-red-500',
+    ghost: 'bg-transparent text-slate-600 hover:bg-slate-100 focus:ring-slate-500',
+    outline: 'bg-transparent border border-slate-200 text-slate-700 hover:bg-slate-50 focus:ring-primary-500',
   };
 
   const sizeStyles = {
