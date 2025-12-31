@@ -523,11 +523,11 @@ export default function ProfilePage() {
                         <h3 className="text-lg font-bold text-slate-900">Preferences</h3>
                         <p className="text-slate-500 text-sm">Customize your notification experience.</p>
                     </div>
-                    <Card className="hover:shadow-md transition-shadow">
-                        <CardBody className="p-0">
-                            <div className="flex items-center justify-between p-6">
-                                <div className="flex items-center space-x-4">
-                                    <div className="w-12 h-12 rounded-full bg-indigo-50 flex items-center justify-center">
+                    <Card className="hover:shadow-md transition-shadow h-full">
+                        <CardBody className="p-0 h-full">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between p-6 gap-4 h-full">
+                                <div className="flex items-start sm:items-center space-x-4">
+                                    <div className="w-12 h-12 rounded-full bg-indigo-50 flex items-center justify-center shrink-0">
                                         <Bell className="h-6 w-6 text-indigo-600" />
                                     </div>
                                     <div>
@@ -535,7 +535,9 @@ export default function ProfilePage() {
                                         <div className="text-sm text-slate-500">Receive alerts when blood is needed nearby</div>
                                     </div>
                                 </div>
-                                <PushNotificationManager />
+                                <div className="self-end sm:self-auto">
+                                    <PushNotificationManager />
+                                </div>
                             </div>
                         </CardBody>
                     </Card>
@@ -548,23 +550,23 @@ export default function ProfilePage() {
                         <p className="text-slate-500 text-sm">Your private contact details.</p>
                     </div>
                     <Card className="divide-y divide-slate-100 h-full">
-                        <div className="p-4 flex justify-between items-center hover:bg-slate-50 transition-colors">
-                            <span className="text-slate-500 text-sm flex items-center gap-2">
+                        <div className="p-6 flex justify-between items-center hover:bg-slate-50 transition-colors">
+                            <span className="text-slate-500 text-sm flex items-center gap-2 shrink-0">
                                 <Mail className="w-4 h-4" /> Email
                             </span>
-                            <span className="font-medium text-slate-900">{user?.email}</span>
+                            <span className="font-medium text-slate-900 text-right truncate ml-4">{user?.email}</span>
                         </div>
-                        <div className="p-4 flex justify-between items-center hover:bg-slate-50 transition-colors">
-                            <span className="text-slate-500 text-sm flex items-center gap-2">
+                        <div className="p-6 flex justify-between items-center hover:bg-slate-50 transition-colors">
+                            <span className="text-slate-500 text-sm flex items-center gap-2 shrink-0">
                                 <Phone className="w-4 h-4" /> Phone
                             </span>
-                            <span className="font-medium text-slate-900">{user?.phone || '--'}</span>
+                            <span className="font-medium text-slate-900 text-right truncate ml-4">{user?.phone || '--'}</span>
                         </div>
-                        <div className="p-4 flex justify-between items-center hover:bg-slate-50 transition-colors">
-                            <span className="text-slate-500 text-sm flex items-center gap-2">
+                        <div className="p-6 flex justify-between items-center hover:bg-slate-50 transition-colors">
+                            <span className="text-slate-500 text-sm flex items-center gap-2 shrink-0">
                                 <MapPin className="w-4 h-4" /> ZIP Code
                             </span>
-                            <span className="font-medium text-slate-900 truncate max-w-[200px]">{user?.present_zip || '--'}</span>
+                            <span className="font-medium text-slate-900 text-right truncate ml-4 max-w-[200px]">{user?.present_zip || '--'}</span>
                         </div>
                     </Card>
                 </div>
