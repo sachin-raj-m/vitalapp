@@ -2,7 +2,7 @@ import { Metadata } from 'next';
 import NearbyDonorsPageContent from './content';
 
 export const metadata: Metadata = {
-    title: 'Nearby Donors | Vital',
+    title: 'Nearby Donors',
     description: 'Find blood donors near your location',
 };
 

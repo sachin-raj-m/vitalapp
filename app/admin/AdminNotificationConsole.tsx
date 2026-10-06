@@ -271,7 +271,7 @@ export function AdminNotificationConsole() {
                         <p className="text-sm text-gray-500">Send notifications to users instantly.</p>
                     </div>
                     {audienceCount !== null && (
-                        <span className="bg-blue-100 text-blue-800 text-xs font-bold px-3 py-1 rounded-full">
+                        <span className="bg-gray-100 text-gray-900 text-xs font-bold px-3 py-1 rounded-full">
                             Est. Audience: {audienceCount}
                         </span>
                     )}
@@ -409,7 +409,7 @@ export function AdminNotificationConsole() {
                         </div>
                         <div className="w-full bg-gray-100 h-2 rounded-full overflow-hidden">
                             <div
-                                className="bg-blue-600 h-full transition-all duration-300"
+                                className="bg-gray-900 h-full transition-all duration-300"
                                 style={{ width: `${(progress.sent + progress.failed) / (progress.total || 1) * 100}%` }}
                             />
                         </div>

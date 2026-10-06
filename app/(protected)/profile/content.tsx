@@ -3,20 +3,19 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Card, CardHeader, CardBody } from '@/components/ui/Card';
-import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { Alert } from '@/components/ui/Alert';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { fetchUserStats, calculateEligibility, type UserStats } from '@/lib/stats';
-import { Loader2, User, MapPin, Phone, Mail, Droplet, Award, Calendar, Settings, LogOut, Edit2, Check, X, Shield, Heart, Bell, Share, Download, ChevronDown, Star, Trophy, Globe, Copy, ExternalLink, Link as LinkIcon, Eye, EyeOff } from 'lucide-react';
+import { Copy, Download, ExternalLink, Pencil, Send } from 'lucide-react';
+import { format } from 'date-fns';
+import { donorProfilePath } from '@/lib/donor-slug';
+import { formatBloodGroup } from '@/lib/blood-compatibility';
+import { Skeleton } from '@/components/ui/Skeleton';
 import html2canvas from 'html2canvas';
 
 import { PushNotificationManager } from '@/components/PushNotificationManager';
-import { SecuritySettings } from './SecuritySettings';
-import type { BloodGroup } from '@/types';
-import { motion } from 'framer-motion';
 import DonorCard from '@/components/DonorCard';
 import { toast } from 'sonner';
 import { ConfirmationModal } from '@/components/ui/ConfirmationModal';
@@ -27,24 +26,24 @@ export default function ProfilePage() {
     const [stats, setStats] = useState<UserStats | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState('');
-    const [isShareOpen, setIsShareOpen] = useState(false);
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const cardRef = useRef<HTMLDivElement>(null);
 
+    const publicPath = user ? donorProfilePath(user) : '';
+    // Read on the client after mount so server and client render the same markup.
+    const [host, setHost] = useState('');
+    useEffect(() => setHost(window.location.host), []);
+
     const handleLinkShare = () => {
         if (!user?.id) return;
-        const cleanName = (user?.full_name || 'User').replace(/[^a-zA-Z0-9]/g, '');
-        const uniqueId = user?.donor_number || user?.id;
-        const vanitySlug = `${cleanName}@${uniqueId}`;
-        const url = `${window.location.origin}/donor/${vanitySlug}`;
-        const text = `I'm a proud blood donor on Vital! Check out my official donor card here: ${url}`;
+        const url = `${window.location.origin}${publicPath}`;
+        const text = `I’m a registered blood donor on Vital. If you’ve ever thought about it, it takes two minutes: ${url}`;
         window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
     };
 
     const togglePublicProfile = async (newValue: boolean) => {
         try {
             await updateProfile({ is_public_profile: newValue });
-            // Optimistic update if needed, but AuthContext should handle it
         } catch (err) {
             console.error('Failed to toggle visibility', err);
             toast.error('Failed to update visibility settings');
@@ -152,463 +151,152 @@ export default function ProfilePage() {
         }
     };
 
+    const copyPublicLink = async () => {
+        try {
+            await navigator.clipboard.writeText(`${window.location.origin}${publicPath}`);
+            toast.success('Link copied');
+        } catch {
+            toast.error('Couldn’t copy the link');
+        }
+    };
+
     // Eligibility Logic using shared utility
     const eligibility = calculateEligibility(stats?.last_donation_date || null);
 
-    if (isLoading) {
-        return (
-            <div className="flex justify-center items-center min-h-[60vh]">
-                <Loader2 className="h-8 w-8 animate-spin text-red-500" />
-            </div>
-        );
-    }
+    const unlocked = stats?.achievements?.filter(a => a.unlocked) ?? [];
+    const row = (label: string, value: React.ReactNode) => (
+        <div className="grid grid-cols-3 gap-4 py-3.5">
+            <dt className="text-sm text-gray-500">{label}</dt>
+            <dd className="col-span-2 truncate text-gray-900">{value || <span className="text-gray-400">Not set</span>}</dd>
+        </div>
+    );
 
     return (
-        <div className="max-w-7xl mx-auto space-y-8 pb-8">
-            {error && (
-                <Alert variant="error" className="mb-4">
-                    {error}
-                </Alert>
-            )}
+        <div className="space-y-12">
+            {error && <Alert variant="error">{error}</Alert>}
 
-            {/* --- HERO SECTION: MESH GRADIENT & DIGITAL CARD --- */}
-            <div className="relative rounded-3xl overflow-hidden bg-white shadow-2xl">
-                {/* Aurora Mesh Background */}
-                <div className="absolute inset-0 z-0">
-                    <div className="absolute inset-0 bg-gradient-to-r from-red-600 to-red-700"></div>
+            <header className="flex flex-col justify-between gap-6 sm:flex-row sm:items-end">
+                <div>
+                    <p className="eyebrow">Profile</p>
+                    <h1 className="display mt-3 text-5xl leading-none">{user?.full_name || 'Your profile'}</h1>
+                    <p className="mt-3 flex items-center gap-2 text-sm text-gray-600">
+                        <span className={`h-2 w-2 rounded-full ${eligibility.isEligible ? 'bg-success-500' : 'bg-warning-500'}`} />
+                        {eligibility.isEligible
+                            ? 'Ready to donate'
+                            : `Recovering · eligible again on ${format(eligibility.nextEligibleDate, 'd MMM yyyy')}`}
+                    </p>
                 </div>
-
-                {/* Glassmorphism Content */}
-                <div className="relative z-10 p-8 md:p-12">
-                    <div className="flex flex-col lg:flex-row items-center justify-between gap-12">
-
-                        {/* LEFT: Welcome & Eligibility */}
-                        <div className="text-center lg:text-left space-y-6 flex-1">
-                            <motion.div
-                                initial={{ opacity: 0, y: 20 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                className="space-y-2"
-                            >
-                                <div className="inline-flex items-center px-4 py-1.5 rounded-full bg-white/20 backdrop-blur-md border border-white/30 text-white text-sm font-medium shadow-sm">
-                                    <span className="relative flex h-2 w-2 mr-2">
-                                        <span className={`animate-ping absolute inline-flex h-full w-full rounded-full ${eligibility.isEligible ? 'bg-green-400' : 'bg-orange-400'} opacity-75`}></span>
-                                        <span className={`relative inline-flex rounded-full h-2 w-2 ${eligibility.isEligible ? 'bg-green-500' : 'bg-orange-500'}`}></span>
-                                    </span>
-                                    {eligibility.isEligible ? 'Ready to Donate' : 'Recovering'}
-                                </div>
-                                <h1 className="text-4xl md:text-5xl font-bold text-white tracking-tight">
-                                    Hello, {user?.full_name?.split(' ')[0] || 'Hero'}.
-                                </h1>
-                                <p className="text-lg text-white/90 max-w-lg leading-relaxed">
-                                    {eligibility.distinctText}
-                                    {!eligibility.isEligible && " Thank you for your recent gift of life."}
-                                </p>
-                            </motion.div>
-
-                            <div className="flex flex-wrap gap-4 justify-center lg:justify-start">
-                                <Button
-                                    onClick={() => router.push('/profile/edit')}
-                                    className="bg-white/10 hover:bg-white/25 text-white border border-white/40 backdrop-blur-md"
-                                >
-                                    <Settings className="w-4 h-4 mr-2" />
-                                    Edit Profile
-                                </Button>
-                                {user?.is_donor && (
-                                    <div className="relative inline-block text-left">
-                                        <div className="inline-flex rounded-lg shadow-sm isolate">
-                                            <button
-                                                onClick={handleLinkShare}
-                                                className="relative inline-flex items-center gap-x-2 rounded-l-lg bg-white px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50 border border-slate-200 transition-colors"
-                                            >
-                                                <Share className="h-4 w-4 text-green-600" />
-                                                Share Link
-                                            </button>
-                                            <button
-                                                onClick={() => setIsShareOpen(!isShareOpen)}
-                                                className="relative -ml-px inline-flex items-center rounded-r-lg bg-white px-2 py-2 text-slate-500 hover:bg-slate-50 border border-slate-200 transition-colors"
-                                            >
-                                                <ChevronDown className="h-4 w-4" />
-                                            </button>
-                                        </div>
-
-                                        {isShareOpen && (
-                                            <div className="absolute right-0 z-20 mt-2 w-56 origin-top-right rounded-xl bg-white shadow-xl ring-1 ring-black ring-opacity-5 focus:outline-none overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-                                                <div className="py-1">
-                                                    <button
-                                                        onClick={() => {
-                                                            handleDownload();
-                                                            setIsShareOpen(false);
-                                                        }}
-                                                        className="flex w-full items-center px-4 py-3 text-sm text-slate-700 hover:bg-slate-50 transition-colors gap-3"
-                                                    >
-                                                        <div className="w-8 h-8 rounded-full bg-red-50 flex items-center justify-center">
-                                                            <Download className="h-4 w-4 text-red-600" />
-                                                        </div>
-                                                        <div className="text-left">
-                                                            <div className="font-semibold">Save Image</div>
-                                                            <div className="text-xs text-slate-500">Download card as PNG</div>
-                                                        </div>
-                                                    </button>
-                                                    <button
-                                                        onClick={() => {
-                                                            handleLinkShare();
-                                                            setIsShareOpen(false);
-                                                        }}
-                                                        className="flex w-full items-center px-4 py-3 text-sm text-slate-700 hover:bg-slate-50 transition-colors gap-3 md:hidden"
-                                                    >
-                                                        <div className="w-8 h-8 rounded-full bg-green-50 flex items-center justify-center">
-                                                            <Share className="h-4 w-4 text-green-600" />
-                                                        </div>
-                                                        <div className="text-left">
-                                                            <div className="font-semibold">WhatsApp</div>
-                                                            <div className="text-xs text-slate-500">Share public link</div>
-                                                        </div>
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        )}
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-
-                        {/* RIGHT: Digital Donor Card */}
-                        {/* RIGHT: Digital Donor Card */}
-                        {/* RIGHT: Digital Donor Card */}
-                        <motion.div
-                            initial={{ opacity: 0, rotateY: 90 }}
-                            animate={{ opacity: 1, rotateY: 0 }}
-                            transition={{ delay: 0.2, type: "spring" }}
-                            className="perspective-1000 group cursor-pointer"
-                        >
-                            <DonorCard
-                                ref={cardRef}
-                                user={user}
-                                showAchievements={true}
-                                achievementCount={stats?.achievements?.filter(a => a.unlocked).length || 0}
-                                totalDonations={stats?.total_donations || 0}
-                                donorNumber={user?.donor_number}
-                            />
-                        </motion.div>
-                    </div>
-                </div>
-            </div>
-
-            {/* --- STATS & ELIGIBILITY GRID --- */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                {/* Visual Eligibility Ring */}
-                <div className="col-span-1 md:col-span-2 bg-white rounded-2xl p-6 shadow-sm border border-slate-100 flex items-center gap-6 relative overflow-hidden group hover:border-red-100 transition-colors">
-                    <div className="absolute top-0 right-0 w-32 h-32 bg-red-50 rounded-full -mr-16 -mt-16 pointer-events-none"></div>
-
-                    <div className="relative w-24 h-24 flex-shrink-0">
-                        <svg className="w-full h-full transform -rotate-90">
-                            <circle cx="48" cy="48" r="40" stroke="currentColor" strokeWidth="8" fill="transparent" className="text-slate-100" />
-                            <circle
-                                cx="48" cy="48" r="40" stroke="currentColor" strokeWidth="8" fill="transparent"
-                                strokeDasharray={251.2}
-                                strokeDashoffset={eligibility.isEligible ? 0 : (251.2 * (eligibility.daysRemaining / 90))}
-                                className={`transition-all duration-1000 ${eligibility.isEligible ? 'text-green-500' : 'text-amber-500'}`}
-                            />
-                        </svg>
-                        <div className="absolute inset-0 flex items-center justify-center font-bold text-xl text-slate-800">
-                            {eligibility.isEligible ? <Check className="w-8 h-8 text-green-500" /> : <span>{eligibility.daysRemaining}d</span>}
-                        </div>
-                    </div>
-                    <div>
-                        <h3 className="text-lg font-bold text-slate-900 mb-1">Donation Status</h3>
-                        <p className="text-slate-600 text-sm leading-relaxed">
-                            {eligibility.isEligible
-                                ? "You're fully recharged! Your help is needed nearby."
-                                : `Recovering well. You'll be ready to save lives again on ${new Date(Date.now() + eligibility.daysRemaining * 86400000).toLocaleDateString()}.`
-                            }
-                        </p>
-                    </div>
-                </div>
-
-                <Link href="/donations" className="block">
-                    <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 hover:shadow-md transition-all group cursor-pointer">
-                        <div className="flex justify-between items-start mb-4">
-                            <div className="bg-red-50 text-red-600 p-3 rounded-xl group-hover:scale-110 transition-transform">
-                                <Heart className="w-6 h-6 fill-current" />
-                            </div>
-                        </div>
-                        <div className="text-3xl font-bold text-slate-900 mb-1">{stats?.total_donations || 0}</div>
-                        <div className="text-sm font-medium text-slate-500">Lives Impacted (Appx)</div>
-                    </div>
+                <Link
+                    href="/profile/edit"
+                    className="inline-flex h-9 items-center gap-1.5 self-start rounded-md border border-gray-300 bg-white px-3.5 text-sm font-medium text-gray-900 hover:border-gray-400 sm:self-auto"
+                >
+                    <Pencil className="h-3.5 w-3.5" /> Edit profile
                 </Link>
+            </header>
 
-                <Link href="/requests/my-requests" className="block">
-                    <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 hover:shadow-md transition-all group cursor-pointer">
-                        <div className="flex justify-between items-start mb-4">
-                            <div className="bg-blue-50 text-blue-600 p-3 rounded-xl group-hover:scale-110 transition-transform">
-                                <Calendar className="w-6 h-6" />
-                            </div>
-                        </div>
-                        <div className="text-3xl font-bold text-slate-900 mb-1">
-                            {stats?.total_requests || 0}
-                        </div>
-                        <div className="text-sm font-medium text-slate-500">Requests Posted</div>
-                    </div>
-                </Link>
-            </div>
-
-            {/* --- BADGES & ACHIEVEMENTS --- */}
-            <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                    <h3 className="text-xl font-bold text-slate-900 flex items-center gap-2">
-                        <Award className="w-5 h-5 text-amber-500" />
-                        Your Legacy
-                    </h3>
-                    {stats?.total_points !== undefined && (
-                        <div className="flex items-center gap-2 px-3 py-1 bg-amber-50 border border-amber-100 rounded-full">
-                            <Trophy className="w-4 h-4 text-amber-600" />
-                            <span className="font-bold text-amber-900 text-sm">{stats.total_points} pts</span>
+            <section className="grid gap-10 lg:grid-cols-[minmax(0,24rem)_1fr] lg:gap-14">
+                <div>
+                    {isLoading ? (
+                        <Skeleton className="h-[22rem] w-full max-w-sm rounded-xl" />
+                    ) : (
+                        <DonorCard
+                            ref={cardRef}
+                            user={user}
+                            totalDonations={stats?.total_donations || 0}
+                            donorNumber={user?.donor_number}
+                            badges={unlocked}
+                        />
+                    )}
+                    {user?.is_donor && (
+                        <div className="mt-4 flex max-w-sm flex-wrap gap-2">
+                            <Button size="sm" variant="secondary" onClick={handleDownload} leftIcon={<Download className="h-3.5 w-3.5" />}>
+                                Save image
+                            </Button>
+                            <Button size="sm" variant="secondary" onClick={handleLinkShare} leftIcon={<Send className="h-3.5 w-3.5" />}>
+                                WhatsApp
+                            </Button>
                         </div>
                     )}
                 </div>
 
-                {
-                    stats?.achievements && stats.achievements.some(a => a.unlocked) ? (
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                            {stats.achievements.filter(a => a.unlocked).map((achievement, index) => {
-                                const getIcon = () => {
-                                    switch (achievement.icon) {
-                                        case 'droplet': return <Droplet className="text-amber-600 w-7 h-7" />;
-                                        case 'shield': return <Shield className="text-amber-600 w-7 h-7" />;
-                                        case 'star': return <Star className="text-amber-600 w-7 h-7" />;
-                                        case 'trophy': return <Trophy className="text-amber-600 w-7 h-7" />;
-                                        case 'heart': return <Heart className="text-red-500 w-7 h-7" />;
-                                        default: return <Award className="text-amber-600 w-7 h-7" />;
-                                    }
-                                };
+                <div className="space-y-10">
+                    <div>
+                        <h2 className="text-lg font-medium tracking-tight text-gray-900">Details</h2>
+                        <dl className="mt-3 divide-y divide-gray-200 border-y border-gray-200">
+                            {row('Blood group', formatBloodGroup(user?.blood_group))}
+                            {row('Email', user?.email)}
+                            {row('Phone', user?.phone)}
+                            {row('City', [user?.city, user?.present_zip].filter(Boolean).join(' · '))}
+                            {row('Donations', isLoading ? '…' : `${stats?.total_donations ?? 0} verified · ${stats?.total_requests ?? 0} requests posted`)}
+                        </dl>
+                    </div>
 
-                                return (
-                                    <Link href="/achievements" key={achievement.id}>
-                                        <motion.div
-                                            initial={{ opacity: 0, scale: 0.9 }}
-                                            animate={{ opacity: 1, scale: 1 }}
-                                            transition={{ delay: 0.1 * index }}
-                                            className="relative group p-6 rounded-2xl border border-slate-200 bg-white hover:border-amber-300 hover:shadow-lg transition-all text-center flex flex-col items-center justify-center gap-3 cursor-pointer h-full"
-                                            title={achievement.motto}
-                                        >
-                                            <div className="w-14 h-14 rounded-full bg-amber-50 flex items-center justify-center group-hover:bg-amber-100 transition-colors">
-                                                {getIcon()}
-                                            </div>
-                                            <div className="space-y-1">
-                                                <div className="font-bold text-slate-900 group-hover:text-amber-700 transition-colors text-sm">{achievement.name}</div>
-                                                <div className="text-xs text-slate-400 font-medium">{achievement.points} pts</div>
-                                            </div>
-                                        </motion.div>
-                                    </Link>
-                                )
-                            })}
-                        </div>
-                    ) : (
-                        <div className="p-8 border-2 border-dashed border-slate-200 rounded-2xl text-center text-slate-500 flex flex-col items-center gap-2">
-                            <Droplet className="w-8 h-8 text-slate-300 mb-2" />
-                            <p className="font-medium text-slate-900">Start Your Legacy</p>
-                            <p className="text-sm">Complete your first donation to earn the "First Drop" badge and 50 points!</p>
-                        </div>
-                    )
-                }
-            </div>
-
-            {/* --- SETTINGS & CONTENT --- */}
-
-            {/* Public Identity Section - Prominent & Accessible */}
-            <div className="bg-white rounded-2xl p-6 md:p-8 shadow-sm border border-slate-100 relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-64 h-64 bg-slate-50 rounded-full -mr-20 -mt-20 pointer-events-none opacity-50"></div>
-
-                <div className="relative z-10">
-                    <div className="flex flex-col md:flex-row md:items-start justify-between gap-6 mb-6">
-                        <div>
-                            <div className="flex items-center gap-3 mb-2">
-                                <div className="p-2 bg-indigo-50 rounded-lg">
-                                    <Globe className="w-6 h-6 text-indigo-600" />
-                                </div>
-                                <h3 className="text-xl font-bold text-slate-900">Public Profile</h3>
+                    <div>
+                        <div className="flex items-start justify-between gap-6">
+                            <div>
+                                <h2 className="text-lg font-medium tracking-tight text-gray-900">Public donor card</h2>
+                                <p className="mt-1 max-w-md text-sm leading-relaxed text-gray-600">
+                                    When on, anyone with your link can see your card: first name, blood group and donation count. Never your contact details.
+                                </p>
                             </div>
-                            <p className="text-slate-600 max-w-xl">
-                                Your public profile is your digital identity. Share it with partners like MuLearn or on social media to verify your donor status.
-                            </p>
-                        </div>
-
-                        <div className="flex items-center gap-3">
-                            <span className={`text-sm font-bold ${user?.is_public_profile ? 'text-green-600' : 'text-slate-400'}`}>
-                                {user?.is_public_profile ? 'Visible to Everyone' : 'Private'}
-                            </span>
-                            <label className="relative inline-flex items-center cursor-pointer">
+                            <label className="relative mt-1 inline-flex shrink-0 cursor-pointer items-center">
                                 <input
                                     type="checkbox"
                                     checked={user?.is_public_profile || false}
                                     onChange={(e) => togglePublicProfile(e.target.checked)}
-                                    className="sr-only peer"
+                                    className="peer sr-only"
+                                    aria-label="Make donor card public"
                                 />
-                                <div className="w-14 h-8 bg-slate-200 peer-focus:outline-none ring-4 ring-transparent peer-focus:ring-indigo-100 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[4px] after:left-[4px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-indigo-600"></div>
+                                <span className="h-6 w-11 rounded-full bg-gray-300 transition-colors after:absolute after:left-[3px] after:top-[3px] after:h-[18px] after:w-[18px] after:rounded-full after:bg-white after:transition-transform after:content-[''] peer-checked:bg-gray-900 peer-checked:after:translate-x-5 peer-focus-visible:ring-2 peer-focus-visible:ring-red-600 peer-focus-visible:ring-offset-2" />
                             </label>
                         </div>
+                        {user?.is_public_profile && (
+                            <div className="mt-4 flex items-center gap-2">
+                                <code className="min-w-0 flex-1 truncate rounded-md border border-gray-200 bg-white px-3 py-2 font-mono text-[13px] text-gray-700">
+                                    {host}{publicPath}
+                                </code>
+                                <Button size="sm" variant="secondary" onClick={copyPublicLink} aria-label="Copy link"><Copy className="h-3.5 w-3.5" /></Button>
+                                <a href={publicPath} target="_blank" rel="noreferrer" className="inline-flex h-8 items-center rounded-md border border-gray-300 bg-white px-3 text-gray-700 hover:border-gray-400" aria-label="Open public card">
+                                    <ExternalLink className="h-3.5 w-3.5" />
+                                </a>
+                            </div>
+                        )}
                     </div>
 
-                    {user?.is_public_profile ? (
-                        <div className="animate-in fade-in slide-in-from-top-4 duration-300">
-                            <div className="bg-slate-50 rounded-xl p-4 md:p-5 border border-slate-200 flex flex-col md:flex-row items-center gap-4">
-                                <div className="flex-1 w-full min-w-0">
-                                    <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 flex items-center gap-1">
-                                        <LinkIcon className="w-3 h-3" />
-                                        Your Public Link
-                                    </div>
-                                    <div className="font-mono text-sm md:text-base text-slate-700 truncate select-all bg-white px-3 py-2 rounded-lg border border-slate-200">
-                                        {(() => {
-                                            const cleanName = (user?.full_name || 'User').replace(/[^a-zA-Z0-9]/g, '');
-                                            const uniqueId = user?.donor_number || user?.id;
-                                            const vanitySlug = `${cleanName}@${uniqueId}`;
-                                            return typeof window !== 'undefined' ? `${window.location.origin}/donor/${vanitySlug}` : `/donor/${vanitySlug}`;
-                                        })()}
-                                    </div>
-                                </div>
-                                <div className="flex items-center gap-2 w-full md:w-auto">
-                                    <Button
-                                        size="sm"
-                                        variant="outline"
-                                        onClick={() => {
-                                            const cleanName = (user?.full_name || 'User').replace(/[^a-zA-Z0-9]/g, '');
-                                            const uniqueId = user?.donor_number || user?.id;
-                                            const vanitySlug = `${cleanName}@${uniqueId}`;
-                                            navigator.clipboard.writeText(`${window.location.origin}/donor/${vanitySlug}`);
-                                            toast.success('Link copied to clipboard!');
-                                        }}
-                                        className="flex-1 md:flex-none h-10 md:h-11"
-                                    >
-                                        <Copy className="w-4 h-4 mr-2" />
-                                        Copy
-                                    </Button>
-                                    <Button
-                                        size="sm"
-                                        variant="outline"
-                                        onClick={() => {
-                                            const cleanName = (user?.full_name || 'User').replace(/[^a-zA-Z0-9]/g, '');
-                                            const uniqueId = user?.donor_number || user?.id;
-                                            const vanitySlug = `${cleanName}@${uniqueId}`;
-                                            window.open(`/donor/${vanitySlug}`, '_blank');
-                                        }}
-                                        className="flex-1 md:flex-none h-10 md:h-11 hover:bg-indigo-50 hover:text-indigo-600 hover:border-indigo-200"
-                                    >
-                                        <ExternalLink className="w-4 h-4 mr-2" />
-                                        Preview
-                                    </Button>
-                                </div>
-                            </div>
+                    <div className="flex items-start justify-between gap-6 border-t border-gray-200 pt-8">
+                        <div>
+                            <h2 className="text-lg font-medium tracking-tight text-gray-900">Alerts on this device</h2>
+                            <p className="mt-1 max-w-md text-sm leading-relaxed text-gray-600">
+                                Get a push notification when someone in your city needs a blood group you can give to.
+                            </p>
                         </div>
-                    ) : (
-                        <div className="bg-amber-50 rounded-xl p-4 border border-amber-100 flex items-start gap-3">
-                            <div className="p-1.5 bg-amber-100 rounded-full mt-0.5">
-                                <EyeOff className="w-4 h-4 text-amber-600" />
-                            </div>
-                            <div>
-                                <h4 className="font-bold text-amber-900 text-sm">Profile is Private</h4>
-                                <p className="text-amber-700 text-sm mt-0.5">Your donor card is not visible to others. Enable public access to share your verified status.</p>
-                            </div>
-                        </div>
-                    )}
-                </div>
-            </div>
-
-
-            {/* --- COMPONENT SECTIONS --- */}
-            {/* --- PREFERENCES & INFO GRID --- */}
-            <div className="grid md:grid-cols-2 gap-6 md:gap-8">
-                {/* Left Column: Preferences */}
-                <div className="space-y-4">
-                    <div className="mb-4">
-                        <h3 className="text-lg font-bold text-slate-900">Preferences</h3>
-                        <p className="text-slate-500 text-sm">Customize your notification experience.</p>
+                        <div className="shrink-0 pt-1"><PushNotificationManager /></div>
                     </div>
-                    <Card className="hover:shadow-md transition-shadow h-full">
-                        <CardBody className="p-0 h-full">
-                            <div className="flex flex-col sm:flex-row sm:items-center justify-between p-6 gap-4 h-full">
-                                <div className="flex items-start sm:items-center space-x-4">
-                                    <div className="w-12 h-12 rounded-full bg-indigo-50 flex items-center justify-center shrink-0">
-                                        <Bell className="h-6 w-6 text-indigo-600" />
-                                    </div>
-                                    <div>
-                                        <div className="font-bold text-slate-900">Push Notifications</div>
-                                        <div className="text-sm text-slate-500">Receive alerts when blood is needed nearby</div>
-                                    </div>
-                                </div>
-                                <div className="self-end sm:self-auto">
-                                    <PushNotificationManager />
-                                </div>
-                            </div>
-                        </CardBody>
-                    </Card>
                 </div>
+            </section>
 
-                {/* Right Column: Contact Info */}
-                <div className="space-y-4">
-                    <div className="mb-4">
-                        <h3 className="text-lg font-bold text-slate-900">My Info</h3>
-                        <p className="text-slate-500 text-sm">Your private contact details.</p>
-                    </div>
-                    <Card className="divide-y divide-slate-100 h-full">
-                        <div className="p-6 flex justify-between items-center hover:bg-slate-50 transition-colors">
-                            <span className="text-slate-500 text-sm flex items-center gap-2 shrink-0">
-                                <Mail className="w-4 h-4" /> Email
-                            </span>
-                            <span className="font-medium text-slate-900 text-right truncate ml-4">{user?.email}</span>
-                        </div>
-                        <div className="p-6 flex justify-between items-center hover:bg-slate-50 transition-colors">
-                            <span className="text-slate-500 text-sm flex items-center gap-2 shrink-0">
-                                <Phone className="w-4 h-4" /> Phone
-                            </span>
-                            <span className="font-medium text-slate-900 text-right truncate ml-4">{user?.phone || '--'}</span>
-                        </div>
-                        <div className="p-6 flex justify-between items-center hover:bg-slate-50 transition-colors">
-                            <span className="text-slate-500 text-sm flex items-center gap-2 shrink-0">
-                                <MapPin className="w-4 h-4" /> ZIP Code
-                            </span>
-                            <span className="font-medium text-slate-900 text-right truncate ml-4 max-w-[200px]">{user?.present_zip || '--'}</span>
-                        </div>
-                    </Card>
+            <section className="flex flex-col gap-4 border-t border-gray-200 pt-8 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                    <h2 className="font-medium text-gray-900">Delete account</h2>
+                    <p className="mt-1 text-sm text-gray-500">Removes your profile, requests and donation history for good.</p>
                 </div>
-            </div>
+                <div className="flex gap-2">
+                    <Button size="sm" variant="ghost" onClick={handleSignOut}>Sign out</Button>
+                    <Button size="sm" variant="secondary" className="text-red-700" onClick={() => setShowDeleteModal(true)}>
+                        Delete account
+                    </Button>
+                </div>
+            </section>
 
-
-            {/* --- DELETE ACCOUNT MODAL --- */}
             <ConfirmationModal
                 isOpen={showDeleteModal}
                 onClose={() => setShowDeleteModal(false)}
                 onConfirm={handleDeleteAccount}
-                title="Delete Account"
-                description="Are you absolutely sure? This action cannot be undone and will permanently delete your account and all data."
-                confirmText="Yes, Delete My Account"
-                cancelText="Cancel"
+                title="Delete your account?"
+                description="This permanently deletes your account and everything in it. It can’t be undone."
+                confirmText="Delete my account"
                 variant="danger"
             />
-
-            <div className="pt-8 border-t border-slate-200 mt-12 space-y-8">
-                <div className="rounded-xl border border-red-200 bg-red-50 p-6">
-                    <div className="flex items-start gap-4">
-                        <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center shrink-0">
-                            <Shield className="w-5 h-5 text-red-600" />
-                        </div>
-                        <div className="space-y-3 flex-1">
-                            <div>
-                                <h4 className="text-base font-bold text-red-900">Danger Zone</h4>
-                                <p className="text-sm text-red-700 mt-1 leading-relaxed">
-                                    Permanently delete your account and all data. This action cannot be undone.
-                                </p>
-                            </div>
-                            <Button
-                                size="sm"
-                                className="bg-red-600 text-white hover:bg-red-700 shadow-sm border border-red-600"
-                                onClick={() => setShowDeleteModal(true)}
-                            >
-                                Delete My Account
-                            </Button>
-                        </div>
-                    </div>
-                </div>
-            </div>
         </div>
     );
 }

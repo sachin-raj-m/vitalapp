@@ -2,7 +2,8 @@ import { Metadata } from 'next';
 import RegisterPageContent from './content';
 
 export const metadata: Metadata = {
-    title: 'Register - Vital Blood Donation',
+    alternates: { canonical: '/register' },
+    title: 'Become a donor',
     description: 'Create a new account to become a blood donor or request blood.',
 };
 

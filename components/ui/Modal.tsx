@@ -1,4 +1,6 @@
-import React, { Fragment } from 'react';
+"use client";
+
+import React, { useEffect, useId, useRef } from 'react';
 import { X } from 'lucide-react';
 
 interface ModalProps {
@@ -9,33 +11,81 @@ interface ModalProps {
 }
 
 export const Modal = ({ isOpen, onClose, title, children }: ModalProps) => {
+    const titleId = useId();
+    const panelRef = useRef<HTMLDivElement>(null);
+    // Keep the latest onClose without re-running the effect on every render.
+    const onCloseRef = useRef(onClose);
+    onCloseRef.current = onClose;
+
+    // Focus management: move focus in, trap Tab inside, Escape closes, and
+    // return focus to whatever opened the dialog. Also locks page scroll.
+    useEffect(() => {
+        if (!isOpen) return;
+        const opener = document.activeElement as HTMLElement | null;
+        const panel = panelRef.current;
+        const focusables = () =>
+            Array.from(panel?.querySelectorAll<HTMLElement>(
+                'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+            ) ?? []).filter(el => el.offsetParent !== null);
+
+        // Prefer the first form field; fall back to the first control (close button).
+        const first = panel?.querySelector<HTMLElement>('input:not([disabled]):not([type="hidden"]), select, textarea') ?? focusables()[0];
+        first?.focus();
+
+        const onKey = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') {
+                onCloseRef.current();
+                return;
+            }
+            if (e.key !== 'Tab') return;
+            const items = focusables();
+            if (!items.length) return;
+            const [head, tail] = [items[0], items[items.length - 1]];
+            if (e.shiftKey && document.activeElement === head) {
+                e.preventDefault();
+                tail.focus();
+            } else if (!e.shiftKey && document.activeElement === tail) {
+                e.preventDefault();
+                head.focus();
+            }
+        };
+
+        const prevOverflow = document.body.style.overflow;
+        document.body.style.overflow = 'hidden';
+        window.addEventListener('keydown', onKey);
+        return () => {
+            document.body.style.overflow = prevOverflow;
+            window.removeEventListener('keydown', onKey);
+            opener?.focus?.();
+        };
+    }, [isOpen]);
+
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 z-50 overflow-y-auto">
-            <div className="flex min-h-screen items-center justify-center p-4 text-center sm:p-0">
-                <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" onClick={onClose} />
-
-                <div className="relative transform overflow-hidden rounded-lg bg-white text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg">
-                    <div className="bg-white px-4 pb-4 pt-5 sm:p-6 sm:pb-4">
-                        <div className="flex items-start justify-between">
-                            <h3 className="text-lg font-medium leading-6 text-gray-900" id="modal-title">
-                                {title}
-                            </h3>
-                            <button
-                                type="button"
-                                className="ml-4 inline-flex flex-shrink-0 items-center justify-center rounded-md bg-white text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2"
-                                onClick={onClose}
-                            >
-                                <span className="sr-only">Close</span>
-                                <X className="h-5 w-5" aria-hidden="true" />
-                            </button>
-                        </div>
-                        <div className="mt-2 text-sm text-gray-500">
-                            {children}
-                        </div>
-                    </div>
+        <div className="fixed inset-0 z-[60] flex items-end justify-center sm:items-center sm:p-6">
+            <div className="absolute inset-0 bg-gray-950/40 backdrop-blur-[2px]" onClick={onClose} aria-hidden />
+            <div
+                ref={panelRef}
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby={titleId}
+                className="relative max-h-[92vh] w-full overflow-y-auto rounded-t-xl border border-gray-200 bg-white animate-fade-up sm:max-w-lg sm:rounded-xl"
+            >
+                <div className="sticky top-0 z-10 flex items-center justify-between gap-4 border-b border-gray-200 bg-white px-5 py-4 sm:px-6">
+                    <h2 id={titleId} className="text-[15px] font-semibold tracking-[-0.01em] text-gray-900">
+                        {title}
+                    </h2>
+                    <button
+                        type="button"
+                        className="-mr-1.5 rounded-md p-1.5 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900"
+                        onClick={onClose}
+                        aria-label="Close"
+                    >
+                        <X className="h-4 w-4" />
+                    </button>
                 </div>
+                <div className="px-5 py-5 text-sm text-gray-700 sm:px-6">{children}</div>
             </div>
         </div>
     );

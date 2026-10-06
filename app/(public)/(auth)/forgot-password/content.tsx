@@ -2,13 +2,11 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { Card, CardHeader, CardBody } from '@/components/ui/Card';
+import { AuthFrame, authLinkClass } from '@/components/auth/AuthFrame';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { Alert } from '@/components/ui/Alert';
 import { supabase } from '@/lib/supabase';
-import { ArrowLeft, Mail } from 'lucide-react';
-import { toast } from 'sonner';
 
 export default function ForgotPasswordContent() {
     const [email, setEmail] = useState('');
@@ -38,7 +36,6 @@ export default function ForgotPasswordContent() {
 
 
             setIsSuccess(true);
-            toast.success("Password reset email sent!");
         } catch (err: any) {
             console.error('Password reset error', err);
             setError(err.message || 'Failed to send reset email. Please try again.');
@@ -47,72 +44,33 @@ export default function ForgotPasswordContent() {
         }
     };
 
+    if (isSuccess) {
+        return (
+            <AuthFrame
+                eyebrow="Check your inbox"
+                title={<>Link <em>sent.</em></>}
+                subtitle={<>If an account exists for <span className="text-gray-900">{email}</span>, a reset link is on its way. It can take a few minutes, so check spam too.</>}
+                footer={<Link href="/login" className={authLinkClass}>Back to sign in</Link>}
+            >
+                {null}
+            </AuthFrame>
+        );
+    }
+
     return (
-        <div className="max-w-md mx-auto">
-            <Card>
-                <CardHeader>
-                    <h1 className="text-2xl font-bold text-center text-gray-900">Reset Password</h1>
-                    <p className="text-center text-gray-600 mt-2">
-                        Enter your email to receive a password reset link.
-                    </p>
-                </CardHeader>
-                <CardBody>
-                    {isSuccess ? (
-                        <div className="text-center space-y-4">
-                            <div className="flex justify-center">
-                                <div className="h-12 w-12 bg-green-100 rounded-full flex items-center justify-center text-green-600">
-                                    <Mail className="h-6 w-6" />
-                                </div>
-                            </div>
-                            <Alert variant="success">
-                                Check your email for a link to reset your password. If it doesn't appear within a few minutes, check your spam folder.
-                            </Alert>
-                            <Link href="/login">
-                                <Button variant="secondary" className="w-full mt-4">
-                                    Back to Login
-                                </Button>
-                            </Link>
-                        </div>
-                    ) : (
-                        <>
-                            {error && (
-                                <Alert variant="error" className="mb-4">
-                                    {error}
-                                </Alert>
-                            )}
-
-                            <form onSubmit={handleSubmit} className="space-y-4">
-                                <Input
-                                    label="Email Address"
-                                    type="email"
-                                    value={email}
-                                    onChange={(e) => setEmail(e.target.value)}
-                                    required
-                                    autoComplete="email"
-                                    placeholder="Enter your registered email"
-                                />
-
-                                <Button
-                                    type="submit"
-                                    variant="primary"
-                                    className="w-full"
-                                    isLoading={isLoading}
-                                >
-                                    Send Reset Link
-                                </Button>
-                            </form>
-                        </>
-                    )}
-
-                    {!isSuccess && (
-                        <div className="mt-6 text-center">
-                            <Link href="/login" className="text-sm text-gray-600 hover:text-gray-900 flex items-center justify-center gap-1">
-                                <ArrowLeft className="h-4 w-4" /> Back to Login
-                            </Link>
-                        </div>
-                    )}
-                </CardBody>
-            </Card>
-        </div>
+        <AuthFrame
+            eyebrow="Reset password"
+            title={<>Forgot it? <em>Happens.</em></>}
+            subtitle="Enter the email you registered with and we’ll send you a reset link."
+            footer={<Link href="/login" className={authLinkClass}>Back to sign in</Link>}
+        >
+            {error && <Alert variant="error" className="mb-6">{error}</Alert>}
+            <form onSubmit={handleSubmit} className="space-y-4">
+                <Input label="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="email" />
+                <Button type="submit" variant="ink" size="lg" className="w-full !mt-6" isLoading={isLoading}>
+                    Send reset link
+                </Button>
+            </form>
+        </AuthFrame>
     );
 }

@@ -5,13 +5,17 @@ import { MapContainer, TileLayer, Marker, Popup, useMapEvents } from 'react-leaf
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 
-// Fix for default marker icon missing
-delete (L.Icon.Default.prototype as any)._getIconUrl;
-L.Icon.Default.mergeOptions({
-    iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
-    iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
-    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
-});
+// Brand marker: a small drop, red by default, ink for "you are here" style pins.
+const dropIcon = (color: string) =>
+    L.divIcon({
+        className: '',
+        iconSize: [22, 30],
+        iconAnchor: [11, 29],
+        popupAnchor: [0, -26],
+        html: `<svg width="22" height="30" viewBox="0 0 10 14" xmlns="http://www.w3.org/2000/svg"><path d="M5 0C5 0 0 6.2 0 9a5 5 0 0 0 10 0C10 6.2 5 0 5 0Z" fill="${color}" stroke="#FAF8F5" stroke-width="0.8"/></svg>`,
+    });
+const RED_DROP = dropIcon('#B5161B');
+const INK_DROP = dropIcon('#1B1815');
 
 interface Location {
     lat: number;
@@ -53,29 +57,29 @@ function LocationMarker({
         },
     });
 
+    const selLat = selectedPosition?.lat;
+    const selLng = selectedPosition?.lng;
     useEffect(() => {
-        if (selectedPosition) {
-            setPosition(selectedPosition);
-            map.flyTo([selectedPosition.lat, selectedPosition.lng], map.getZoom());
-        }
-    }, [selectedPosition, map]);
+        if (selLat === undefined || selLng === undefined) return;
+        setPosition({ lat: selLat, lng: selLng });
+        map.flyTo([selLat, selLng], Math.max(map.getZoom(), 13));
+    }, [selLat, selLng, map]);
 
     return position === null ? null : (
-        <Marker position={position}>
-            <Popup>Selected Location</Popup>
+        <Marker position={position} icon={INK_DROP}>
+            <Popup>Hospital location</Popup>
         </Marker>
     );
 }
 
 // Component to handle map center updates
-function MapUpdater({ center, zoom }: { center: Location, zoom: number }) {
+// Depends on the coordinates, not the object, so re-renders with an
+// equal-but-new center don't re-fly the map and undo the user's panning.
+function MapUpdater({ lat, lng, zoom }: { lat: number; lng: number; zoom: number }) {
     const map = useMapEvents({});
     useEffect(() => {
-        map.flyTo([center.lat, center.lng], zoom, {
-            animate: true,
-            duration: 1.5
-        });
-    }, [center, zoom, map]);
+        map.flyTo([lat, lng], zoom, { animate: true, duration: 1.2 });
+    }, [lat, lng, zoom, map]);
     return null;
 }
 
@@ -92,24 +96,28 @@ export default function Map({
             center={[center.lat, center.lng]}
             zoom={zoom}
             scrollWheelZoom={true}
-            style={{ height: '100%', width: '100%', minHeight: '400px', borderRadius: '0.5rem' }}
+            style={{ height: '100%', width: '100%', minHeight: '240px', background: '#F3F0EB' }}
         >
+            {/* Keyless OSM tiles, desaturated in CSS (.vital-tiles) to sit quietly in the design. */}
             <TileLayer
-                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+                className="vital-tiles"
+                maxZoom={19}
             />
 
-            <MapUpdater center={center} zoom={zoom} />
+            <MapUpdater lat={center.lat} lng={center.lng} zoom={zoom} />
 
             {markers.map((marker, idx) => (
                 <Marker
                     key={`${marker.position.lat}-${marker.position.lng}-${idx}`}
                     position={[marker.position.lat, marker.position.lng]}
+                    icon={marker.title === 'You are here' ? INK_DROP : RED_DROP}
                 >
                     {(marker.title || marker.description) && (
                         <Popup>
-                            <div className="font-semibold">{marker.title}</div>
-                            {marker.description && <div className="text-sm">{marker.description}</div>}
+                            <div className="font-sans text-sm font-medium text-gray-900">{marker.title}</div>
+                            {marker.description && <div className="font-sans text-xs text-gray-600">{marker.description}</div>}
                         </Popup>
                     )}
                 </Marker>

@@ -1,109 +1,110 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Button } from './ui/Button';
-import { useAuth } from '../context/AuthContext';
-import { LogIn, User, HeartPulse, Menu, X, LayoutDashboard } from 'lucide-react';
-import { NotificationBell } from './NotificationBell';
-
 import { usePathname } from 'next/navigation';
+import { Menu, X, ArrowUpRight } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
+import { Logo } from './Logo';
+import { cn } from '@/lib/cn';
+import { isAppRoute, isHybridRoute, isStandaloneRoute } from '@/lib/routes';
+
+const NAV = [
+  { href: '/how-it-works', label: 'How it works' },
+  { href: '/requests', label: 'Open requests' },
+];
 
 export function Header() {
   const { user } = useAuth();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const pathname = usePathname();
 
-  const toggleMenu = () => setIsMenuOpen(!isMenuOpen);
-  const closeMenu = () => setIsMenuOpen(false);
+  useEffect(() => setIsMenuOpen(false), [pathname]);
 
-  // 1. Strictly Hide on Public Profile (Custom Layout)
-  if (pathname?.startsWith('/donor')) return null;
-
-  // 2. Strictly Hide on Protected Routes (Sidebar is present)
-  // These routes are guarded, so if user is here, they are logged in (or redirecting).
-  const isProtectedRoute =
-    pathname?.startsWith('/dashboard') ||
-    pathname?.startsWith('/admin') ||
-    pathname?.startsWith('/profile') ||
-    pathname?.startsWith('/nearby-donors') ||
-    pathname?.startsWith('/achievements') ||
-    pathname?.startsWith('/donations');
-
-  if (isProtectedRoute) return null;
-
-  // 3. Hybrid Routes (e.g. Requests)
-  // If user is logged in, they see Sidebar. If guest, they see Header.
-  const isHybridRoute = pathname?.startsWith('/requests');
-
-  if (isHybridRoute && user) return null;
-
-  // For other routes (Home, Login, Register), show Header.
+  if (isStandaloneRoute(pathname) || isAppRoute(pathname)) return null;
+  if (isHybridRoute(pathname) && user) return null;
 
   return (
-    <header className="bg-white border-b border-gray-200 sticky top-0 z-50">
-      <div className="w-full px-4 md:px-8 py-4">
-        <div className="flex items-center justify-between">
-          <Link href={user ? "/dashboard" : "/"} className="text-2xl font-bold text-primary-600 flex items-center" onClick={closeMenu}>
-            <HeartPulse className="h-8 w-8 mr-2" />
-            Vital
-          </Link>
+    <header className="sticky top-0 z-50 border-b border-gray-200/80 bg-paper/85 backdrop-blur-md">
+      <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-5 sm:px-8">
+        <Link href="/" aria-label="Vital home" className="-mb-1">
+          <Logo />
+        </Link>
 
-          {/* Mobile Menu Button */}
-          <button
-            className="md:hidden p-2 text-gray-600 hover:text-gray-900 focus:outline-none"
-            onClick={toggleMenu}
-          >
-            {isMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
-          </button>
+        <nav className="hidden items-center gap-8 md:flex" aria-label="Main">
+          {NAV.map(item => (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={cn(
+                'text-sm transition-colors hover:text-gray-900',
+                pathname === item.href ? 'text-gray-900' : 'text-gray-600',
+              )}
+            >
+              {item.label}
+            </Link>
+          ))}
+        </nav>
 
-          {/* Desktop Navigation */}
-          <nav className="hidden md:flex items-center space-x-6">
-            {user ? (
-              <div className="flex items-center space-x-6">
-                <Link href="/dashboard">
-                  <Button variant="primary" className="flex items-center space-x-2">
-                    <LayoutDashboard className="h-4 w-4" />
-                    <span>Dashboard</span>
-                  </Button>
-                </Link>
-              </div>
-            ) : (
-              <div className="flex items-center space-x-6">
-                <Link href="/how-it-works" className="text-gray-600 hover:text-gray-900">How it Works</Link>
-                <Link href="/requests" className="text-gray-600 hover:text-gray-900">Requests</Link>
-                <Link href="/nearby-donors" className="text-gray-600 hover:text-gray-900">Find Donors</Link>
-                <Link href="/login">
-                  <Button variant="ghost" className="flex items-center space-x-2">
-                    <LogIn className="h-5 w-5" />
-                    <span>Login</span>
-                  </Button>
-                </Link>
-              </div>
-            )}
-          </nav>
+        <div className="hidden items-center gap-2 md:flex">
+          {user ? (
+            <Link
+              href="/dashboard"
+              className="inline-flex h-9 items-center gap-1.5 rounded-md bg-gray-900 px-3.5 text-sm font-medium text-gray-50 transition-colors hover:bg-gray-800"
+            >
+              Open dashboard <ArrowUpRight className="h-3.5 w-3.5" />
+            </Link>
+          ) : (
+            <>
+              <Link href="/login" className="px-3 text-sm text-gray-700 transition-colors hover:text-gray-900">
+                Sign in
+              </Link>
+              <Link
+                href="/register"
+                className="inline-flex h-9 items-center rounded-md bg-red-600 px-3.5 text-sm font-medium text-white transition-colors hover:bg-red-700"
+              >
+                Become a donor
+              </Link>
+            </>
+          )}
         </div>
 
-        {/* Mobile Navigation Dropdown */}
-        {isMenuOpen && (
-          <div className="md:hidden mt-4 pb-4 border-t border-gray-100 pt-4 space-y-4">
-            {user ? (
-              <div className="flex flex-col space-y-3">
-                <Link href="/dashboard" onClick={closeMenu} className="block px-2 py-1 text-primary-600 font-medium hover:bg-gray-50 rounded-md">
-                  Go to Dashboard
-                </Link>
-              </div>
-            ) : (
-              <Link href="/login" onClick={closeMenu}>
-                <Button variant="ghost" className="w-full flex items-center justify-center space-x-2">
-                  <LogIn className="h-5 w-5" />
-                  <span>Login</span>
-                </Button>
+        <button
+          className="-mr-2 rounded-md p-2 text-gray-700 md:hidden"
+          onClick={() => setIsMenuOpen(o => !o)}
+          aria-expanded={isMenuOpen}
+          aria-controls="mobile-menu"
+          aria-label={isMenuOpen ? 'Close menu' : 'Open menu'}
+        >
+          {isMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+        </button>
+      </div>
+
+      {isMenuOpen && (
+        <div id="mobile-menu" className="border-t border-gray-200 bg-paper px-5 pb-6 pt-2 md:hidden">
+          <nav className="flex flex-col" aria-label="Mobile">
+            {NAV.map(item => (
+              <Link key={item.href} href={item.href} className="border-b border-gray-200 py-3.5 text-[15px] text-gray-800">
+                {item.label}
+              </Link>
+            ))}
+            {!user && (
+              <Link href="/login" className="border-b border-gray-200 py-3.5 text-[15px] text-gray-800">
+                Sign in
               </Link>
             )}
-          </div>
-        )}
-      </div>
+          </nav>
+          <Link
+            href={user ? '/dashboard' : '/register'}
+            className={cn(
+              'mt-5 flex h-11 items-center justify-center rounded-md text-[15px] font-medium',
+              user ? 'bg-gray-900 text-gray-50' : 'bg-red-600 text-white',
+            )}
+          >
+            {user ? 'Open dashboard' : 'Become a donor'}
+          </Link>
+        </div>
+      )}
     </header>
   );
 }

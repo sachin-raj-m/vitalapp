@@ -1,7 +1,7 @@
 import { MyRequestsContent } from './content';
 
 export const metadata = {
-    title: 'My Requests | Vital',
+    title: 'My Requests',
     description: 'Manage your blood donation requests',
 };
 

@@ -92,7 +92,7 @@ export function calculateAchievements(donations: any[]): Achievement[] {
             if ((badge as any).criteria === 'urgent_donation') {
                 const urgentDonation = completedDonations.find(d => {
                     const request = Array.isArray(d.blood_requests) ? d.blood_requests[0] : d.blood_requests;
-                    return request?.urgency_level === 'critical' || request?.urgency_level === 'urgent';
+                    return request?.urgency_level === 'High';
                 });
                 if (urgentDonation) {
                     unlocked = true;

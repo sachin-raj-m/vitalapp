@@ -2,18 +2,18 @@
 
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Card, CardHeader, CardBody } from '@/components/ui/Card';
 import { Input, Select } from '@/components/ui/Input';
 import { Alert } from '@/components/ui/Alert';
 import { Button } from '@/components/ui/Button';
 import { supabase } from '@/lib/supabase';
-import { Loader2, MapPin, ShieldCheck } from 'lucide-react';
+import { BLOOD_GROUPS, formatBloodGroup } from '@/lib/blood-compatibility';
 import type { BloodGroup } from '@/types';
 import { useAuth } from '@/context/AuthContext';
 import { isRegistrationComplete } from '@/lib/auth-helpers';
-import { PermanentDeferralQuestions } from '@/components/nbtc/PermanentDeferralQuestions';
 import { addDays } from 'date-fns';
 import { toast } from 'sonner';
+import Link from 'next/link';
+import { PRIVACY_VERSION } from '@/lib/legal';
 
 interface PendingRegistration {
     userId: string;
@@ -41,7 +41,7 @@ interface CompleteRegistrationForm {
 
 export default function CompleteRegistration() {
     const router = useRouter();
-    const { user } = useAuth();
+    const { user, loading: authLoading } = useAuth();
     const [error, setError] = useState<string>('');
     const [status, setStatus] = useState<string>('loading');
     const [progress, setProgress] = useState<number>(0);
@@ -107,8 +107,10 @@ export default function CompleteRegistration() {
             }
         };
 
-        if (user !== undefined) init();
-    }, [router, user]);
+        // Wait for auth to settle; `user` is null while loading, which would
+        // otherwise bounce a freshly registered user to /login.
+        if (!authLoading) init();
+    }, [router, user, authLoading]);
 
     const validateForm = () => {
         const errors: Record<string, string> = {};
@@ -129,7 +131,7 @@ export default function CompleteRegistration() {
             if (age < 18) errors.dob = 'You must be at least 18 years old to register as a donor.';
         }
 
-        if (!formData.consent) errors.consent = 'You must agree to the privacy policy to continue.';
+        if (!formData.consent) errors.consent = 'Please agree to the Privacy notice to continue.';
 
         setFieldErrors(errors);
         return Object.keys(errors).length === 0;
@@ -166,9 +168,13 @@ export default function CompleteRegistration() {
                         city: formData.city,
                         district: formData.district,
                         state: formData.state,
+                        permanent_zip: formData.permanentZip,
+                        present_zip: formData.presentZip,
                         availability: formData.availability,
                         has_medical_conditions: formData.hasConditions,
                         consent_agreed: true,
+                        consent_at: new Date().toISOString(),
+                        consent_version: PRIVACY_VERSION,
                         next_eligible_date: (() => {
                             if (!nbtcEligible) return null; // Permanent deferral
                             if (!formData.lastDonationDate) return new Date().toISOString();
@@ -202,8 +208,8 @@ export default function CompleteRegistration() {
             setProgress(100);
             setStatus('completed');
             localStorage.removeItem('pendingRegistration');
-            toast.success("Welcome to the Network!", {
-                description: "You are now part of our lifesaving algorithm."
+            toast.success('You’re on the network', {
+                description: 'We’ll alert you when someone nearby needs your blood group.'
             });
             setTimeout(() => router.push('/dashboard'), 1500);
 
@@ -214,280 +220,176 @@ export default function CompleteRegistration() {
         }
     };
 
-    const renderContent = () => {
-        switch (status) {
-            case 'loading':
-                return (
-                    <div className="flex flex-col items-center py-8">
-                        <Loader2 className="h-8 w-8 animate-spin text-primary-500 mb-4" />
-                        <p className="text-gray-600">Loading...</p>
+    const set = <K extends keyof CompleteRegistrationForm>(key: K, value: CompleteRegistrationForm[K]) =>
+        setFormData(prev => ({ ...prev, [key]: value }));
+
+    const checkbox = (checked: boolean, onChange: (v: boolean) => void, title: string, body: React.ReactNode, error?: string) => (
+        <div>
+            <label className="flex cursor-pointer items-start gap-3">
+                <input type="checkbox" checked={checked} onChange={e => onChange(e.target.checked)} className="mt-1 h-4 w-4 shrink-0 rounded-[4px] border-gray-400 accent-gray-900" />
+                <span className="text-sm leading-relaxed text-gray-600">
+                    <span className="block font-medium text-gray-900">{title}</span>
+                    {body}
+                </span>
+            </label>
+            {error && <p className="ml-7 mt-1.5 text-[13px] text-red-700">{error}</p>}
+        </div>
+    );
+
+    const section = (n: string, title: string, hint: string, children: React.ReactNode) => (
+        <section className="grid gap-6 border-t border-gray-200 py-8 md:grid-cols-3 md:gap-10">
+            <div>
+                <p className="font-mono text-xs text-red-600">{n}</p>
+                <h2 className="mt-2 font-medium text-gray-900">{title}</h2>
+                <p className="mt-1 text-sm leading-relaxed text-gray-500">{hint}</p>
+            </div>
+            <div className="space-y-4 md:col-span-2">{children}</div>
+        </section>
+    );
+
+    if (status === 'loading' || status === 'creating_profile' || status === 'finalizing' || status === 'completed') {
+        const label = status === 'loading' ? 'One moment…' : status === 'completed' ? 'You’re in. Taking you to your dashboard…' : 'Setting up your profile…';
+        return (
+            <div className="mx-auto flex min-h-[60vh] max-w-md flex-col justify-center px-5">
+                <p className="eyebrow">{status === 'completed' ? 'Done' : 'Please wait'}</p>
+                <p className="display mt-3 text-4xl leading-tight">{label}</p>
+                {status !== 'loading' && (
+                    <div className="mt-8 h-1 overflow-hidden rounded-full bg-gray-200">
+                        <div className="h-full rounded-full bg-red-600 transition-[width] duration-500" style={{ width: `${progress}%` }} />
                     </div>
-                );
+                )}
+            </div>
+        );
+    }
 
-            case 'form':
-                return (
-                    <>
-                        <h2 className="text-xl font-bold mb-2">Complete Profile</h2>
-                        <p className="text-sm text-gray-500 mb-6">Tell us a bit about yourself to find donors near you.</p>
-
-                        {/* Storytelling: Precision Matching */}
-                        <div className="bg-blue-50 border border-blue-100 rounded-lg p-4 mb-6 flex gap-3">
-                            <div className="bg-blue-100 rounded-full p-2 h-fit">
-                                <MapPin className="w-4 h-4 text-blue-600" />
-                            </div>
-                            <div>
-                                <h4 className="font-bold text-sm text-blue-900">Why accurate location matters?</h4>
-                                <p className="text-xs text-blue-700 mt-1">
-                                    Vital uses a <strong>hyper-local algorithm</strong>. We only alert you when a patient within 5-10km needs your specific blood type, preventing unnecessary travel and fatigue.
-                                </p>
-                            </div>
-                        </div>
-
-                        {error && <Alert variant="error" className="mb-4">{error}</Alert>}
-
-                        <form onSubmit={handleSubmit} className="space-y-4 text-left">
-                            <Input
-                                label="Full Name"
-                                value={formData.fullName}
-                                onChange={e => setFormData({ ...formData, fullName: e.target.value })}
-                                required
-                                placeholder="e.g. John Doe"
-                                error={fieldErrors.fullName}
-                            />
-
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <Input
-                                    label="Date of Birth"
-                                    type="date"
-                                    value={formData.dob}
-                                    onChange={e => setFormData({ ...formData, dob: e.target.value })}
-                                    required
-                                    error={fieldErrors.dob}
-                                />
-                                <Select
-                                    label="Gender"
-                                    value={formData.gender}
-                                    onChange={e => setFormData({ ...formData, gender: e.target.value })}
-                                    options={[
-                                        { value: '', label: 'Select Gender' },
-                                        { value: 'Male', label: 'Male' },
-                                        { value: 'Female', label: 'Female' },
-                                        { value: 'Other', label: 'Other' },
-                                    ]}
-                                    required
-                                    error={fieldErrors.gender}
-                                />
-                            </div>
-
-                            <Input
-                                label="Mobile Number"
-                                type="tel"
-                                value={formData.phone}
-                                onChange={e => setFormData({ ...formData, phone: e.target.value })}
-                                required
-                                placeholder="+91 9876543210"
-                                error={fieldErrors.phone}
-                            />
-
-                            <Select
-                                label="Blood Group"
-                                value={formData.bloodGroup}
-                                onChange={e => setFormData({ ...formData, bloodGroup: e.target.value as BloodGroup })}
-                                options={[
-                                    { value: '', label: 'Select Blood Group' },
-                                    { value: 'A+', label: 'A+' },
-                                    { value: 'A-', label: 'A-' },
-                                    { value: 'B+', label: 'B+' },
-                                    { value: 'B-', label: 'B-' },
-                                    { value: 'AB+', label: 'AB+' },
-                                    { value: 'AB-', label: 'AB-' },
-                                    { value: 'O+', label: 'O+' },
-                                    { value: 'O-', label: 'O-' },
-                                ]}
-                                required
-                                error={fieldErrors.bloodGroup}
-                            />
-
-                            <div className="grid grid-cols-2 gap-4">
-                                <Input
-                                    label="State"
-                                    value={formData.state}
-                                    onChange={e => setFormData({ ...formData, state: e.target.value })}
-                                    required
-                                    placeholder="e.g. Kerala"
-                                    error={fieldErrors.state}
-                                />
-                                <Input
-                                    label="City"
-                                    value={formData.city}
-                                    onChange={e => setFormData({ ...formData, city: e.target.value })}
-                                    required
-                                    placeholder="e.g. Kochi"
-                                    error={fieldErrors.city}
-                                />
-                            </div>
-                            <Input
-                                label="District"
-                                value={formData.district}
-                                onChange={e => setFormData({ ...formData, district: e.target.value })}
-                                required
-                                placeholder="e.g. Ernakulam"
-                                error={fieldErrors.district}
-                            />
-
-                            <div className="grid grid-cols-2 gap-4">
-                                <Input
-                                    label="Permanent Pin Code"
-                                    value={formData.permanentZip}
-                                    onChange={e => setFormData({ ...formData, permanentZip: e.target.value })}
-                                    required
-                                    placeholder="e.g. 560001"
-                                    error={fieldErrors.permanentZip}
-                                />
-                                <Input
-                                    label="Present Pin Code"
-                                    value={formData.presentZip}
-                                    onChange={e => setFormData({ ...formData, presentZip: e.target.value })}
-                                    required
-                                    placeholder="e.g. 560001"
-                                    error={fieldErrors.presentZip}
-                                />
-                            </div>
-
-                            {/* Preferences Section */}
-                            <div className="border-t pt-4 mt-6">
-                                <h3 className="text-sm font-semibold text-gray-900 mb-4">Donor Preferences</h3>
-
-                                <div className="space-y-6">
-                                    {/* Willingness to Travel */}
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                                            How far can you travel to donate?
-                                        </label>
-                                        <div className="flex items-center gap-4">
-                                            <input
-                                                type="range"
-                                                min="1" max="50"
-                                                value={formData.willingTovelKm}
-                                                onChange={e => setFormData({ ...formData, willingTovelKm: Number(e.target.value) })}
-                                                className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-primary-600"
-                                            />
-                                            <span className="text-sm font-bold w-16 text-right text-primary-700">{formData.willingTovelKm} km</span>
-                                        </div>
-                                    </div>
-
-                                    {/* Availability */}
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-2">When are you usually available?</label>
-                                        <div className="flex gap-6">
-                                            {['Weekdays', 'Weekends'].map(dayType => (
-                                                <label key={dayType} className="flex items-center space-x-2 cursor-pointer">
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={formData.availability.includes(dayType)}
-                                                        onChange={e => {
-                                                            const newAvail = e.target.checked
-                                                                ? [...formData.availability, dayType]
-                                                                : formData.availability.filter(d => d !== dayType);
-                                                            setFormData({ ...formData, availability: newAvail });
-                                                        }}
-                                                        className="rounded text-primary-600 focus:ring-primary-500 h-4 w-4"
-                                                    />
-                                                    <span className="text-sm text-gray-700">{dayType}</span>
-                                                </label>
-                                            ))}
-                                        </div>
-                                    </div>
-
-                                    {/* Last Donation */}
-                                    <Input
-                                        label="Last Donation Date (if any)"
-                                        type="date"
-                                        value={formData.lastDonationDate}
-                                        onChange={e => setFormData({ ...formData, lastDonationDate: e.target.value })}
-                                    />
-
-                                    {/* Medical Deferral */}
-                                    <div className="bg-gray-50 p-3 rounded-lg border border-gray-100">
-                                        <label className="flex items-start space-x-3 cursor-pointer">
-                                            <input
-                                                type="checkbox"
-                                                checked={!formData.hasConditions}
-                                                onChange={e => setFormData({ ...formData, hasConditions: !e.target.checked })}
-                                                className="mt-1 rounded text-primary-600 focus:ring-primary-500 h-4 w-4"
-                                            />
-                                            <div className="text-sm text-gray-600">
-                                                <span className="font-medium text-gray-900 block mb-0.5">I am fit to donate.</span>
-                                                I confirm I do not have any serious chronic illness, recent major surgery, or disqualifying conditions.
-                                            </div>
-                                        </label>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Consent Section (DPDP) */}
-                            <div className="mt-6 p-4 bg-blue-50 border border-blue-100 rounded-lg">
-                                <label className="flex items-start space-x-3 cursor-pointer">
-                                    <input
-                                        type="checkbox"
-                                        checked={formData.consent}
-                                        onChange={e => setFormData({ ...formData, consent: e.target.checked })}
-                                        className="mt-1 rounded text-primary-600 focus:ring-primary-500 h-4 w-4"
-                                    />
-                                    <div className="text-sm text-gray-600">
-                                        <span className="font-bold text-gray-900 block mb-1">Privacy & Consent</span>
-                                        <p>
-                                            I consent to share my details (Name, Mobile, Location, Blood Group) with
-                                            <strong> verified blood banks & hospitals </strong> only for the purpose of blood donation.
-                                            We retain this data until you withdraw consent or delete your account.
-                                        </p>
-                                    </div>
-                                </label>
-                                {fieldErrors.consent && <p className="text-xs text-red-600 mt-2 font-medium">{fieldErrors.consent}</p>}
-                            </div>
-
-                            <Button type="submit" variant="primary" className="w-full mt-6">
-                                Complete Registration
-                            </Button>
-                        </form>
-                    </>
-                );
-
-            case 'creating_profile':
-            case 'finalizing':
-                return (
-                    <div className="flex flex-col items-center py-8">
-                        <div className="w-full bg-gray-200 rounded-full h-2.5 mb-4">
-                            <div className="bg-primary-500 h-2.5 rounded-full transition-all duration-500" style={{ width: `${progress}%` }} />
-                        </div>
-                        <p className="text-gray-600">{status === 'creating_profile' ? 'Creating profile...' : 'Finalizing...'}</p>
-                    </div>
-                );
-
-            case 'completed':
-                return (
-                    <div className="text-center py-8">
-                        <h2 className="text-xl font-bold text-green-600 mb-2">You're All Set!</h2>
-                        <p className="text-gray-600">Redirecting to dashboard...</p>
-                    </div>
-                );
-
-            case 'error':
-                return (
-                    <div className="text-center py-8">
-                        <h2 className="text-xl font-bold text-red-600 mb-2">Error</h2>
-                        <p className="mb-4 text-gray-600">{error}</p>
-                        <Button onClick={() => setStatus('form')} variant="secondary">Try Again</Button>
-                    </div>
-                );
-        }
-    };
+    if (status === 'error') {
+        return (
+            <div className="mx-auto flex min-h-[60vh] max-w-md flex-col justify-center px-5">
+                <p className="font-mono text-xs text-red-600">Error</p>
+                <p className="display mt-3 text-4xl leading-tight">That didn’t save.</p>
+                <p className="mt-4 text-gray-600">{error}</p>
+                <Button variant="ink" className="mt-8 self-start" onClick={() => setStatus('form')}>Back to the form</Button>
+            </div>
+        );
+    }
 
     return (
-        <div className="max-w-lg mx-auto p-4">
-            <Card>
-                <CardBody>{renderContent()}</CardBody>
-            </Card>
+        <div className="mx-auto max-w-4xl px-5 py-12 sm:px-8 sm:py-16">
+            <header className="pb-8">
+                <p className="eyebrow">Step 2 of 2</p>
+                <h1 className="display mt-3 text-5xl leading-none">A little about <em>you.</em></h1>
+                <p className="mt-4 max-w-xl leading-relaxed text-gray-600">
+                    This is what lets Vital alert you only when your blood group is needed in your city, and not otherwise.
+                </p>
+            </header>
+
+            {error && <Alert variant="error" className="mb-6">{error}</Alert>}
+
+            <form onSubmit={handleSubmit} noValidate>
+                {section('01', 'You', 'Your name and number are only shared with a family after you offer to help them.', <>
+                    <Input label="Full name" value={formData.fullName} onChange={e => set('fullName', e.target.value)} required autoComplete="name" error={fieldErrors.fullName} />
+                    <div className="grid gap-4 sm:grid-cols-2">
+                        <Input label="Date of birth" type="date" value={formData.dob} onChange={e => set('dob', e.target.value)} required error={fieldErrors.dob} />
+                        <Select
+                            label="Gender"
+                            value={formData.gender}
+                            onChange={e => set('gender', e.target.value)}
+                            options={[
+                                { value: '', label: 'Select' },
+                                { value: 'Male', label: 'Male' },
+                                { value: 'Female', label: 'Female' },
+                                { value: 'Other', label: 'Other' },
+                            ]}
+                            required
+                            error={fieldErrors.gender}
+                        />
+                    </div>
+                    <Input label="Mobile number" type="tel" value={formData.phone} onChange={e => set('phone', e.target.value)} required autoComplete="tel" placeholder="+91 98765 43210" error={fieldErrors.phone} />
+                </>)}
+
+                {section('02', 'Your blood', 'If you’re not sure, it’s on any blood test report, or a blood bank can tell you for free.', <>
+                    <div className="grid grid-cols-4 gap-1.5" role="radiogroup" aria-label="Blood group">
+                        {BLOOD_GROUPS.map(g => (
+                            <button
+                                key={g}
+                                type="button"
+                                role="radio"
+                                aria-checked={formData.bloodGroup === g}
+                                onClick={() => set('bloodGroup', g)}
+                                className={`h-14 rounded-md border font-serif text-3xl transition-colors ${formData.bloodGroup === g ? 'border-gray-900 bg-gray-900 text-white' : 'border-gray-300 bg-white text-gray-900 hover:border-gray-400'}`}
+                            >
+                                {formatBloodGroup(g)}
+                            </button>
+                        ))}
+                    </div>
+                    {fieldErrors.bloodGroup && <p className="text-[13px] text-red-700">{fieldErrors.bloodGroup}</p>}
+                    <Input
+                        label="Last donated (if you have before)"
+                        type="date"
+                        value={formData.lastDonationDate}
+                        max={new Date().toISOString().split('T')[0]}
+                        onChange={e => set('lastDonationDate', e.target.value)}
+                        helperText="Used to work out when you can donate next."
+                    />
+                </>)}
+
+                {section('03', 'Where you are', 'Requests are matched by city, so this decides which alerts you get.', <>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                        <Input label="City" value={formData.city} onChange={e => set('city', e.target.value)} required placeholder="e.g. Kochi" error={fieldErrors.city} />
+                        <Input label="District" value={formData.district} onChange={e => set('district', e.target.value)} required placeholder="e.g. Ernakulam" error={fieldErrors.district} />
+                    </div>
+                    <Input label="State" value={formData.state} onChange={e => set('state', e.target.value)} required placeholder="e.g. Kerala" error={fieldErrors.state} />
+                    <div className="grid gap-4 sm:grid-cols-2">
+                        <Input label="Current PIN code" inputMode="numeric" value={formData.presentZip} onChange={e => set('presentZip', e.target.value)} required placeholder="e.g. 682011" error={fieldErrors.presentZip} />
+                        <Input label="Permanent PIN code" inputMode="numeric" value={formData.permanentZip} onChange={e => set('permanentZip', e.target.value)} required placeholder="e.g. 682011" error={fieldErrors.permanentZip} />
+                    </div>
+                    <div>
+                        <p className="mb-2 text-[13px] font-medium text-gray-800">Usually free on</p>
+                        <div className="flex gap-1.5">
+                            {['Weekdays', 'Weekends'].map(day => {
+                                const on = formData.availability.includes(day);
+                                return (
+                                    <button
+                                        key={day}
+                                        type="button"
+                                        aria-pressed={on}
+                                        onClick={() => set('availability', on ? formData.availability.filter(d => d !== day) : [...formData.availability, day])}
+                                        className={`h-9 rounded-full border px-4 text-sm transition-colors ${on ? 'border-gray-900 bg-gray-900 text-gray-50' : 'border-gray-300 bg-white text-gray-700 hover:border-gray-400'}`}
+                                    >
+                                        {day}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
+                </>)}
+
+                {section('04', 'Confirm', 'Both are required to join as a donor.', <>
+                    {checkbox(
+                        !formData.hasConditions,
+                        v => set('hasConditions', !v),
+                        'I’m fit to donate',
+                        'I don’t have a serious chronic illness, haven’t had recent major surgery, and don’t have any other condition that rules out donating.',
+                    )}
+                    {checkbox(
+                        formData.consent,
+                        v => set('consent', v),
+                        'I agree to share my details for donation',
+                        <>
+                            My name and mobile are shared with a family only when I offer to help them. I’ve read the{' '}
+                            <Link href="/privacy" target="_blank" className="text-gray-900 underline decoration-gray-300 underline-offset-4">Privacy notice</Link>
+                            {' '}and can withdraw by deleting my account.
+                        </>,
+                        fieldErrors.consent,
+                    )}
+                </>)}
+
+                <div className="flex justify-end border-t border-gray-200 pt-6">
+                    <Button type="submit" variant="primary" size="lg">
+                        Join the network
+                    </Button>
+                </div>
+            </form>
         </div>
     );
 }

@@ -3,8 +3,8 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { UserPlus } from 'lucide-react';
-import { Card, CardHeader, CardBody } from '@/components/ui/Card';
+import { AuthFrame, authLinkClass } from '@/components/auth/AuthFrame';
+import { GoogleButton, OrDivider, friendlyAuthError } from '@/components/auth/GoogleButton';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { Alert } from '@/components/ui/Alert';
@@ -21,6 +21,22 @@ export default function RegisterPage() {
     const [error, setError] = useState('');
     const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
     const [isLoading, setIsLoading] = useState(false);
+    const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+
+    const handleGoogleSignUp = async () => {
+        setIsGoogleLoading(true);
+        setError('');
+        try {
+            const { error } = await supabase.auth.signInWithOAuth({
+                provider: 'google',
+                options: { redirectTo: `${window.location.origin}/auth/callback` },
+            });
+            if (error) throw error;
+        } catch (err: any) {
+            setError(friendlyAuthError(err?.message));
+            setIsGoogleLoading(false);
+        }
+    };
 
     const validateForm = () => {
         const errors: Record<string, string> = {};
@@ -36,8 +52,8 @@ export default function RegisterPage() {
         // Password validation
         if (!formData.password) {
             errors.password = 'Password is required';
-        } else if (formData.password.length < 6) {
-            errors.password = 'Password must be at least 6 characters long';
+        } else if (formData.password.length < 8) {
+            errors.password = 'Use at least 8 characters.';
         }
 
         setFieldErrors(errors);
@@ -80,14 +96,8 @@ export default function RegisterPage() {
             }));
 
             // Trigger Welcome Email in background
-            fetch('/api/notify/welcome', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    email: formData.email,
-                    name: formData.email.split('@')[0] // Use email prefix as temp name until profile is completed
-                })
-            }).catch(e => console.error('Welcome email failed', e));
+            // Welcome email goes to the signed-in user's own address (server-side).
+            fetch('/api/notify/welcome', { method: 'POST' }).catch(() => {});
 
             // Direct onboarding: auto-login logic (handled by supabase client usually if confirm is off)
             // Redirect to completion page immediately
@@ -95,76 +105,56 @@ export default function RegisterPage() {
 
         } catch (err: any) {
             console.error('Registration error');
-            if (err?.message?.includes('User already registered')) {
-                setError('An account with this email already exists');
-            } else if (err?.message) {
-                setError(err.message);
-            } else {
-                setError('Failed to create account. Please try again.');
-            }
+            setError(friendlyAuthError(err?.message));
         } finally {
             setIsLoading(false);
         }
     };
 
     return (
-        <div className="max-w-md mx-auto">
-            <Card>
-                <CardHeader>
-                    <h1 className="text-2xl font-bold text-center text-gray-900">Create Account</h1>
-                    <p className="text-center text-gray-600 mt-2">Join our community of blood donors</p>
-                </CardHeader>
-                <CardBody>
-                    {error && (
-                        <Alert variant="error" className="mb-4">
-                            {error}
-                        </Alert>
-                    )}
+        <AuthFrame
+            eyebrow="Become a donor"
+            title={<>Join the <em className="text-red-600">network.</em></>}
+            subtitle="Create an account, then tell us your blood group and where you are. Two minutes, start to finish."
+            footer={<>Already registered? <Link href="/login" className={authLinkClass}>Sign in</Link></>}
+        >
+            {error && <Alert variant="error" className="mb-6">{error}</Alert>}
 
-                    <form onSubmit={handleSubmit} className="space-y-4">
-                        <Input
-                            label="Email"
-                            type="email"
-                            value={formData.email}
-                            onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                            required
-                            autoComplete="email"
-                            placeholder="your.email@example.com"
-                            error={fieldErrors.email}
-                        />
+            <GoogleButton onClick={handleGoogleSignUp} isLoading={isGoogleLoading} />
+            <OrDivider />
 
-                        <Input
-                            label="Password"
-                            type="password"
-                            value={formData.password}
-                            onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                            required
-                            autoComplete="new-password"
-                            placeholder="Minimum 6 characters"
-                            error={fieldErrors.password}
-                        />
+            <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+                <Input
+                    label="Email"
+                    type="email"
+                    value={formData.email}
+                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    required
+                    autoComplete="email"
+                    placeholder="you@example.com"
+                    error={fieldErrors.email}
+                />
+                <Input
+                    label="Password"
+                    type="password"
+                    value={formData.password}
+                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                    required
+                    autoComplete="new-password"
+                    minLength={8}
+                    helperText="At least 8 characters."
+                    error={fieldErrors.password}
+                />
+                <Button type="submit" variant="primary" size="lg" className="w-full !mt-6" isLoading={isLoading}>
+                    Create account
+                </Button>
+            </form>
 
-                        <Button
-                            type="submit"
-                            variant="primary"
-                            className="w-full"
-                            isLoading={isLoading}
-                            leftIcon={<UserPlus className="h-5 w-5" />}
-                        >
-                            Create Account
-                        </Button>
-                    </form>
-
-                    <div className="mt-6 text-center">
-                        <p className="text-sm text-gray-600">
-                            Already have an account?{' '}
-                            <Link href="/login" className="text-primary-500 hover:text-primary-600">
-                                Sign in
-                            </Link>
-                        </p>
-                    </div>
-                </CardBody>
-            </Card>
-        </div>
+            <p className="mt-6 text-[13px] leading-relaxed text-gray-500">
+                By creating an account you agree to the <Link href="/terms" className={authLinkClass}>Terms</Link> and
+                {' '}<Link href="/privacy" className={authLinkClass}>Privacy notice</Link>. Vital is voluntary: you’ll never
+                be paid, and never be asked to pay.
+            </p>
+        </AuthFrame>
     );
 }

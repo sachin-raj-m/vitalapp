@@ -282,9 +282,9 @@ export default function AdminDashboard() {
 
             {/* Stats Overview */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-                <Card className="bg-blue-50 border-blue-100">
+                <Card className="bg-gray-100 border-gray-200">
                     <CardBody className="p-4 flex items-center space-x-4">
-                        <div className="p-3 bg-blue-100 rounded-full text-blue-600"><Users size={24} /></div>
+                        <div className="p-3 bg-gray-100 rounded-full text-gray-900"><Users size={24} /></div>
                         <div>
                             <div className="text-2xl font-bold">{stats.users}</div>
                             <div className="text-sm text-gray-500">Total Users</div>
@@ -300,18 +300,18 @@ export default function AdminDashboard() {
                         </div>
                     </CardBody>
                 </Card>
-                <Card className="bg-orange-50 border-orange-100">
+                <Card className="bg-gray-100 border-gray-200">
                     <CardBody className="p-4 flex items-center space-x-4">
-                        <div className="p-3 bg-orange-100 rounded-full text-orange-600"><Shield size={24} /></div>
+                        <div className="p-3 bg-gray-100 rounded-full text-gray-900"><Shield size={24} /></div>
                         <div>
                             <div className="text-2xl font-bold">{stats.pending}</div>
                             <div className="text-sm text-gray-500">Pending Verify</div>
                         </div>
                     </CardBody>
                 </Card>
-                <Card className="bg-green-50 border-green-100">
+                <Card className="bg-success-50 border-success-100">
                     <CardBody className="p-4 flex items-center space-x-4">
-                        <div className="p-3 bg-green-100 rounded-full text-green-600"><Activity size={24} /></div>
+                        <div className="p-3 bg-success-100 rounded-full text-success-600"><Activity size={24} /></div>
                         <div>
                             <div className="text-2xl font-bold">{stats.requests}</div>
                             <div className="text-sm text-gray-500">Active Requests</div>
@@ -370,9 +370,9 @@ export default function AdminDashboard() {
                                 .map((item, i) => {
                                     return (
                                         <div key={i} className="flex items-start space-x-3 p-3 bg-white rounded-lg border border-slate-100 hover:shadow-sm transition-shadow">
-                                            <div className={`p-2 rounded-full ${item.type === 'user' ? 'bg-blue-100 text-blue-600' :
+                                            <div className={`p-2 rounded-full ${item.type === 'user' ? 'bg-gray-100 text-gray-900' :
                                                 item.type === 'request' ? 'bg-red-100 text-red-600' :
-                                                    'bg-green-100 text-green-600'
+                                                    'bg-success-100 text-success-600'
                                                 }`}>
                                                 {item.type === 'user' && <User size={16} />}
                                                 {item.type === 'request' && <Activity size={16} />}
@@ -447,13 +447,13 @@ export default function AdminDashboard() {
                                                 <div className="text-sm text-gray-500">{user.email}</div>
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap">
-                                                <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${user.role === 'admin' ? 'bg-purple-100 text-purple-800' : 'bg-gray-100 text-gray-800'}`}>
+                                                <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${user.role === 'admin' ? 'bg-gray-100 text-gray-900' : 'bg-gray-100 text-gray-800'}`}>
                                                     {user.role || 'user'}
                                                 </span>
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap">
                                                 {user.is_donor ? (
-                                                    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${user.verification_status === 'verified' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
+                                                    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${user.verification_status === 'verified' ? 'bg-success-100 text-success-800' : 'bg-warning-100 text-warning-800'}`}>
                                                         {user.verification_status === 'verified' ? 'Verified Donor' : 'Pending Verified'}
                                                     </span>
                                                 ) : <span className="text-gray-400 text-xs">Recipient</span>}
@@ -462,7 +462,7 @@ export default function AdminDashboard() {
                                                 <Button
                                                     size="sm"
                                                     variant="ghost"
-                                                    className="text-blue-600 hover:text-blue-900"
+                                                    className="text-gray-900 hover:text-gray-900"
                                                     isLoading={actionLoading === user.id}
                                                     onClick={() => initiateToggleRole(user.id, user.role || 'user')}
                                                 >
@@ -508,7 +508,7 @@ export default function AdminDashboard() {
                                             <td className="px-6 py-4 text-sm font-medium text-gray-900">{req.hospital_name}</td>
                                             <td className="px-6 py-4 text-sm text-gray-900">{req.blood_group} ({req.units_needed} units) <span className="text-xs text-red-500 border border-red-200 px-1 rounded">{req.urgency_level}</span></td>
                                             <td className="px-6 py-4 text-sm">
-                                                <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${req.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
+                                                <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${req.status === 'active' ? 'bg-success-100 text-success-800' : 'bg-gray-100 text-gray-800'}`}>
                                                     {req.status}
                                                 </span>
                                             </td>
@@ -543,7 +543,7 @@ export default function AdminDashboard() {
                     <motion.div
                         initial={{ opacity: 0, scale: 0.95 }}
                         animate={{ opacity: 1, scale: 1 }}
-                        className="bg-white rounded-xl shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto"
+                        className="bg-white rounded-xl shadow-sm max-w-lg w-full max-h-[90vh] overflow-y-auto"
                     >
                         {/* ... Modal content ... */}
                         <div className="p-6 border-b flex justify-between items-center sticky top-0 bg-white z-10">

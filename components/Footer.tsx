@@ -1,99 +1,53 @@
 "use client";
 
-import React, { useState } from 'react';
+import React from 'react';
 import Link from 'next/link';
-import { Mail } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
-import { useRouter, usePathname } from 'next/navigation';
-import { AuthModal } from './AuthModal';
+import { usePathname } from 'next/navigation';
+import { Logo } from './Logo';
+import { isAppRoute, isHybridRoute, isStandaloneRoute } from '@/lib/routes';
 
+const linkClass = 'text-sm text-gray-600 transition-colors hover:text-gray-900';
 
 export const Footer: React.FC = () => {
   const { user, loading } = useAuth();
-  const router = useRouter();
-  const [showAuthModal, setShowAuthModal] = useState(false);
   const pathname = usePathname();
 
-  // 1. Strictly Hide on Public Profile (Custom Layout)
-  if (pathname?.startsWith('/donor')) return null;
+  if (isStandaloneRoute(pathname) || isAppRoute(pathname)) return null;
+  if (isHybridRoute(pathname) && user && !loading) return null;
 
-  // 2. Strictly Hide on Protected Routes (Sidebar is present)
-  const isProtectedRoute =
-    pathname?.startsWith('/dashboard') ||
-    pathname?.startsWith('/admin') ||
-    pathname?.startsWith('/profile') ||
-    pathname?.startsWith('/nearby-donors') ||
-    pathname?.startsWith('/achievements') ||
-    pathname?.startsWith('/donations');
-
-  if (isProtectedRoute) return null;
-
-  // 3. Hybrid Routes (e.g. Requests)
-  // If user is logged in, they see Sidebar. If guest, they see Footer.
-  const isHybridRoute = pathname?.startsWith('/requests');
-
-  if (isHybridRoute && user && !loading) return null;
-
-
-  const handleRequestBlood = (e: React.MouseEvent) => {
-    e.preventDefault();
-    if (user) {
-      router.push('/requests/new');
-    } else {
-      setShowAuthModal(true);
-    }
-  };
 
   return (
-    <footer className="bg-white border-t border-gray-100 py-12 pb-24 md:pb-12 mt-auto">
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8 flex flex-col items-center">
+    <footer className="mt-auto border-t border-gray-200 pb-24 md:pb-0">
+      <div className="mx-auto max-w-6xl px-5 py-12 sm:px-8">
+        <div className="flex flex-col justify-between gap-10 md:flex-row">
+          <div className="max-w-xs">
+            <Logo />
+            <p className="mt-4 text-sm leading-relaxed text-gray-500">
+              A free, non-commercial blood donor network. Nobody pays, nobody gets paid.
+            </p>
+          </div>
 
-        <div className="flex items-center space-x-2 mb-4">
-          <span className="text-2xl font-bold text-gray-900">Vital</span>
+          <div className="grid grid-cols-2 gap-x-16 gap-y-3 sm:grid-cols-3">
+            <Link href="/requests" className={linkClass}>Open requests</Link>
+            <Link href="/requests/new" className={linkClass}>Request blood</Link>
+            <Link href="/register" className={linkClass}>Become a donor</Link>
+            <Link href="/how-it-works" className={linkClass}>How it works</Link>
+            <Link href="/changelog" className={linkClass}>Changelog</Link>
+            <a href="mailto:sachin@vitalapp.in" className={linkClass}>Contact</a>
+          </div>
         </div>
 
-        <p className="text-gray-500 text-center max-w-md mb-8">
-          Connecting donors with those in need, instantly. Join our mission to save lives every day.
-        </p>
-
-        <div className="flex flex-wrap justify-center gap-8 mb-8">
-          <Link href="/requests" className="text-sm font-medium text-gray-600 hover:text-red-500 transition-colors">
-            Find Donors
-          </Link>
-          <a
-            href="/requests/new"
-            onClick={handleRequestBlood}
-            className="text-sm font-medium text-gray-600 hover:text-red-500 transition-colors cursor-pointer"
-          >
-            Request Blood
-          </a>
-          <Link href="/register" className="text-sm font-medium text-gray-600 hover:text-red-500 transition-colors">
-            Become a Donor
-          </Link>
-          <Link href="/changelog" className="text-sm font-medium text-gray-600 hover:text-red-500 transition-colors">
-            Changelog
-          </Link>
-        </div>
-
-        <div className="flex items-center space-x-2 text-gray-500 hover:text-red-500 transition-colors">
-          <Mail className="h-4 w-4" />
-          <a href="mailto:sachin@vitalapp.in" className="text-sm font-medium">sachin@vitalapp.in</a>
-        </div>
-
-        <div className="mt-12 text-center text-xs text-gray-400">
-          &copy; {new Date().getFullYear()} Vital Blood Donation. All rights reserved.
+        <div className="mt-12 flex flex-col justify-between gap-3 border-t border-gray-200 pt-6 font-mono text-[11px] uppercase tracking-[0.12em] text-gray-400 sm:flex-row sm:items-center">
+          <span suppressHydrationWarning>© {new Date().getFullYear()} Vital · Voluntary · Non-remunerated</span>
+          <nav className="flex gap-5" aria-label="Legal">
+            <Link href="/privacy" className="hover:text-gray-900">Privacy</Link>
+            <Link href="/terms" className="hover:text-gray-900">Terms</Link>
+            <Link href="/safety-guidelines" className="hover:text-gray-900">Safety</Link>
+          </nav>
         </div>
       </div>
 
-      <AuthModal
-        isOpen={showAuthModal}
-        onClose={() => setShowAuthModal(false)}
-        onSuccess={() => {
-          setShowAuthModal(false);
-          router.push('/requests/new');
-        }}
-        message="Login to Create Request"
-      />
     </footer>
   );
 };
