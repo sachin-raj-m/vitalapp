@@ -1,44 +1,23 @@
 import { MetadataRoute } from 'next'
+import { SITE_URL } from '@/lib/site'
+
+const PAGES: { path: string; changeFrequency: MetadataRoute.Sitemap[number]['changeFrequency']; priority: number }[] = [
+    { path: '', changeFrequency: 'daily', priority: 1 },
+    { path: '/requests', changeFrequency: 'hourly', priority: 0.9 },
+    { path: '/how-it-works', changeFrequency: 'monthly', priority: 0.8 },
+    { path: '/register', changeFrequency: 'monthly', priority: 0.8 },
+    { path: '/safety-guidelines', changeFrequency: 'yearly', priority: 0.6 },
+    { path: '/privacy', changeFrequency: 'yearly', priority: 0.4 },
+    { path: '/terms', changeFrequency: 'yearly', priority: 0.4 },
+    { path: '/changelog', changeFrequency: 'weekly', priority: 0.5 },
+    { path: '/login', changeFrequency: 'yearly', priority: 0.3 },
+]
 
 export default function sitemap(): MetadataRoute.Sitemap {
-    const baseUrl = 'https://vitalapp.vercel.app'
-
-    return [
-        {
-            url: baseUrl,
-            lastModified: new Date(),
-            changeFrequency: 'daily',
-            priority: 1,
-        },
-        {
-            url: `${baseUrl}/requests`,
-            lastModified: new Date(),
-            changeFrequency: 'hourly',
-            priority: 0.9,
-        },
-        {
-            url: `${baseUrl}/register`,
-            lastModified: new Date(),
-            changeFrequency: 'monthly',
-            priority: 0.8,
-        },
-        {
-            url: `${baseUrl}/login`,
-            lastModified: new Date(),
-            changeFrequency: 'monthly',
-            priority: 0.5,
-        },
-        {
-            url: `${baseUrl}/changelog`,
-            lastModified: new Date(),
-            changeFrequency: 'weekly',
-            priority: 0.7,
-        },
-        {
-            url: `${baseUrl}/forgot-password`,
-            lastModified: new Date(),
-            changeFrequency: 'yearly',
-            priority: 0.3,
-        },
-    ]
+    return PAGES.map(p => ({
+        url: `${SITE_URL}${p.path}`,
+        lastModified: new Date(),
+        changeFrequency: p.changeFrequency,
+        priority: p.priority,
+    }))
 }
