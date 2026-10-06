@@ -2,7 +2,8 @@ import { Metadata } from 'next';
 import LoginPageContent from './content';
 
 export const metadata: Metadata = {
-    title: 'Login - Vital Blood Donation',
+    alternates: { canonical: '/login' },
+    title: 'Sign in',
     description: 'Sign in to your Vital Blood Donation account to manage requests and donations.',
 };
 

@@ -3,128 +3,141 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { motion, AnimatePresence } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
 import {
-    LayoutDashboard,
-    HeartHandshake,
-    List,
+    LayoutGrid,
+    Inbox,
+    FileText,
+    HeartPulse,
     MapPin,
     User,
     LogOut,
     Menu,
     X,
-    HeartPulse,
     Shield,
-    Award
+    Award,
+    Plus,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
-import { Button } from './ui/Button';
+import { Logo } from './Logo';
+import { cn } from '@/lib/cn';
+
+const NAV = [
+    { href: '/dashboard', label: 'Overview', icon: LayoutGrid },
+    { href: '/requests', label: 'Open requests', icon: Inbox },
+    { href: '/requests/my-requests', label: 'My requests', icon: FileText },
+    { href: '/donations', label: 'My donations', icon: HeartPulse },
+    { href: '/nearby-donors', label: 'Donors nearby', icon: MapPin },
+    { href: '/achievements', label: 'Milestones', icon: Award },
+    { href: '/profile', label: 'Profile', icon: User },
+];
 
 export function AppSidebar() {
     const pathname = usePathname();
     const { user, signOut } = useAuth();
     const [isMobileOpen, setIsMobileOpen] = useState(false);
 
-    // Close mobile menu on path change
+    useEffect(() => setIsMobileOpen(false), [pathname]);
+
     useEffect(() => {
-        setIsMobileOpen(false);
-    }, [pathname]);
+        if (!isMobileOpen) return;
+        const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setIsMobileOpen(false);
+        window.addEventListener('keydown', onKey);
+        return () => window.removeEventListener('keydown', onKey);
+    }, [isMobileOpen]);
 
-    const navItems = [
-        { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-        { href: '/requests', label: 'All Requests', icon: HeartHandshake },
-        { href: '/requests/my-requests', label: 'My Requests', icon: List },
-        { href: '/donations', label: 'Donations', icon: HeartPulse },
-        { href: '/nearby-donors', label: 'Find Donors', icon: MapPin },
-        { href: '/achievements', label: 'Achievements', icon: Award },
-        { href: '/profile', label: 'Profile', icon: User },
-    ];
-
-    if (user?.role === 'admin') {
-        navItems.push({ href: '/admin', label: 'Admin Console', icon: Shield });
-    }
+    const navItems = user?.role === 'admin'
+        ? [...NAV, { href: '/admin', label: 'Admin', icon: Shield }]
+        : NAV;
 
     const isActive = (path: string) => pathname === path;
 
-    const SidebarContent = () => (
-        <div className="flex flex-col h-full bg-white border-r border-gray-200 shadow-sm">
-            <Link href="/" className="p-6 flex items-center gap-3 border-b border-gray-100 hover:bg-gray-50 transition-colors">
-                <div className="bg-red-50 p-2 rounded-lg">
-                    <HeartPulse className="h-6 w-6 text-red-600" />
-                </div>
-                <span className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-red-600 to-red-900">
-                    VitalApp
-                </span>
-            </Link>
+    const sidebarContent = (
+        <div className="flex h-full flex-col bg-paper">
+            <div className="flex h-16 items-center px-6">
+                <Link href="/" aria-label="Vital home" className="-mb-1">
+                    <Logo />
+                </Link>
+            </div>
 
-            <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
-                <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4 px-2">
-                    Menu
-                </div>
-                {navItems.map((item) => (
-                    <Link key={item.href} href={item.href}>
-                        <div className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 group ${isActive(item.href)
-                            ? 'bg-red-50 text-red-700 font-medium shadow-sm'
-                            : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                            }`}>
-                            <item.icon size={20} className={isActive(item.href) ? 'text-red-600' : 'text-gray-400 group-hover:text-gray-600'} />
-                            <span>{item.label}</span>
-                            {isActive(item.href) && (
-                                <motion.div
-                                    layoutId="active-pill"
-                                    className="ml-auto w-1.5 h-1.5 rounded-full bg-red-600"
-                                />
-                            )}
-                        </div>
-                    </Link>
-                ))}
+            <div className="px-4 pb-2 pt-2">
+                <Link
+                    href="/requests/new"
+                    className="flex h-9 items-center justify-center gap-1.5 rounded-md bg-red-600 text-sm font-medium text-white transition-colors hover:bg-red-700"
+                >
+                    <Plus className="h-4 w-4" /> Request blood
+                </Link>
+            </div>
+
+            <nav className="flex-1 overflow-y-auto px-3 py-4" aria-label="App">
+                <ul className="space-y-0.5">
+                    {navItems.map(({ href, label, icon: Icon }) => {
+                        const active = isActive(href);
+                        return (
+                            <li key={href}>
+                                <Link
+                                    href={href}
+                                    aria-current={active ? 'page' : undefined}
+                                    className={cn(
+                                        'relative flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors',
+                                        active
+                                            ? 'bg-white font-medium text-gray-900 ring-1 ring-gray-200'
+                                            : 'text-gray-600 hover:bg-gray-200/50 hover:text-gray-900',
+                                    )}
+                                >
+                                    {active && <span className="absolute left-0 top-2 bottom-2 w-[2px] rounded-full bg-red-600" />}
+                                    <Icon className={cn('h-4 w-4', active ? 'text-gray-900' : 'text-gray-400')} strokeWidth={1.75} />
+                                    {label}
+                                </Link>
+                            </li>
+                        );
+                    })}
+                </ul>
             </nav>
 
-            <div className="p-4 border-t border-gray-100">
-                <div className="flex items-center gap-3 px-3 py-3 mb-2">
-                    <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center text-red-700 font-bold shrink-0">
-                        {user?.full_name?.[0] || 'U'}
+            <div className="border-t border-gray-200 p-3">
+                <div className="flex items-center gap-3 px-2 py-2">
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gray-900 font-mono text-xs text-gray-50">
+                        {user?.blood_group || user?.full_name?.[0] || '·'}
                     </div>
-                    <div className="overflow-hidden">
-                        <p className="text-sm font-medium text-gray-900 truncate">{user?.full_name}</p>
-                        <p className="text-xs text-gray-500 truncate">{user?.email}</p>
+                    <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium text-gray-900">{user?.full_name}</p>
+                        <p className="truncate text-xs text-gray-500">{user?.email}</p>
                     </div>
+                    <button
+                        onClick={() => signOut()}
+                        className="rounded-md p-1.5 text-gray-400 transition-colors hover:bg-gray-200/60 hover:text-gray-900"
+                        aria-label="Sign out"
+                        title="Sign out"
+                    >
+                        <LogOut className="h-4 w-4" />
+                    </button>
                 </div>
-                <Button
-                    variant="ghost"
-                    className="w-full justify-start text-red-600 hover:text-red-700 hover:bg-red-50"
-                    onClick={() => signOut()}
-                >
-                    <LogOut size={18} className="mr-2" />
-                    Sign Out
-                </Button>
             </div>
         </div>
     );
 
     return (
         <>
-            {/* Desktop Sidebar */}
-            <div className="hidden md:block w-64 fixed inset-y-0 left-0 z-30">
-                <SidebarContent />
-            </div>
+            <aside className="fixed inset-y-0 left-0 z-30 hidden w-60 border-r border-gray-200 md:block">
+                {sidebarContent}
+            </aside>
 
-            <div className="md:hidden sticky top-0 z-40 bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between shadow-sm">
-                <Link href="/dashboard" className="flex items-center gap-2">
-                    <div className="bg-red-50 p-1.5 rounded-lg">
-                        <HeartPulse className="h-5 w-5 text-red-600" />
-                    </div>
-                    <span className="font-bold text-lg text-gray-900">VitalApp</span>
+            <div className="sticky top-0 z-40 flex h-14 items-center justify-between border-b border-gray-200 bg-paper/90 px-4 backdrop-blur-md md:hidden">
+                <Link href="/dashboard" aria-label="Vital dashboard" className="-mb-1">
+                    <Logo className="text-[22px]" />
                 </Link>
                 <button
                     onClick={() => setIsMobileOpen(true)}
-                    className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                    className="-mr-2 rounded-md p-2 text-gray-700"
+                    aria-label="Open menu"
+                    aria-expanded={isMobileOpen}
+                    aria-controls="app-drawer"
                 >
-                    <Menu size={24} />
+                    <Menu className="h-5 w-5" />
                 </button>
             </div>
 
-            {/* Mobile Overlay & Sidebar */}
             <AnimatePresence>
                 {isMobileOpen && (
                     <>
@@ -133,24 +146,28 @@ export function AppSidebar() {
                             animate={{ opacity: 1 }}
                             exit={{ opacity: 0 }}
                             onClick={() => setIsMobileOpen(false)}
-                            className="md:hidden fixed inset-0 z-40 bg-black/50 backdrop-blur-sm"
+                            className="fixed inset-0 z-40 bg-gray-950/40 md:hidden"
                         />
                         <motion.div
                             initial={{ x: '-100%' }}
                             animate={{ x: 0 }}
                             exit={{ x: '-100%' }}
-                            transition={{ type: "spring", bounce: 0, duration: 0.3 }}
-                            className="md:hidden fixed inset-y-0 left-0 z-50 w-72 bg-white shadow-2xl"
+                            transition={{ type: 'spring', bounce: 0, duration: 0.3 }}
+                            className="fixed inset-y-0 left-0 z-50 w-72 border-r border-gray-200 md:hidden"
+                            id="app-drawer"
+                            role="dialog"
+                            aria-modal="true"
+                            aria-label="Menu"
                         >
-                            <div className="h-full relative">
-                                <button
-                                    onClick={() => setIsMobileOpen(false)}
-                                    className="absolute top-4 right-4 p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg"
-                                >
-                                    <X size={20} />
-                                </button>
-                                <SidebarContent />
-                            </div>
+                            <button
+                                autoFocus
+                                onClick={() => setIsMobileOpen(false)}
+                                className="absolute right-3 top-4 z-10 rounded-md p-1.5 text-gray-500 hover:text-gray-900"
+                                aria-label="Close menu"
+                            >
+                                <X className="h-5 w-5" />
+                            </button>
+                            {sidebarContent}
                         </motion.div>
                     </>
                 )}

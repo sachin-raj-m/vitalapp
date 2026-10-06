@@ -1,158 +1,140 @@
-import { ArrowRight, Activity, Bell, MapPin, Shield, CheckCircle } from 'lucide-react';
 import Link from 'next/link';
-import { Button } from '@/components/ui/Button';
+import { ArrowRight } from 'lucide-react';
 
 export const metadata = {
-    title: 'How Vital Works - The Science of Saving Lives',
-    description: 'Understand the algorithm and safety protocols behind Vital\'s real-time blood donation network.',
+    alternates: { canonical: '/how-it-works' },
+    title: 'How it works',
+    description: 'What happens between a blood request going up and a donor walking into the hospital.',
 };
+
+const STEPS = [
+    {
+        kicker: 'The request',
+        title: 'A family posts what they need.',
+        body: [
+            'Blood group, number of units, the hospital, the date it’s needed by, and a contact person. Requests can be marked high, medium or low urgency.',
+            'The request is public, so it can be shared on WhatsApp. Contact details are not.',
+        ],
+        figure: (
+            <div className="space-y-3 font-mono text-[13px]">
+                {[
+                    ['Group', 'B+'],
+                    ['Units', '2'],
+                    ['Hospital', 'General Hospital, Kochi'],
+                    ['Needed by', 'Thu, 14 Nov'],
+                    ['Urgency', 'High'],
+                ].map(([k, v]) => (
+                    <div key={k} className="flex justify-between border-b border-gray-200 pb-3 last:border-0 last:pb-0">
+                        <span className="text-gray-500">{k}</span>
+                        <span className="text-gray-900">{v}</span>
+                    </div>
+                ))}
+            </div>
+        ),
+    },
+    {
+        kicker: 'The match',
+        title: 'Only people who can help are told.',
+        body: [
+            'Vital looks for registered donors in the same city whose blood group is compatible with the patient. That means donors whose red cells the patient can actually receive, not just an exact match.',
+            'Those donors get a push notification and an email. Nobody else is pinged.',
+        ],
+        figure: (
+            <div className="grid grid-cols-4 gap-px overflow-hidden rounded-md bg-gray-200 font-serif text-3xl">
+                {['O−', 'O+', 'A−', 'A+', 'B−', 'B+', 'AB−', 'AB+'].map(g => {
+                    const match = ['O−', 'O+', 'B−', 'B+'].includes(g);
+                    return (
+                        <div key={g} className={`flex aspect-square items-center justify-center ${match ? 'bg-gray-900 text-white' : 'bg-white text-gray-300'}`}>
+                            {g}
+                        </div>
+                    );
+                })}
+            </div>
+        ),
+    },
+    {
+        kicker: 'The offer',
+        title: 'A donor checks themselves, then says yes.',
+        body: [
+            'Before offering, a donor confirms they’re well today and haven’t recently had antibiotics, alcohol, a tattoo, surgery, or an infection like malaria or dengue.',
+            'Once they offer, they see the family’s contact, and the family sees theirs. That’s the only time numbers are exchanged.',
+        ],
+        figure: (
+            <ul className="space-y-3 text-sm">
+                {['Feeling well today', 'No antibiotics in 14 days', 'No tattoo or surgery in 12 months', 'No alcohol in 24 hours', 'No recent infection'].map(t => (
+                    <li key={t} className="flex items-center gap-3">
+                        <span className="flex h-4 w-4 items-center justify-center rounded-sm bg-gray-900">
+                            <svg viewBox="0 0 12 12" className="h-2.5 w-2.5 text-white" aria-hidden><path d="M2.5 6.5l2.2 2L9.5 3.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                        </span>
+                        <span className="text-gray-800">{t}</span>
+                    </li>
+                ))}
+            </ul>
+        ),
+    },
+    {
+        kicker: 'The proof',
+        title: 'The family confirms with a PIN.',
+        body: [
+            'Every donor has a private 4-digit PIN. At the hospital they share it with the family, who enter it in Vital to confirm the donation happened.',
+            'When enough units are confirmed, the request closes on its own, and the donor’s recovery clock starts.',
+        ],
+        figure: (
+            <div className="flex justify-center gap-2">
+                {['4', '7', '1', '9'].map((d, i) => (
+                    <span key={i} className="flex h-16 w-12 items-center justify-center rounded-md border border-gray-300 bg-white font-mono text-2xl text-gray-900">
+                        {d}
+                    </span>
+                ))}
+            </div>
+        ),
+    },
+];
 
 export default function HowItWorksPage() {
     return (
-        <div className="bg-white text-slate-900 font-sans selection:bg-red-100 selection:text-red-900">
-
-            {/* Hero Section */}
-            <section className="pt-32 pb-20 bg-slate-50">
-                <div className="container mx-auto px-4 md:px-6 text-center">
-                    <h1 className="text-4xl md:text-6xl font-extrabold text-slate-900 mb-6 tracking-tight">
-                        Under the Hood of <span className="text-red-600">Saving Lives</span>
-                    </h1>
-                    <p className="text-xl text-slate-600 max-w-2xl mx-auto mb-10">
-                        Vital isn't just a list of donors. It's a real-time, hyperlocal logistics engine designed to cut response times from hours to minutes.
-                    </p>
-                </div>
+        <div>
+            <section className="mx-auto max-w-6xl px-5 pb-16 pt-16 sm:px-8 sm:pt-24">
+                <p className="eyebrow">How it works</p>
+                <h1 className="display mt-5 max-w-4xl text-5xl leading-[0.98] sm:text-7xl">
+                    From a request to a donor at the bedside, <em className="text-red-600">in four steps.</em>
+                </h1>
             </section>
 
-            {/* The Protocol Section */}
-            <section className="py-24">
-                <div className="container mx-auto px-4 md:px-6">
-                    <div className="max-w-4xl mx-auto space-y-24">
-
-                        {/* Step 1: The Trigger */}
-                        <div className="flex flex-col md:flex-row gap-12 items-center">
-                            <div className="flex-1 space-y-4">
-                                <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center text-red-600 font-bold text-xl mb-4">1</div>
-                                <h2 className="text-3xl font-bold text-slate-900">The Trigger</h2>
-                                <h3 className="text-xl font-medium text-red-600">A verified need arises.</h3>
-                                <p className="text-lg text-slate-600 leading-relaxed">
-                                    When a hospital or individual posts a request, it isn't broadcast to everyone. That creates noice.
-                                    Instead, our system validates the urgency, location, and specific blood component required.
+            <section className="mx-auto max-w-6xl px-5 pb-24 sm:px-8">
+                <ol className="border-t border-gray-200">
+                    {STEPS.map((step, i) => (
+                        <li key={step.kicker} className="grid gap-10 border-b border-gray-200 py-14 lg:grid-cols-12 lg:gap-16">
+                            <div className="lg:col-span-7">
+                                <p className="font-mono text-xs text-red-600">
+                                    0{i + 1} <span className="ml-2 uppercase tracking-[0.14em] text-gray-500">{step.kicker}</span>
                                 </p>
-                            </div>
-                            <div className="flex-1 bg-slate-50 p-8 rounded-3xl border border-slate-100 shadow-lg">
-                                <div className="flex items-center gap-4 mb-4 opacity-50">
-                                    <div className="w-2 h-2 rounded-full bg-red-500"></div>
-                                    <div className="h-2 bg-slate-200 rounded-full w-24"></div>
-                                </div>
-                                <div className="space-y-3">
-                                    <div className="h-4 bg-slate-200 rounded w-3/4"></div>
-                                    <div className="h-4 bg-slate-200 rounded w-1/2"></div>
-                                </div>
-                                <div className="mt-6 flex justify-end">
-                                    <div className="px-4 py-2 bg-red-600 text-white text-sm font-bold rounded-lg shadow-md">Request Verified</div>
+                                <h2 className="mt-5 text-3xl font-medium leading-tight tracking-tight text-gray-900 sm:text-4xl">{step.title}</h2>
+                                <div className="mt-5 max-w-xl space-y-4 text-[17px] leading-relaxed text-gray-600">
+                                    {step.body.map(p => <p key={p}>{p}</p>)}
                                 </div>
                             </div>
-                        </div>
-
-                        {/* Step 2: The Algorithm */}
-                        <div className="flex flex-col md:flex-row-reverse gap-12 items-center">
-                            <div className="flex-1 space-y-4">
-                                <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-bold text-xl mb-4">2</div>
-                                <h2 className="text-3xl font-bold text-slate-900">The Matching Algorithm</h2>
-                                <h3 className="text-xl font-medium text-blue-600">Precision over volume.</h3>
-                                <p className="text-lg text-slate-600 leading-relaxed">
-                                    Vital's engine filters our donor database instantly based on 3 criteria:
-                                </p>
-                                <ul className="space-y-3 mt-4">
-                                    <li className="flex items-center gap-3 text-slate-700">
-                                        <CheckCircle className="w-5 h-5 text-green-500" />
-                                        <span><strong>Blood Compatibility:</strong> Only exact matches (e.g. O+ for O+).</span>
-                                    </li>
-                                    <li className="flex items-center gap-3 text-slate-700">
-                                        <CheckCircle className="w-5 h-5 text-green-500" />
-                                        <span><strong>Hyper-location:</strong> Donors within a 5-10km radius to ensure speed.</span>
-                                    </li>
-                                    <li className="flex items-center gap-3 text-slate-700">
-                                        <CheckCircle className="w-5 h-5 text-green-500" />
-                                        <span><strong>Eligibility Status:</strong> Donors not in their cooling-off period.</span>
-                                    </li>
-                                </ul>
+                            <div className="lg:col-span-5">
+                                <div className="rounded-lg border border-gray-200 bg-gray-100/60 p-6 sm:p-8">{step.figure}</div>
                             </div>
-                            <div className="flex-1 bg-slate-900 p-8 rounded-3xl shadow-xl text-white relative overflow-hidden">
-                                <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20"></div>
-                                <div className="relative z-10 grid grid-cols-2 gap-4">
-                                    <div className="p-4 bg-slate-800 rounded-xl border border-slate-700">
-                                        <div className="text-xs text-slate-400 mb-1">Distance</div>
-                                        <div className="text-xl font-mono text-green-400">3.2 km</div>
-                                    </div>
-                                    <div className="p-4 bg-slate-800 rounded-xl border border-slate-700">
-                                        <div className="text-xs text-slate-400 mb-1">Blood Group</div>
-                                        <div className="text-xl font-mono text-red-400">Match</div>
-                                    </div>
-                                    <div className="col-span-2 p-4 bg-slate-800 rounded-xl border border-slate-700 flex justify-between items-center">
-                                        <div className="text-sm font-bold">Eligibility Check</div>
-                                        <div className="flex gap-1">
-                                            <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
-                                            <div className="text-xs text-green-400">PASSED</div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Step 3: The Connection */}
-                        <div className="flex flex-col md:flex-row gap-12 items-center">
-                            <div className="flex-1 space-y-4">
-                                <div className="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center text-emerald-600 font-bold text-xl mb-4">3</div>
-                                <h2 className="text-3xl font-bold text-slate-900">The Connection</h2>
-                                <h3 className="text-xl font-medium text-emerald-600">Privacy-first handshake.</h3>
-                                <p className="text-lg text-slate-600 leading-relaxed">
-                                    Donors receive a push notification. They review the case. If they accept, only THEN is contact information exchanged via a secure, temporary bridge.
-                                    This prevents spam and harassment.
-                                </p>
-                            </div>
-                            <div className="flex-1 flex justify-center">
-                                <div className="relative w-64 h-auto bg-white border border-slate-200 rounded-[2rem] shadow-2xl p-4">
-                                    <div className="absolute top-0 left-1/2 -translate-x-1/2 w-24 h-6 bg-slate-900 rounded-b-xl"></div>
-                                    <div className="mt-8 space-y-4">
-                                        <div className="p-4 bg-red-50 rounded-2xl border border-red-100">
-                                            <div className="flex items-center gap-3 mb-2">
-                                                <Bell className="w-5 h-5 text-red-600" />
-                                                <span className="text-xs font-bold text-red-800 uppercase">Urgent Request</span>
-                                            </div>
-                                            <p className="text-sm text-slate-700 font-medium">A+ Blood Needed at City Hospital</p>
-                                            <div className="mt-3 flex gap-2">
-                                                <div className="flex-1 py-2 bg-white border border-slate-200 rounded-lg text-center text-xs font-bold shadow-sm">Decline</div>
-                                                <div className="flex-1 py-2 bg-red-600 text-white rounded-lg text-center text-xs font-bold shadow-sm">I can donate</div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                    </div>
-                </div>
+                        </li>
+                    ))}
+                </ol>
             </section>
 
-            {/* CTA */}
-            <section className="py-24 bg-red-50 text-center relative overflow-hidden">
-                <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-10"></div>
-                <div className="container mx-auto px-4 relative z-10">
-                    <h2 className="text-3xl md:text-5xl font-bold text-slate-900 mb-6 tracking-tight">
-                        Ready to be part of the <span className="text-red-600">algorithm</span>?
+            <section className="bg-gray-950 text-gray-50">
+                <div className="mx-auto flex max-w-6xl flex-col gap-8 px-5 py-20 sm:px-8 lg:flex-row lg:items-end lg:justify-between">
+                    <h2 className="max-w-2xl font-serif text-5xl leading-[1] tracking-tight sm:text-6xl">
+                        The network is only as good as the people on it.
                     </h2>
-                    <p className="text-xl text-slate-600 mb-10 max-w-2xl mx-auto">
-                        Your registration inserts a new verified node into our network. When a request matches you, you'll be the first to know.
-                    </p>
-                    <Link href="/register">
-                        <Button size="xl" className="bg-red-600 hover:bg-red-700 text-white rounded-full px-12 py-6 text-xl font-bold shadow-xl shadow-red-200 transition-all hover:scale-105">
-                            Join the Network
-                        </Button>
+                    <Link
+                        href="/register"
+                        className="inline-flex h-12 shrink-0 items-center justify-center gap-2 rounded-md bg-red-600 px-6 text-[15px] font-medium text-white transition-colors hover:bg-red-700"
+                    >
+                        Become a donor <ArrowRight className="h-4 w-4" />
                     </Link>
                 </div>
             </section>
-
         </div>
     );
 }

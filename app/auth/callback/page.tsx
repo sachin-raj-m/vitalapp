@@ -2,10 +2,10 @@
 
 import React, { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Card, CardBody } from '@/components/ui/Card';
-import { Loader2 } from 'lucide-react';
+import { PageLoader } from '@/components/PageLoader';
 import { supabase } from '@/lib/supabase';
 import { isRegistrationComplete } from '@/lib/auth-helpers';
+import { safeInternalPath } from '@/lib/site';
 
 export default function AuthCallback() {
     const router = useRouter();
@@ -32,7 +32,9 @@ export default function AuthCallback() {
                     }));
                     router.push('/complete-registration');
                 } else {
-                    router.push('/dashboard');
+                    // e.g. a password-reset link sends people to /profile/edit.
+                    const next = new URLSearchParams(window.location.search).get('next');
+                    router.push(safeInternalPath(next));
                 }
             } catch (error) {
                 console.error('Auth callback error:', error);
@@ -44,13 +46,6 @@ export default function AuthCallback() {
     }, [router]);
 
     return (
-        <div className="max-w-md mx-auto">
-            <Card>
-                <CardBody className="text-center py-8">
-                    <h2 className="text-xl font-semibold mb-4">Processing Sign In</h2>
-                    <Loader2 className="h-8 w-8 animate-spin text-primary-500 mx-auto" />
-                </CardBody>
-            </Card>
-        </div>
+        <PageLoader label="Signing you in…" />
     );
 }

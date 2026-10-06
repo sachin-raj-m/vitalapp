@@ -1,9 +1,9 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
-import { Check, X, AlertTriangle } from 'lucide-react';
+import { cn } from '@/lib/cn';
 
 interface TemporaryDeferralModalProps {
     isOpen: boolean;
@@ -11,109 +11,72 @@ interface TemporaryDeferralModalProps {
     onConfirm: () => void;
 }
 
+const CHECKS = [
+    { key: 'health', title: 'I’m feeling well today', detail: 'No cold, flu, sore throat or fever.' },
+    { key: 'antibiotics', title: 'No antibiotics in the last 14 days', detail: 'Counted from your last dose.' },
+    { key: 'procedures', title: 'No tattoo, piercing or surgery in the last 12 months' },
+    { key: 'alcohol', title: 'No alcohol in the last 24 hours' },
+    { key: 'infection', title: 'No recent infection', detail: 'Malaria in 3 months, dengue in 6, typhoid in 12.' },
+] as const;
+
+type CheckKey = typeof CHECKS[number]['key'];
+
 export function TemporaryDeferralModal({ isOpen, onClose, onConfirm }: TemporaryDeferralModalProps) {
-    const [checklist, setChecklist] = useState({
-        health: false,
-        antibiotics: false,
-        procedures: false,
-        alcohol: false,
-        infection: false,
-    });
+    const [checked, setChecked] = useState<Set<CheckKey>>(new Set());
 
-    const allChecked = Object.values(checklist).every(val => val === true);
+    // Every offer starts with a fresh checklist.
+    useEffect(() => {
+        if (isOpen) setChecked(new Set());
+    }, [isOpen]);
 
-    const handleCheck = (key: keyof typeof checklist) => {
-        setChecklist(prev => ({ ...prev, [key]: !prev[key] }));
-    };
+    const toggle = (key: CheckKey) =>
+        setChecked(prev => {
+            const next = new Set(prev);
+            next.has(key) ? next.delete(key) : next.add(key);
+            return next;
+        });
+
+    const allChecked = checked.size === CHECKS.length;
 
     return (
-        <Modal isOpen={isOpen} onClose={onClose} title="Donation Safety Check">
-            <div className="space-y-6">
-                <div className="bg-amber-50 border border-amber-200 p-4 rounded-lg flex gap-3">
-                    <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0" />
-                    <p className="text-sm text-amber-800">
-                        To ensure the safety of the patient, please confirm you meet these temporary health criteria today.
-                    </p>
-                </div>
+        <Modal isOpen={isOpen} onClose={onClose} title="Before you offer">
+            <p className="leading-relaxed text-gray-600">
+                These keep the patient safe. If any of them aren’t true today, please sit this one out. There will be others.
+            </p>
 
-                <div className="space-y-3">
-                    <label className="flex items-start gap-3 p-3 border rounded-lg hover:bg-gray-50 cursor-pointer transition-colors">
-                        <input
-                            type="checkbox"
-                            checked={checklist.health}
-                            onChange={() => handleCheck('health')}
-                            className="mt-1 w-5 h-5 text-green-600 rounded focus:ring-green-500"
-                        />
-                        <div className="text-sm">
-                            <strong>I am feeling well today.</strong>
-                            <p className="text-gray-500 text-xs">No cold, flu, sore throat, or fever.</p>
-                        </div>
-                    </label>
+            <ul className="mt-5 divide-y divide-gray-200 border-y border-gray-200">
+                {CHECKS.map(item => {
+                    const on = checked.has(item.key);
+                    return (
+                        <li key={item.key}>
+                            <label className="flex cursor-pointer items-start gap-3 py-3.5">
+                                <input type="checkbox" checked={on} onChange={() => toggle(item.key)} className="peer sr-only" />
+                                <span
+                                    aria-hidden
+                                    className={cn(
+                                        'mt-0.5 flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-[4px] border transition-colors peer-focus-visible:ring-2 peer-focus-visible:ring-red-600 peer-focus-visible:ring-offset-2',
+                                        on ? 'border-gray-900 bg-gray-900' : 'border-gray-300 bg-white',
+                                    )}
+                                >
+                                    {on && (
+                                        <svg viewBox="0 0 12 12" className="h-2.5 w-2.5 text-white"><path d="M2.5 6.5l2.2 2L9.5 3.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                                    )}
+                                </span>
+                                <span>
+                                    <span className="block text-gray-900">{item.title}</span>
+                                    {'detail' in item && <span className="mt-0.5 block text-[13px] text-gray-500">{item.detail}</span>}
+                                </span>
+                            </label>
+                        </li>
+                    );
+                })}
+            </ul>
 
-                    <label className="flex items-start gap-3 p-3 border rounded-lg hover:bg-gray-50 cursor-pointer transition-colors">
-                        <input
-                            type="checkbox"
-                            checked={checklist.antibiotics}
-                            onChange={() => handleCheck('antibiotics')}
-                            className="mt-1 w-5 h-5 text-green-600 rounded focus:ring-green-500"
-                        />
-                        <div className="text-sm">
-                            <strong>No antibiotics in the last 14 days.</strong>
-                            <p className="text-gray-500 text-xs">Wait 14 days after your last dose.</p>
-                        </div>
-                    </label>
-
-                    <label className="flex items-start gap-3 p-3 border rounded-lg hover:bg-gray-50 cursor-pointer transition-colors">
-                        <input
-                            type="checkbox"
-                            checked={checklist.procedures}
-                            onChange={() => handleCheck('procedures')}
-                            className="mt-1 w-5 h-5 text-green-600 rounded focus:ring-green-500"
-                        />
-                        <div className="text-sm">
-                            <strong>No tattoo, piercing, or surgery in the last 12 months.</strong>
-                        </div>
-                    </label>
-
-                    <label className="flex items-start gap-3 p-3 border rounded-lg hover:bg-gray-50 cursor-pointer transition-colors">
-                        <input
-                            type="checkbox"
-                            checked={checklist.alcohol}
-                            onChange={() => handleCheck('alcohol')}
-                            className="mt-1 w-5 h-5 text-green-600 rounded focus:ring-green-500"
-                        />
-                        <div className="text-sm">
-                            <strong>No alcohol in the last 24 hours.</strong>
-                        </div>
-                    </label>
-
-                    <label className="flex items-start gap-3 p-3 border rounded-lg hover:bg-gray-50 cursor-pointer transition-colors">
-                        <input
-                            type="checkbox"
-                            checked={checklist.infection}
-                            onChange={() => handleCheck('infection')}
-                            className="mt-1 w-5 h-5 text-green-600 rounded focus:ring-green-500"
-                        />
-                        <div className="text-sm">
-                            <strong>No recent infections.</strong>
-                            <p className="text-gray-500 text-xs">Malaria (3mo), Dengue (6mo), Typhoid (12mo).</p>
-                        </div>
-                    </label>
-                </div>
-
-                <div className="flex gap-3 pt-4">
-                    <Button variant="secondary" className="flex-1" onClick={onClose}>
-                        <X className="w-4 h-4 mr-2" />
-                        Cancel
-                    </Button>
-                    <Button
-                        disabled={!allChecked}
-                        className={`flex-1 ${allChecked ? 'bg-green-600 hover:bg-green-700' : 'bg-gray-300'}`}
-                        onClick={onConfirm}
-                    >
-                        <Check className="w-4 h-4 mr-2" />
-                        I Confirm
-                    </Button>
+            <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <span className="font-mono text-xs text-gray-400">{checked.size} / {CHECKS.length}</span>
+                <div className="flex flex-col-reverse gap-2 sm:flex-row">
+                    <Button variant="secondary" onClick={onClose}>Cancel</Button>
+                    <Button variant="ink" disabled={!allChecked} onClick={onConfirm}>All true, continue</Button>
                 </div>
             </div>
         </Modal>

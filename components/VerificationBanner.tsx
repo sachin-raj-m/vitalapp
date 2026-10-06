@@ -55,60 +55,33 @@ export const VerificationBanner = () => {
         window.location.href = '/profile/edit';
     };
 
+    const message = !emailVerified && needsPhoneVerification
+        ? 'Confirm your email and phone number so families can trust your offers.'
+        : !emailVerified
+            ? 'Confirm your email address so families can trust your offers.'
+            : 'Confirm your phone number so families can trust your offers.';
+
     return (
-        <div className="bg-yellow-50 border-b border-yellow-200 p-4 relative">
-            <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                <div className="flex-1">
-                    <h3 className="text-sm font-medium text-yellow-800 flex items-center gap-2">
-                        <span className="flex items-center justify-center w-5 h-5 rounded-full bg-yellow-200 text-yellow-700 text-xs font-bold">!</span>
-                        Account Verification
-                    </h3>
-                    <p className="mt-1 text-sm text-yellow-700">
-                        {!emailVerified && needsPhoneVerification
-                            ? "Please verify your email and phone number to secure your account."
-                            : !emailVerified
-                                ? "Please verify your email address to secure your account."
-                                : "Please verify your phone number to secure your account."
-                        }
-                    </p>
-                    {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
-                    {sent === 'email' && <p className="mt-1 text-xs text-green-600">Verification email sent!</p>}
-                </div>
-
-                <div className="flex flex-wrap gap-2">
-                    {!emailVerified && sent !== 'email' && (
-                        <Button
-                            size="sm"
-                            variant="outline"
-                            className="bg-white hover:bg-yellow-50 text-yellow-700 border-yellow-300"
-                            onClick={handleVerifyEmail}
-                            isLoading={loading === 'email'}
-                            leftIcon={<Mail className="h-3 w-3" />}
-                        >
-                            Verify Email
-                        </Button>
-                    )}
-
-                    {needsPhoneVerification && (
-                        <Button
-                            size="sm"
-                            variant="outline"
-                            className="bg-white hover:bg-yellow-50 text-yellow-700 border-yellow-300"
-                            onClick={handleVerifyPhone}
-                            leftIcon={<Phone className="h-3 w-3" />}
-                        >
-                            Verify Phone
-                        </Button>
-                    )}
-
-                    <button
-                        onClick={() => setIsVisible(false)}
-                        className="text-yellow-500 hover:text-yellow-700 p-1"
-                        aria-label="Dismiss"
-                    >
-                        <X className="h-5 w-5" />
-                    </button>
-                </div>
+        <div className="flex flex-col gap-3 rounded-md border-l-2 border-warning-500 bg-warning-50 px-4 py-3 text-sm sm:flex-row sm:items-center">
+            <div className="flex-1 text-warning-800">
+                <p>{message}</p>
+                {error && <p className="mt-1 text-[13px] text-red-700">{error}</p>}
+                {sent === 'email' && <p className="mt-1 text-[13px] text-success-700">Sent. Check your inbox.</p>}
+            </div>
+            <div className="flex items-center gap-2">
+                {!emailVerified && sent !== 'email' && (
+                    <Button size="sm" variant="secondary" onClick={handleVerifyEmail} isLoading={loading === 'email'} leftIcon={<Mail className="h-3.5 w-3.5" />}>
+                        Send email
+                    </Button>
+                )}
+                {needsPhoneVerification && (
+                    <Button size="sm" variant="secondary" onClick={handleVerifyPhone} leftIcon={<Phone className="h-3.5 w-3.5" />}>
+                        Verify phone
+                    </Button>
+                )}
+                <button onClick={() => setIsVisible(false)} className="rounded p-1 text-warning-600 hover:text-warning-800" aria-label="Dismiss">
+                    <X className="h-4 w-4" />
+                </button>
             </div>
         </div>
     );

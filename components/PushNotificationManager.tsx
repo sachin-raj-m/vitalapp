@@ -116,36 +116,20 @@ export function PushNotificationManager() {
     };
 
     if (loading) {
-        return <Loader2 className="h-5 w-5 animate-spin text-gray-500" />;
+        return <Loader2 className="h-4 w-4 animate-spin text-gray-400" />;
     }
 
     if (!isSupported) {
-        return <div className="text-sm text-gray-500">Push notifications not supported</div>;
+        return <span className="text-sm text-gray-500">Not supported in this browser</span>;
     }
 
-    return (
-        <div className="flex items-center space-x-2">
-            {subscription ? (
-                <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={unsubscribeFromPush}
-                    className="text-red-600 border-red-200 hover:bg-red-50"
-                >
-                    <BellOff className="h-4 w-4 mr-2" />
-                    Disable Notifications
-                </Button>
-            ) : (
-                <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={subscribeToPush}
-                    className="text-primary-600 border-primary-200 hover:bg-primary-50"
-                >
-                    <Bell className="h-4 w-4 mr-2" />
-                    Enable Notifications
-                </Button>
-            )}
-        </div>
+    return subscription ? (
+        <Button variant="secondary" size="sm" onClick={unsubscribeFromPush} leftIcon={<BellOff className="h-3.5 w-3.5" />}>
+            Turn off
+        </Button>
+    ) : (
+        <Button variant="ink" size="sm" onClick={subscribeToPush} leftIcon={<Bell className="h-3.5 w-3.5" />}>
+            Turn on
+        </Button>
     );
 }

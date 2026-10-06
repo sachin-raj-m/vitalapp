@@ -2,7 +2,7 @@ import { Metadata } from 'next';
 import ProfilePageContent from './content';
 
 export const metadata: Metadata = {
-    title: 'My Profile - Vital Blood Donation',
+    title: 'My Profile',
     description: 'Manage your personal profile and preferences.',
 };
 

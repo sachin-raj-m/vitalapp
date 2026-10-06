@@ -4,15 +4,15 @@ import React, { useEffect, useState, useCallback } from 'react';
 import dynamic from 'next/dynamic';
 import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/Button';
-import { Card, CardBody } from '@/components/ui/Card';
-import { MapPin, Navigation, Search } from 'lucide-react';
+import { MapPin, Navigation } from 'lucide-react';
+import { formatBloodGroup } from '@/lib/blood-compatibility';
 import { Alert } from '@/components/ui/Alert';
 import { useAuth } from '@/context/AuthContext';
 import { NearbyDonorsSkeleton } from './skeleton';
 
 const Map = dynamic(() => import('@/components/Map'), {
     ssr: false,
-    loading: () => <div className="h-full w-full bg-gray-100 animate-pulse rounded-xl flex items-center justify-center text-gray-400">Loading Map...</div>
+    loading: () => <div className="h-full w-full animate-pulse bg-gray-100" />
 });
 
 interface Donor {
@@ -40,19 +40,9 @@ function haversineDistanceKm(lat1: number, lon1: number, lat2: number, lon2: num
     return R * c;
 }
 
-const getInitials = (name: string) => {
-    return name
-        .split(' ')
-        .map(n => n[0])
-        .slice(0, 2)
-        .join('')
-        .toUpperCase();
-};
-
-const getBloodGroupColor = (bg: string) => {
-    if (bg.includes('+')) return 'bg-rose-100 text-rose-700 border-rose-200';
-    return 'bg-indigo-100 text-indigo-700 border-indigo-200';
-};
+// public_donors already returns "First L." names and ~1 km locations; rounding
+// again here also covers locations geocoded from a PIN code.
+const coarse = (n: number) => Math.round(n * 100) / 100;
 
 export default function NearbyDonorsPageContent() {
     const { user } = useAuth();
@@ -70,18 +60,21 @@ export default function NearbyDonorsPageContent() {
     useEffect(() => {
         const fetchDonors = async () => {
             try {
+                // public_donors exposes only a display name, blood group, PIN code
+                // and a location already rounded to ~1 km.
                 const { data, error } = await supabase
-                    .from('profiles')
-                    .select('id, full_name, blood_group, location, present_zip')
-                    .eq('is_donor', true);
+                    .from('public_donors')
+                    .select('id, display_name, blood_group, approx_location, present_zip');
 
                 if (error) throw error;
 
-                // Parse location jsonb and initial processing
-                let parsedDonors = data?.map(d => ({
-                    ...d,
-                    location: typeof d.location === 'string' ? JSON.parse(d.location) : d.location
-                })) || [];
+                let parsedDonors = (data || []).map((d: any) => ({
+                    id: d.id,
+                    full_name: d.display_name,
+                    blood_group: d.blood_group,
+                    present_zip: d.present_zip,
+                    location: d.approx_location || {},
+                }));
 
                 // Identify unique zips that need geocoding (where lat/lng is 0 or missing)
                 const zipsToGeocode = new Set<string>();
@@ -223,8 +216,9 @@ export default function NearbyDonorsPageContent() {
         );
 
         const withDistance = validDonors.map(d => {
-            const dist = haversineDistanceKm(center.lat, center.lng, d.location.latitude, d.location.longitude);
-            return { ...d, distanceKm: dist };
+            const location = { ...d.location, latitude: coarse(d.location.latitude), longitude: coarse(d.location.longitude) };
+            const dist = haversineDistanceKm(center.lat, center.lng, location.latitude, location.longitude);
+            return { ...d, location, distanceKm: dist };
         });
 
         // Sort by distance and take top 20
@@ -238,107 +232,74 @@ export default function NearbyDonorsPageContent() {
     }
 
     return (
-        <div className="space-y-6 h-auto lg:h-[calc(100vh-140px)] flex flex-col">
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 flex-shrink-0">
+        <div className="space-y-6">
+            <header className="flex flex-col justify-between gap-6 sm:flex-row sm:items-end">
                 <div>
-                    <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Find Donors Nearby</h1>
-                    <p className="text-gray-500 text-sm">Discover life-savers in your vicinity</p>
+                    <p className="eyebrow">Donors nearby</p>
+                    <h1 className="display mt-3 text-5xl leading-none">Who’s around you.</h1>
+                    <p className="mt-3 max-w-lg text-sm text-gray-600">
+                        The 20 registered donors closest to you. Locations are approximate, and contact details are never shown here.
+                    </p>
                 </div>
                 <Button
+                    variant="secondary"
                     onClick={getUserLocation}
-                    leftIcon={status ? <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" /> : <Navigation className="h-4 w-4" />}
-                    disabled={!!status}
-                    className="shadow-sm transition-all hover:shadow-md active:scale-95"
+                    isLoading={!!status}
+                    leftIcon={<Navigation className="h-3.5 w-3.5" />}
+                    className="self-start sm:self-auto"
                 >
-                    {status || "Use My Location"}
+                    {status || 'Use my location'}
                 </Button>
-            </div>
+            </header>
 
-            {error && <Alert variant="error" className="flex-shrink-0">{error}</Alert>}
+            {error && <Alert variant="error" onClose={() => setError('')}>{error}</Alert>}
 
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 flex-grow min-h-0">
-                {/* Map Section */}
-                <div className="lg:col-span-8 h-[250px] md:h-[350px] lg:h-full rounded-2xl overflow-hidden border border-gray-200 shadow-sm relative group bg-gray-50">
+            <div className="grid overflow-hidden rounded-lg border border-gray-200 bg-white lg:h-[calc(100vh-17rem)] lg:min-h-[480px] lg:grid-cols-[1fr_340px]">
+                <div className="relative z-0 h-[300px] border-b border-gray-200 lg:h-full lg:border-b-0 lg:border-r">
                     <Map
                         center={center}
                         zoom={11}
                         markers={[
-                            { position: center, title: "You are here" },
+                            { position: center, title: 'You are here' },
                             ...nearbyDonors.map(d => ({
                                 position: { lat: d.location.latitude, lng: d.location.longitude },
-                                title: d.full_name,
-                                description: `${d.blood_group} | ${d.distanceKm?.toFixed(1)} km away`
+                                title: `${d.full_name} · ${formatBloodGroup(d.blood_group)}`,
+                                description: `About ${d.distanceKm?.toFixed(1)} km away`
                             }))
                         ]}
                     />
                 </div>
 
-                {/* List Section */}
-                <div className="lg:col-span-4 flex flex-col h-[500px] lg:h-full min-h-0 bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-                    <div className="p-4 border-b border-gray-100 bg-gray-50/50 flex justify-between items-center">
-                        <h2 className="font-semibold text-gray-800 flex items-center">
-                            <Search className="w-4 h-4 mr-2 text-gray-400" />
-                            Closest Donors
-                        </h2>
-                        <span className="bg-white text-gray-600 px-2 py-0.5 rounded-full text-xs font-medium border border-gray-200">
-                            {nearbyDonors.length} found
-                        </span>
+                <div className="flex min-h-0 flex-col">
+                    <div className="flex items-center justify-between border-b border-gray-200 px-5 py-3">
+                        <span className="eyebrow">Closest first</span>
+                        <span className="font-mono text-xs text-gray-500">{nearbyDonors.length}</span>
                     </div>
-
-                    <div className="overflow-y-auto p-4 space-y-3 custom-scrollbar flex-grow">
+                    <ul className="max-h-[420px] flex-1 divide-y divide-gray-200 overflow-y-auto lg:max-h-none">
                         {nearbyDonors.length === 0 ? (
-                            <div className="text-center py-12 flex flex-col items-center justify-center opacity-60">
-                                <div className="bg-gray-100 p-4 rounded-full mb-3">
-                                    <MapPin className="h-8 w-8 text-gray-400" />
-                                </div>
-                                <p className="text-gray-900 font-medium">No donors found nearby</p>
-                                <p className="text-sm text-gray-500 mt-1 max-w-[200px]">
-                                    Try using your current location or expanding your search area.
-                                </p>
-                            </div>
-                        ) : (
-                            nearbyDonors.map(donor => (
-                                <div
-                                    key={donor.id}
+                            <li className="px-5 py-12 text-center">
+                                <MapPin className="mx-auto h-5 w-5 text-gray-400" strokeWidth={1.75} />
+                                <p className="mt-3 text-sm font-medium text-gray-900">No donors found nearby</p>
+                                <p className="mt-1 text-sm text-gray-500">Try using your current location.</p>
+                            </li>
+                        ) : nearbyDonors.map(donor => (
+                            <li key={donor.id}>
+                                <button
                                     onClick={() => setCenter({ lat: donor.location.latitude, lng: donor.location.longitude })}
-                                    className="group flex items-center p-3 rounded-xl border border-gray-100 hover:border-primary-100 hover:bg-primary-50/30 transition-all duration-200 cursor-pointer"
+                                    className="flex w-full items-center gap-3 px-5 py-3 text-left transition-colors hover:bg-gray-50"
                                 >
-                                    {/* Avatar */}
-                                    <div className="h-12 w-12 rounded-full bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center text-gray-500 font-bold text-lg shadow-inner flex-shrink-0">
-                                        {getInitials(donor.full_name)}
-                                    </div>
-
-                                    {/* Content */}
-                                    <div className="ml-3 flex-grow min-w-0">
-                                        <div className="flex justify-between items-start">
-                                            <h3 className="font-semibold text-gray-900 truncate pr-2">
-                                                {donor.full_name}
-                                            </h3>
-                                            <span className={`text-xs font-bold px-2 py-0.5 rounded border ${getBloodGroupColor(donor.blood_group)}`}>
-                                                {donor.blood_group}
-                                            </span>
-                                        </div>
-
-                                        <div className="flex items-center justify-between mt-1">
-                                            <div className="flex items-center text-xs text-gray-500">
-                                                {donor.present_zip ? (
-                                                    <span className="bg-gray-100 px-1.5 py-0.5 rounded text-gray-600 font-mono">
-                                                        {donor.present_zip}
-                                                    </span>
-                                                ) : (
-                                                    <span className="text-gray-400 italic">Zip N/A</span>
-                                                )}
-                                            </div>
-                                            <div className="text-xs font-medium text-gray-500 flex items-center">
-                                                <MapPin className="w-3 h-3 mr-1 text-gray-400" />
-                                                {donor.distanceKm?.toFixed(1)} km
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            ))
-                        )}
-                    </div>
+                                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-gray-100 font-serif text-xl tracking-tight text-gray-900">
+                                        {formatBloodGroup(donor.blood_group)}
+                                    </span>
+                                    <span className="min-w-0 flex-1">
+                                        <span className="block truncate text-sm font-medium text-gray-900">{donor.full_name}</span>
+                                        <span className="block font-mono text-[11px] text-gray-500">{donor.present_zip || 'PIN code not set'}</span>
+                                    </span>
+                                    <span className="shrink-0 font-mono text-xs text-gray-600">{donor.distanceKm?.toFixed(1)} km</span>
+                                </button>
+                            </li>
+                        ))}
+                    </ul>
                 </div>
             </div>
         </div>

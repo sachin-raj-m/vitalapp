@@ -2,7 +2,8 @@ import { Metadata } from 'next';
 import RequestsPageContent from './content';
 
 export const metadata: Metadata = {
-    title: 'Blood Requests - Vital Blood Donation',
+    alternates: { canonical: '/requests' },
+    title: 'Open requests',
     description: 'View active blood donation requests and help those in need.',
 };
 

@@ -5,7 +5,8 @@ import { promises as fs } from 'fs';
 import path from 'path';
 
 export const metadata: Metadata = {
-    title: 'Changelog | Vital Blood Donation',
+    alternates: { canonical: '/changelog' },
+    title: 'Changelog',
     description: 'See the latest updates, features, and improvements to the VitalApp platform.',
 };
 
@@ -24,8 +25,6 @@ export default async function ChangelogPage() {
     const data = await getChangelogData();
 
     return (
-        <div className="min-h-screen py-10 bg-gray-50/50">
-            <ChangelogClient data={data} />
-        </div>
+        <ChangelogClient data={data} />
     );
 }

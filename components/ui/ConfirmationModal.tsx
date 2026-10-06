@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Modal } from './Modal';
 import { Button } from './Button';
@@ -25,29 +24,16 @@ export const ConfirmationModal = ({
     cancelText = 'Cancel',
     variant = 'primary',
     isLoading = false,
-}: ConfirmationModalProps) => {
-    return (
-        <Modal isOpen={isOpen} onClose={onClose} title={title}>
-            <div className="space-y-4">
-                <p className="text-slate-600">{description}</p>
-
-                <div className="flex items-center justify-end gap-3 mt-6">
-                    <Button
-                        variant="outline"
-                        onClick={onClose}
-                        disabled={isLoading}
-                    >
-                        {cancelText}
-                    </Button>
-                    <Button
-                        className={variant === 'danger' ? 'bg-red-600 hover:bg-red-700 text-white' : ''}
-                        onClick={onConfirm}
-                        isLoading={isLoading}
-                    >
-                        {confirmText}
-                    </Button>
-                </div>
-            </div>
-        </Modal>
-    );
-};
+}: ConfirmationModalProps) => (
+    <Modal isOpen={isOpen} onClose={onClose} title={title}>
+        <p className="leading-relaxed text-gray-600">{description}</p>
+        <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <Button variant="secondary" onClick={onClose} disabled={isLoading}>
+                {cancelText}
+            </Button>
+            <Button variant={variant === 'danger' ? 'primary' : 'ink'} onClick={onConfirm} isLoading={isLoading}>
+                {confirmText}
+            </Button>
+        </div>
+    </Modal>
+);

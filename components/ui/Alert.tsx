@@ -1,5 +1,6 @@
 import React from 'react';
-import { AlertCircle, CheckCircle, Info, X } from 'lucide-react';
+import { X } from 'lucide-react';
+import { cn } from '@/lib/cn';
 
 interface AlertProps {
   title?: string;
@@ -9,72 +10,37 @@ interface AlertProps {
   className?: string;
 }
 
+const variantStyles = {
+  info: 'border-gray-900 bg-white text-gray-800',
+  success: 'border-success-600 bg-success-50 text-success-800',
+  warning: 'border-warning-500 bg-warning-50 text-warning-800',
+  error: 'border-red-600 bg-red-50 text-red-800',
+};
+
 export const Alert: React.FC<AlertProps> = ({
   title,
   children,
   variant = 'info',
   onClose,
-  className = '',
-}) => {
-  const baseStyles = 'rounded-lg p-4';
-
-  const variantStyles = {
-    info: 'bg-blue-50 text-blue-800',
-    success: 'bg-green-50 text-green-800',
-    warning: 'bg-yellow-50 text-yellow-800',
-    error: 'bg-red-50 text-red-800',
-  };
-
-  const icons = {
-    info: <Info className="h-5 w-5 text-blue-400" />,
-    success: <CheckCircle className="h-5 w-5 text-green-400" />,
-    warning: <AlertCircle className="h-5 w-5 text-yellow-400" />,
-    error: <AlertCircle className="h-5 w-5 text-red-400" />,
-  };
-
-  const alertClasses = `
-    ${baseStyles}
-    ${variantStyles[variant]}
-    ${className}
-  `;
-
-  return (
-    <div className={alertClasses}>
-      <div className="flex">
-        <div className="flex-shrink-0">
-          {icons[variant]}
-        </div>
-        <div className="ml-3 flex-1">
-          {title && (
-            <h3 className="text-sm font-medium">
-              {title}
-            </h3>
-          )}
-          <div className={`text-sm ${title ? 'mt-2' : ''}`}>
-            {children}
-          </div>
-        </div>
-        {onClose && (
-          <div className="ml-auto pl-3">
-            <div className="-mx-1.5 -my-1.5">
-              <button
-                type="button"
-                onClick={onClose}
-                className={`
-                  inline-flex rounded-md p-1.5 focus:outline-none focus:ring-2 focus:ring-offset-2
-                  ${variant === 'info' ? 'text-blue-500 hover:bg-blue-100 focus:ring-blue-600' : ''}
-                  ${variant === 'success' ? 'text-green-500 hover:bg-green-100 focus:ring-green-600' : ''}
-                  ${variant === 'warning' ? 'text-yellow-500 hover:bg-yellow-100 focus:ring-yellow-600' : ''}
-                  ${variant === 'error' ? 'text-red-500 hover:bg-red-100 focus:ring-red-600' : ''}
-                `}
-              >
-                <span className="sr-only">Dismiss</span>
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
+  className,
+}) => (
+  <div
+    role={variant === 'error' ? 'alert' : 'status'}
+    className={cn('flex items-start gap-3 rounded-md border-l-2 px-4 py-3 text-sm', variantStyles[variant], className)}
+  >
+    <div className="flex-1 leading-relaxed">
+      {title && <p className="font-medium">{title}</p>}
+      <div className={title ? 'mt-1 opacity-90' : ''}>{children}</div>
     </div>
-  );
-};
+    {onClose && (
+      <button
+        type="button"
+        onClick={onClose}
+        className="-mr-1 rounded p-1 opacity-60 transition-opacity hover:opacity-100"
+        aria-label="Dismiss"
+      >
+        <X className="h-4 w-4" />
+      </button>
+    )}
+  </div>
+);

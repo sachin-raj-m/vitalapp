@@ -1,193 +1,102 @@
 "use client";
 
-
 import React, { useEffect, useState } from 'react';
-import Link from 'next/link';
-import { Card, CardBody } from '@/components/ui/Card';
+import { format } from 'date-fns';
+import { Check } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
-import { fetchUserStats, type Achievement } from '@/lib/stats';
-import { Award, Droplet, Heart, Lock, Calendar, Trophy, Star, Shield, ArrowLeft } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { fetchUserStats, type UserStats } from '@/lib/stats';
+import { Skeleton } from '@/components/ui/Skeleton';
+import { Alert } from '@/components/ui/Alert';
+import { cn } from '@/lib/cn';
 
 export default function AchievementsPage() {
     const { user } = useAuth();
-    const [achievements, setAchievements] = useState<Achievement[]>([]);
-    const [stats, setStats] = useState({
-        total_donations: 0,
-        total_requests: 0,
-        total_points: 0,
-    });
+    const [stats, setStats] = useState<UserStats | null>(null);
+    const [error, setError] = useState('');
 
     useEffect(() => {
-        if (user?.id) {
-            loadData();
-        }
-    }, [user]);
-
-    const loadData = async () => {
         if (!user?.id) return;
+        fetchUserStats(user.id)
+            .then(setStats)
+            .catch(() => setError('Couldn’t load your milestones. Please refresh.'));
+    }, [user?.id]);
 
-        try {
-            const userStats = await fetchUserStats(user.id);
-
-            setStats({
-                total_donations: userStats.total_donations,
-                total_requests: userStats.total_requests,
-                total_points: userStats.total_points,
-            });
-            setAchievements(userStats.achievements);
-        } catch (error) {
-            console.error("Failed to load achievements", error);
-        }
-    };
-
-    const getIconComponent = (iconType: string, unlocked: boolean) => {
-        const className = unlocked ? "w-8 h-8 text-amber-600" : "w-8 h-8 text-slate-300";
-        switch (iconType) {
-            case 'droplet':
-                return <Droplet className={className} />;
-            case 'heart':
-                return <Heart className="w-8 h-8 text-red-500" />;
-            case 'shield':
-                return <Shield className={className} />;
-            case 'star':
-                return <Star className={className} />;
-            case 'trophy':
-                return <Trophy className={className} />;
-            default:
-                return <Award className={className} />;
-        }
-    };
+    const achievements = stats?.achievements ?? [];
+    const earned = achievements.filter(a => a.unlocked).length;
 
     return (
-        <div className="max-w-6xl mx-auto py-8 space-y-8">
-            <div className="flex items-center gap-3">
-                <Trophy className="w-8 h-8 text-amber-500" />
-                <h1 className="text-3xl font-bold text-slate-900">Your Achievements</h1>
-            </div>
+        <div className="space-y-10">
+            <header>
+                <p className="eyebrow">Milestones</p>
+                <h1 className="display mt-3 text-5xl leading-none">
+                    {stats ? <>{earned} of {achievements.length} <em>reached.</em></> : 'Milestones'}
+                </h1>
+                <p className="mt-3 max-w-lg text-gray-600">
+                    Small markers along the way. Points are just for you. They don’t buy anything, and nobody else sees them.
+                </p>
+            </header>
 
-            {/* Stats Overview */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-                <Card className="border-slate-200">
-                    <CardBody className="p-6 text-center">
-                        <div className="text-4xl font-black text-amber-600 mb-2">
-                            {achievements.filter(a => a.unlocked).length}
-                        </div>
-                        <div className="text-sm font-medium text-slate-500">Badges Earned</div>
-                    </CardBody>
-                </Card>
+            {error && <Alert variant="error">{error}</Alert>}
 
-                <Card className="border-slate-200">
-                    <CardBody className="p-6 text-center">
-                        <div className="text-4xl font-black text-amber-600 mb-2">
-                            {stats.total_points}
-                        </div>
-                        <div className="text-sm font-medium text-slate-500">Total Score</div>
-                    </CardBody>
-                </Card>
+            <dl className="grid grid-cols-2 overflow-hidden rounded-lg border border-gray-200 bg-white sm:grid-cols-3 sm:divide-x sm:divide-gray-200">
+                {[
+                    ['Donations', stats?.total_donations],
+                    ['Points', stats?.total_points],
+                    ['Requests posted', stats?.total_requests],
+                ].map(([label, value], i) => (
+                    <div key={label as string} className={cn('p-5 sm:p-6', i === 2 && 'col-span-2 border-t border-gray-200 sm:col-span-1 sm:border-t-0', i === 1 && 'border-l border-gray-200 sm:border-l-0')}>
+                        <dt className="eyebrow">{label}</dt>
+                        <dd className="mt-3 font-serif text-4xl leading-none tracking-tight text-gray-900">
+                            {stats ? value ?? 0 : <Skeleton className="h-9 w-14" />}
+                        </dd>
+                    </div>
+                ))}
+            </dl>
 
-                <Card className="border-slate-200">
-                    <CardBody className="p-6 text-center">
-                        <div className="text-4xl font-black text-red-600 mb-2">
-                            {stats.total_donations}
-                        </div>
-                        <div className="text-sm font-medium text-slate-500">Total Donations</div>
-                    </CardBody>
-                </Card>
-
-                <Card className="border-slate-200">
-                    <CardBody className="p-6 text-center">
-                        <div className="text-4xl font-black text-slate-900 mb-2">
-                            {achievements.filter(a => a.unlocked).length}/{achievements.length}
-                        </div>
-                        <div className="text-sm font-medium text-slate-500">Progress</div>
-                    </CardBody>
-                </Card>
-            </div>
-
-            {/* Achievements Grid */}
-            <div>
-                <h2 className="text-2xl font-bold text-slate-900 mb-6">Hall of Fame</h2>
-                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {achievements.map((achievement, index) => (
-                        <motion.div
-                            key={achievement.id}
-                            initial={{ opacity: 0, y: 20 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: index * 0.1 }}
-                        >
-                            <Card className={`border-2 ${achievement.unlocked ? 'border-amber-300 bg-amber-50/30' : 'border-slate-200 bg-slate-50/50'} transition-all hover:shadow-lg h-full`}>
-                                <CardBody className="p-6 flex flex-col h-full">
-                                    <div className="flex items-start gap-4 mb-4">
-                                        <div className={`w-16 h-16 rounded-full flex items-center justify-center shrink-0 ${achievement.unlocked ? 'bg-amber-100' : 'bg-slate-200'} `}>
-                                            {achievement.unlocked ? (
-                                                getIconComponent(achievement.icon, true)
-                                            ) : (
-                                                <Lock className="w-8 h-8 text-slate-400" />
-                                            )}
-                                        </div>
-                                        <div className="flex-1 min-w-0">
-                                            <div className="flex justify-between items-start gap-2">
-                                                <h3 className={`font-bold text-lg leading-tight ${achievement.unlocked ? 'text-slate-900' : 'text-slate-500'} `}>
-                                                    {achievement.name}
-                                                </h3>
-                                                <div className="text-xs font-bold text-amber-700 bg-amber-100 px-2 py-1 rounded-full whitespace-nowrap">
-                                                    {achievement.points} pts
-                                                </div>
-                                            </div>
-                                            <p className="text-sm text-slate-600 mt-1 line-clamp-2">
-                                                {achievement.description}
-                                            </p>
-                                        </div>
+            <ol className="divide-y divide-gray-200 overflow-hidden rounded-lg border border-gray-200 bg-white">
+                {!stats
+                    ? [1, 2, 3, 4].map(i => (
+                        <li key={i} className="flex items-center gap-4 p-5">
+                            <Skeleton className="h-10 w-10 rounded-full" />
+                            <div className="flex-1 space-y-2"><Skeleton className="h-4 w-40" /><Skeleton className="h-3 w-64" /></div>
+                        </li>
+                    ))
+                    : achievements.map(a => {
+                        const pct = a.threshold ? Math.min(100, (a.progress / a.threshold) * 100) : 0;
+                        return (
+                            <li key={a.id} className="flex items-start gap-4 p-5">
+                                <div
+                                    className={cn(
+                                        'flex h-10 w-10 shrink-0 items-center justify-center rounded-full font-mono text-xs',
+                                        a.unlocked ? 'bg-gray-900 text-gray-50' : 'border border-dashed border-gray-300 text-gray-400',
+                                    )}
+                                >
+                                    {a.unlocked ? <Check className="h-4 w-4" /> : a.threshold ?? '★'}
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                    <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+                                        <h2 className={cn('font-medium', a.unlocked ? 'text-gray-900' : 'text-gray-700')}>{a.name}</h2>
+                                        <span className="font-mono text-xs text-gray-500">+{a.points} pts</span>
                                     </div>
-
-                                    <div className="mt-auto space-y-3">
-                                        <p className="text-xs text-slate-500 italic border-l-2 border-amber-200 pl-3">
-                                            "{achievement.motto}"
-                                        </p>
-
-                                        {achievement.unlocked && achievement.unlockedDate ? (
-                                            <div className="flex items-center gap-2 text-xs text-green-700 bg-green-100 px-3 py-1.5 rounded-full w-fit">
-                                                <Calendar className="w-3 h-3" />
-                                                <span className="font-medium">
-                                                    Unlocked: {new Date(achievement.unlockedDate).toLocaleDateString('en-US', {
-                                                        month: 'short',
-                                                        day: 'numeric',
-                                                        year: 'numeric'
-                                                    })}
-                                                </span>
+                                    <p className="mt-0.5 text-sm text-gray-500">
+                                        {a.description}
+                                        {a.unlocked && a.unlockedDate && ` · ${format(new Date(a.unlockedDate), 'd MMM yyyy')}`}
+                                    </p>
+                                    {a.unlocked ? (
+                                        <p className="mt-2 font-serif text-lg italic text-gray-700">“{a.motto}”</p>
+                                    ) : a.threshold ? (
+                                        <div className="mt-3 flex items-center gap-3">
+                                            <div className="h-1 max-w-xs flex-1 overflow-hidden rounded-full bg-gray-200">
+                                                <div className="h-full rounded-full bg-red-600" style={{ width: `${pct}%` }} />
                                             </div>
-                                        ) : (
-                                            <div>
-                                                {achievement.threshold && (
-                                                    <div className="space-y-1.5">
-                                                        <div className="flex justify-between text-xs text-slate-500">
-                                                            <span>Progress</span>
-                                                            <span>{achievement.progress} / {achievement.threshold}</span>
-                                                        </div>
-                                                        <div className="h-2 w-full bg-slate-200 rounded-full overflow-hidden">
-                                                            <div
-                                                                className="h-full bg-amber-400 rounded-full transition-all duration-1000"
-                                                                style={{ width: `${Math.min(100, (achievement.progress / achievement.threshold) * 100)}%` }}
-                                                            />
-                                                        </div>
-                                                    </div>
-                                                )}
-                                                {!achievement.threshold && (
-                                                    <div className="text-xs text-slate-400 flex items-center gap-1">
-                                                        <Lock className="w-3 h-3" />
-                                                        Locked
-                                                    </div>
-                                                )}
-                                            </div>
-                                        )}
-                                    </div>
-                                </CardBody>
-                            </Card>
-                        </motion.div>
-                    ))}
-                </div>
-            </div>
+                                            <span className="font-mono text-xs text-gray-500">{a.progress}/{a.threshold}</span>
+                                        </div>
+                                    ) : null}
+                                </div>
+                            </li>
+                        );
+                    })}
+            </ol>
         </div>
     );
 }

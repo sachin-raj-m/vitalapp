@@ -2,13 +2,14 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Card, CardHeader, CardBody } from '@/components/ui/Card';
+import Link from 'next/link';
+import { Modal } from '@/components/ui/Modal';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { Alert } from '@/components/ui/Alert';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
-import { ArrowLeft, Check, Lock } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import { SecuritySettings } from '@/app/(protected)/profile/SecuritySettings';
 
 export default function ProfileEditPage() {
@@ -86,7 +87,7 @@ export default function ProfileEditPage() {
                 is_public_profile: editForm.is_public_profile
                 // phone is not updated here directly if not changed
             });
-            setSuccess('Profile updated successfully!');
+            setSuccess('Saved.');
             setTimeout(() => router.push('/profile'), 1500);
         } catch (err: any) {
             console.error('Error updating profile:', err);
@@ -131,247 +132,98 @@ export default function ProfileEditPage() {
         }
     };
 
-    return (
-        <div className="max-w-3xl mx-auto py-8">
-            <div className="mb-6 flex items-center gap-4">
-                <Button
-                    variant="ghost"
-                    onClick={() => router.push('/profile')}
-                    className="p-2 h-10 w-10 rounded-full hover:bg-slate-100"
-                >
-                    <ArrowLeft className="h-5 w-5 text-slate-600" />
-                </Button>
-                <div>
-                    <h1 className="text-2xl font-bold text-slate-900">Edit Profile</h1>
-                    <p className="text-slate-500 text-sm">Update your personal information</p>
-                </div>
+    const section = (title: string, hint: string, children: React.ReactNode) => (
+        <section className="grid gap-6 border-t border-gray-200 py-8 md:grid-cols-3 md:gap-10">
+            <div>
+                <h2 className="font-medium text-gray-900">{title}</h2>
+                <p className="mt-1 text-sm leading-relaxed text-gray-500">{hint}</p>
             </div>
+            <div className="space-y-4 md:col-span-2">{children}</div>
+        </section>
+    );
 
-            {error && (
-                <Alert variant="error" className="mb-6">
-                    {error}
-                </Alert>
-            )}
+    const toggle = (checked: boolean, onChange: (v: boolean) => void, title: string, body: string) => (
+        <label className="flex cursor-pointer items-start justify-between gap-6">
+            <span>
+                <span className="block text-gray-900">{title}</span>
+                <span className="mt-0.5 block text-sm text-gray-500">{body}</span>
+            </span>
+            <span className="relative mt-1 inline-flex shrink-0">
+                <input type="checkbox" checked={checked} onChange={e => onChange(e.target.checked)} className="peer sr-only" />
+                <span className="h-6 w-11 rounded-full bg-gray-300 transition-colors after:absolute after:left-[3px] after:top-[3px] after:h-[18px] after:w-[18px] after:rounded-full after:bg-white after:transition-transform after:content-[''] peer-checked:bg-gray-900 peer-checked:after:translate-x-5 peer-focus-visible:ring-2 peer-focus-visible:ring-red-600 peer-focus-visible:ring-offset-2" />
+            </span>
+        </label>
+    );
 
-            {success && (
-                <Alert variant="success" className="mb-6">
-                    {success}
-                </Alert>
-            )}
+    return (
+        <div className="mx-auto max-w-4xl">
+            <Link href="/profile" className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-900">
+                <ArrowLeft className="h-3.5 w-3.5" /> Profile
+            </Link>
+            <header className="pb-8 pt-6">
+                <h1 className="display text-5xl leading-none">Edit profile</h1>
+            </header>
 
-            <Card className="border-slate-200 shadow-lg">
-                <CardBody className="p-8">
-                    <form onSubmit={handleSave} className="space-y-8">
-                        {/* Personal Details */}
-                        <div className="space-y-6">
-                            <h3 className="text-sm font-bold uppercase tracking-wider text-slate-400">Personal Details</h3>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <Input
-                                    label="Full Name"
-                                    value={editForm.full_name}
-                                    onChange={(e) => setEditForm({ ...editForm, full_name: e.target.value })}
-                                    required
-                                    className="h-11"
-                                />
-                                <Input
-                                    label="Phone"
-                                    value={editForm.phone}
-                                    onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
-                                    required
-                                    className="h-11"
-                                />
-                            </div>
-                        </div>
+            {error && <Alert variant="error" className="mb-6">{error}</Alert>}
+            {success && <Alert variant="success" className="mb-6">{success}</Alert>}
 
-                        <div className="h-px bg-slate-100" />
+            <form onSubmit={handleSave}>
+                {section('You', 'Changing your phone number sends a code to the new number to confirm it.', <>
+                    <Input label="Full name" value={editForm.full_name} onChange={(e) => setEditForm({ ...editForm, full_name: e.target.value })} required autoComplete="name" />
+                    <Input label="Phone" type="tel" value={editForm.phone} onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })} required autoComplete="tel" />
+                </>)}
 
-                        {/* Location */}
-                        <div className="space-y-6">
-                            <h3 className="text-sm font-bold uppercase tracking-wider text-slate-400">Location</h3>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <Input
-                                    label="Permanent Zip Code"
-                                    value={editForm.permanent_zip}
-                                    onChange={(e) => setEditForm({ ...editForm, permanent_zip: e.target.value })}
-                                    required
-                                    placeholder="e.g. 560001"
-                                    className="h-11"
-                                />
-                                <Input
-                                    label="Present Zip Code"
-                                    value={editForm.present_zip}
-                                    onChange={(e) => setEditForm({ ...editForm, present_zip: e.target.value })}
-                                    required
-                                    placeholder="e.g. 560001"
-                                    className="h-11"
-                                />
-                            </div>
-                        </div>
+                {section('Location', 'Used to show you donors and requests nearby.', <div className="grid gap-4 sm:grid-cols-2">
+                    <Input label="Current PIN code" inputMode="numeric" value={editForm.present_zip} onChange={(e) => setEditForm({ ...editForm, present_zip: e.target.value })} required />
+                    <Input label="Permanent PIN code" inputMode="numeric" value={editForm.permanent_zip} onChange={(e) => setEditForm({ ...editForm, permanent_zip: e.target.value })} required />
+                </div>)}
 
-                        <div className="h-px bg-slate-100" />
+                {section('Availability', 'You can pause yourself any time, for travel, illness or anything else.', <div className="space-y-5">
+                    {toggle(editForm.is_available, v => setEditForm({ ...editForm, is_available: v }), 'Available to donate', 'Turn off to stop getting requests for a while.')}
+                    {toggle(editForm.is_public_profile, v => setEditForm({ ...editForm, is_public_profile: v }), 'Public donor card', 'Anyone with your link can see your first name, blood group and donation count.')}
+                </div>)}
 
-                        {/* Availability */}
-                        <div className="space-y-6">
-                            <h3 className="text-sm font-bold uppercase tracking-wider text-slate-400">Status</h3>
-                            <div className="flex items-center space-x-3 p-4 bg-red-50 rounded-xl border border-red-100">
-                                <input
-                                    type="checkbox"
-                                    id="is_available"
-                                    checked={editForm.is_available}
-                                    onChange={(e) => setEditForm({ ...editForm, is_available: e.target.checked })}
-                                    className="w-5 h-5 rounded border-gray-300 text-red-600 focus:ring-red-500"
-                                />
-                                <label htmlFor="is_available" className="text-sm font-medium text-gray-700 cursor-pointer select-none flex-1">
-                                    I am currently available for blood donation requests
-                                </label>
-                            </div>
-                        </div>
-
-                        <div className="h-px bg-slate-100" />
-
-                        {/* Public Identity */}
-                        <div className="space-y-6">
-                            <h3 className="text-sm font-bold uppercase tracking-wider text-slate-400">Public Identity</h3>
-                            <div className="p-5 bg-slate-50 rounded-xl border border-slate-200">
-                                <div className="flex items-center justify-between gap-4">
-                                    <div>
-                                        <h4 className="font-bold text-slate-900">Make Profile Public</h4>
-                                        <p className="text-sm text-slate-500 mt-1">Allow anyone with the link to view your verified donor card. Essential for partner integrations.</p>
-                                    </div>
-                                    <label className="relative inline-flex items-center cursor-pointer">
-                                        <input
-                                            type="checkbox"
-                                            checked={editForm.is_public_profile}
-                                            onChange={(e) => setEditForm({ ...editForm, is_public_profile: e.target.checked })}
-                                            className="sr-only peer"
-                                        />
-                                        <div className="w-11 h-6 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                                    </label>
-                                </div>
-
-                                {editForm.is_public_profile && (
-                                    <div className="mt-4 pt-4 border-t border-slate-200 animate-in fade-in slide-in-from-top-2">
-                                        <p className="text-xs font-bold text-slate-500 uppercase mb-2">Your Public Profile Link</p>
-                                        <div className="flex items-center gap-2">
-                                            <div className="flex-1 bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-600 font-mono truncate select-all">
-                                                {(() => {
-                                                    const cleanName = (user?.full_name || 'User').replace(/[^a-zA-Z0-9]/g, '');
-                                                    const uniqueId = user?.donor_number || user?.id; // Prefer donor number
-                                                    const vanitySlug = `${cleanName}@${uniqueId}`;
-                                                    const url = typeof window !== 'undefined' ? `${window.location.origin}/donor/${vanitySlug}` : `/donor/${vanitySlug}`;
-                                                    return url;
-                                                })()}
-                                            </div>
-                                            <Button
-                                                type="button"
-                                                size="sm"
-                                                variant="outline"
-                                                onClick={() => {
-                                                    const cleanName = (user?.full_name || 'User').replace(/[^a-zA-Z0-9]/g, '');
-                                                    const uniqueId = user?.donor_number || user?.id;
-                                                    const vanitySlug = `${cleanName}@${uniqueId}`;
-                                                    window.open(`/donor/${vanitySlug}`, '_blank');
-                                                }}
-                                                className="shrink-0"
-                                            >
-                                                Open
-                                            </Button>
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-
-                        <div className="flex space-x-4 pt-6">
-                            <Button
-                                type="submit"
-                                size="lg"
-                                className="flex-1 bg-red-600 hover:bg-red-700 text-white font-bold h-12"
-                                disabled={isLoading}
-                            >
-                                {isLoading ? 'Saving...' : (
-                                    <>
-                                        <Check className="h-5 w-5 mr-2" />
-                                        Save Changes
-                                    </>
-                                )}
-                            </Button>
-                            <Button
-                                type="button"
-                                size="lg"
-                                variant="outline"
-                                onClick={() => router.push('/profile')}
-                                className="h-12 px-8"
-                            >
-                                Cancel
-                            </Button>
-                        </div>
-                    </form>
-                </CardBody>
-            </Card>
-
-            {/* Account Security Section */}
-            <Card className="border-slate-200 shadow-lg mt-8">
-                <CardBody className="p-8">
-                    <div className="mb-6">
-                        <h3 className="text-lg font-bold text-slate-900">Account Security</h3>
-                        <p className="text-slate-500 text-sm">Manage how you access your account.</p>
-                    </div>
-                    <SecuritySettings />
-                </CardBody>
-            </Card>
-
-            {/* OTP Verification Modal */}
-            {isVerifying && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-                    <Card className="w-full max-w-md shadow-2xl animate-in zoom-in-95 duration-200">
-                        <CardHeader className="bg-slate-50 border-b border-slate-100 p-6 text-center">
-                            <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                                <Lock className="w-6 h-6 text-red-600" />
-                            </div>
-                            <h2 className="text-xl font-bold text-slate-900">Verify Phone Number</h2>
-                            <p className="text-sm text-slate-500 mt-2">
-                                We sent a 6-digit code to <span className="font-semibold text-slate-900">{pendingPhone}</span>
-                            </p>
-                        </CardHeader>
-                        <CardBody className="p-6">
-                            <form onSubmit={handleVerifyOtp} className="space-y-6">
-                                <Input
-                                    label="Verification Code"
-                                    value={otp}
-                                    onChange={(e) => setOtp(e.target.value)}
-                                    placeholder="000000"
-                                    required
-                                    className="h-12 text-center text-lg tracking-widest letter-spacing-2"
-                                />
-
-                                <div className="space-y-3">
-                                    <Button
-                                        type="submit"
-                                        size="lg"
-                                        className="w-full bg-red-600 hover:bg-red-700 text-white font-bold h-12"
-                                        disabled={isLoading || otp.length < 6}
-                                    >
-                                        {isLoading ? 'Verifying...' : 'Verify & Save'}
-                                    </Button>
-                                    <Button
-                                        type="button"
-                                        variant="ghost"
-                                        className="w-full text-slate-500"
-                                        onClick={() => {
-                                            setIsVerifying(false);
-                                            setIsLoading(false);
-                                            setOtp('');
-                                        }}
-                                    >
-                                        Cancel
-                                    </Button>
-                                </div>
-                            </form>
-                        </CardBody>
-                    </Card>
+                <div className="flex flex-col-reverse gap-2 border-t border-gray-200 py-6 sm:flex-row sm:justify-end">
+                    <Button type="button" variant="ghost" onClick={() => router.push('/profile')}>Cancel</Button>
+                    <Button type="submit" variant="ink" size="lg" isLoading={isLoading}>Save changes</Button>
                 </div>
-            )}
+            </form>
+
+            <section className="grid gap-6 border-t border-gray-200 py-8 md:grid-cols-3 md:gap-10">
+                <div>
+                    <h2 className="font-medium text-gray-900">Password</h2>
+                    <p className="mt-1 text-sm leading-relaxed text-gray-500">How you sign in to Vital.</p>
+                </div>
+                <div className="md:col-span-2"><SecuritySettings /></div>
+            </section>
+
+            <Modal
+                isOpen={isVerifying}
+                onClose={() => { setIsVerifying(false); setIsLoading(false); setOtp(''); }}
+                title="Confirm your new number"
+            >
+                <form onSubmit={handleVerifyOtp} className="space-y-5">
+                    <p className="leading-relaxed text-gray-600">
+                        We sent a 6-digit code to <span className="text-gray-900">{pendingPhone}</span>.
+                    </p>
+                    <Input
+                        label="Code"
+                        inputMode="numeric"
+                        autoComplete="one-time-code"
+                        value={otp}
+                        onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                        placeholder="000000"
+                        required
+                        className="h-14 text-center font-mono text-2xl tracking-[0.4em]"
+                    />
+                    <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                        <Button type="button" variant="secondary" onClick={() => { setIsVerifying(false); setIsLoading(false); setOtp(''); }}>
+                            Cancel
+                        </Button>
+                        <Button type="submit" variant="ink" isLoading={isLoading} disabled={otp.length < 6}>Verify and save</Button>
+                    </div>
+                </form>
+            </Modal>
         </div>
     );
 }

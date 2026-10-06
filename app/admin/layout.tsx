@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
-import { Loader2 } from 'lucide-react';
+import { PageLoader } from '@/components/PageLoader';
 import { SidebarWrapper } from '@/components/SidebarWrapper';
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -45,9 +45,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
     if (loading) {
         return (
-            <div className="flex items-center justify-center min-h-screen">
-                <Loader2 className="h-8 w-8 animate-spin text-primary-500" />
-            </div>
+            <PageLoader />
         );
     }
 
@@ -56,7 +54,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     return (
         <SidebarWrapper>
             <div className="space-y-6">
-                <h1 className="text-2xl font-bold mb-6 text-gray-900 border-b pb-4">Admin Console</h1>
+                <h1 className="display border-b border-gray-200 pb-6 text-5xl leading-none">Admin</h1>
                 {children}
             </div>
         </SidebarWrapper>
