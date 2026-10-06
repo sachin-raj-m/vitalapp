@@ -26,7 +26,9 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 // Helper function to cache profile in localStorage
 const cacheUserProfile = (profile: User) => {
   try {
-    localStorage.setItem('vital_user_profile', JSON.stringify(profile));
+    // Never persist the donor PIN in browser storage.
+    const { donor_pin: _pin, ...safe } = profile;
+    localStorage.setItem('vital_user_profile', JSON.stringify(safe));
   } catch (err) {
     console.warn('Failed to cache profile in localStorage');
   }
@@ -95,18 +97,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       if (data) {
-        // Cache the profile in localStorage
-        cacheUserProfile(data as User);
+        // The PIN lives in donor_secrets, readable only by its owner.
+        const { data: secret } = await supabase
+          .from('donor_secrets')
+          .select('pin')
+          .eq('user_id', userId)
+          .maybeSingle();
+        const profile = { ...(data as User), donor_pin: secret?.pin ?? undefined };
 
-        // Set user immediately
+        cacheUserProfile(profile);
+
         setState(prev => ({
           ...prev,
-          user: data as User,
+          user: profile,
           loading: false,
           error: null
         }));
 
-        return data as User;
+        return profile;
       } else {
         // Get user data from auth
         const { data: { user: authUser } } = await supabase.auth.getUser();

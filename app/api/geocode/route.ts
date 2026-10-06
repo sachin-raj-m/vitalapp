@@ -10,9 +10,12 @@ export async function GET(request: Request) {
     let nominatimUrl = 'https://nominatim.openstreetmap.org/search?format=json&limit=1&country=India';
 
     if (zip) {
+        if (!/^[0-9]{6}$/.test(zip)) {
+            return NextResponse.json({ error: 'Invalid PIN code' }, { status: 400 });
+        }
         nominatimUrl += `&postalcode=${zip}`;
     } else if (city) {
-        nominatimUrl += `&city=${city}`;
+        nominatimUrl += `&city=${encodeURIComponent(city)}`;
     } else if (query) {
         nominatimUrl += `&q=${encodeURIComponent(query)}`;
     } else {
