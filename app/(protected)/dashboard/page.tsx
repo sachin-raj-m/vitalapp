@@ -2,7 +2,7 @@ import { Metadata } from 'next';
 import DashboardPageContent from './content';
 
 export const metadata: Metadata = {
-    title: 'Dashboard - Vital Blood Donation',
+    title: 'Dashboard',
     description: 'Manage your blood requests and find donation opportunities.',
 };
 

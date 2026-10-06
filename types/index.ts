@@ -7,21 +7,30 @@ export interface User {
   email: string;
   full_name: string;
   phone: string;
-  blood_group: BloodGroup;
-  blood_group_proof_type?: string;
-  blood_group_proof_url?: string;
+  dob?: string;
+  gender?: string;
+  blood_group?: BloodGroup; // Optional
+  city?: string;
+  district?: string;
   permanent_zip?: string;
   present_zip?: string;
   is_donor: boolean;
   is_available: boolean;
+  is_public_profile?: boolean; // New Visibility Toggle
+  willingness_to_travel?: number;
+  last_donation_date?: string;
+  next_eligible_date?: string; // New NBTC Field
+  availability?: string[];
+  has_medical_conditions?: boolean;
   location: {
     latitude: number;
     longitude: number;
     address: string;
   };
-  government_id?: string;
   role?: 'user' | 'admin' | string;
+  /** Loaded from donor_secrets for the signed-in user only; never cached. */
   donor_pin?: string;
+  donor_number?: number;
   created_at: string;
 }
 
@@ -35,7 +44,8 @@ export interface BloodRequest {
   urgency_level: UrgencyLevel;
   notes?: string;
   contact_name: string;
-  contact_phone: string;
+  /** No longer stored on the request row; read it via the get_request_contact RPC. */
+  contact_phone?: string | null;
   location: {
     latitude: number;
     longitude: number;

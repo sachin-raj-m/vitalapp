@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import type { BloodRequest } from '@/types';
 import { useAuth } from './AuthContext';
@@ -21,10 +21,13 @@ export function RequestsProvider({ children }: { children: React.ReactNode }) {
     const [myDonations, setMyDonations] = useState<Set<string>>(new Set());
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<Error | null>(null);
+    const hasLoaded = useRef(false);
 
     const fetchRequests = useCallback(async () => {
         try {
-            setLoading(true);
+            // Only show the loading state on the first fetch; later refreshes
+            // (realtime events, after donating) update the list in place.
+            if (!hasLoaded.current) setLoading(true);
             setError(null);
 
             // Centralized fetch: Only Active requests, newest first
@@ -32,6 +35,8 @@ export function RequestsProvider({ children }: { children: React.ReactNode }) {
                 .from('blood_requests')
                 .select('*')
                 .eq('status', 'active')
+                // Hide requests whose needed-by date has passed; they're stale, not open.
+                .or(`date_needed.is.null,date_needed.gte.${new Date().toISOString().slice(0, 10)}`)
                 .order('created_at', { ascending: false });
 
             if (supabaseError) throw supabaseError;
@@ -54,12 +59,16 @@ export function RequestsProvider({ children }: { children: React.ReactNode }) {
             }
 
         } catch (err: any) {
-            console.error('Error in RequestsContext:', err);
+            console.error('Error loading requests:', err?.message || err, err?.code ?? '');
             setError(err);
         } finally {
+            hasLoaded.current = true;
             setLoading(false);
         }
-    }, [user]); // Re-fetch when user changes
+        // Depend on the id, not the object: the profile object is replaced
+        // several times during sign-in, which used to refetch 2-3 times.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [user?.id]);
 
     // Fetch on mount or when user changes (e.g. login/logout could change RLS visibility)
     useEffect(() => {
@@ -71,7 +80,7 @@ export function RequestsProvider({ children }: { children: React.ReactNode }) {
             .on('postgres_changes',
                 { event: '*', schema: 'public', table: 'blood_requests' },
                 () => {
-                    console.log('Real-time update: Refreshing requests...');
+
                     fetchRequests();
                 }
             )
@@ -80,7 +89,7 @@ export function RequestsProvider({ children }: { children: React.ReactNode }) {
         return () => {
             supabase.removeChannel(channel);
         };
-    }, [fetchRequests, user]);
+    }, [fetchRequests]);
 
     const value = {
         requests,

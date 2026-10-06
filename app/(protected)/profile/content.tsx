@@ -1,67 +1,127 @@
 "use client";
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { Card, CardHeader, CardBody } from '@/components/ui/Card';
-import { Input } from '@/components/ui/Input';
+import Link from 'next/link';
 import { Button } from '@/components/ui/Button';
 import { Alert } from '@/components/ui/Alert';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
-import { Loader2, User, MapPin, Phone, Mail, Droplet, Award, Calendar, Settings, LogOut } from 'lucide-react';
-import type { BloodGroup } from '@/types';
+import { fetchUserStats, calculateEligibility, type UserStats } from '@/lib/stats';
+import { Copy, Download, ExternalLink, Pencil, Send } from 'lucide-react';
+import { format } from 'date-fns';
+import { donorProfilePath } from '@/lib/donor-slug';
+import { formatBloodGroup } from '@/lib/blood-compatibility';
+import { Skeleton } from '@/components/ui/Skeleton';
+import html2canvas from 'html2canvas';
 
-interface Profile {
-    id: string;
-    email: string;
-    full_name: string;
-    phone: string;
-    blood_group: BloodGroup;
-    blood_group_proof_type: string;
-    blood_group_proof_url: string;
-    is_donor: boolean;
-    is_available: boolean;
-    permanent_zip?: string;
-    present_zip?: string;
-    location: {
-        latitude: number;
-        longitude: number;
-        address: string;
-    };
-    created_at: string;
-}
-
-interface Stats {
-    total_donations: number;
-    total_requests: number;
-    last_donation_date: string | null;
-    achievements: string[];
-}
+import { PushNotificationManager } from '@/components/PushNotificationManager';
+import DonorCard from '@/components/DonorCard';
+import { toast } from 'sonner';
+import { ConfirmationModal } from '@/components/ui/ConfirmationModal';
 
 export default function ProfilePage() {
     const router = useRouter();
     const { user, signOut, session, updateProfile } = useAuth();
-    const [stats, setStats] = useState<Stats | null>(null);
+    const [stats, setStats] = useState<UserStats | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState('');
-    const [isEditing, setIsEditing] = useState(false);
-    const [editForm, setEditForm] = useState({
-        full_name: '',
-        phone: '',
-        is_available: false,
-        permanent_zip: '',
-        present_zip: ''
-    });
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const cardRef = useRef<HTMLDivElement>(null);
+
+    const publicPath = user ? donorProfilePath(user) : '';
+    // Read on the client after mount so server and client render the same markup.
+    const [host, setHost] = useState('');
+    useEffect(() => setHost(window.location.host), []);
+
+    const handleLinkShare = () => {
+        if (!user?.id) return;
+        const url = `${window.location.origin}${publicPath}`;
+        const text = `I’m a registered blood donor on Vital. If you’ve ever thought about it, it takes two minutes: ${url}`;
+        window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+    };
+
+    const togglePublicProfile = async (newValue: boolean) => {
+        try {
+            await updateProfile({ is_public_profile: newValue });
+        } catch (err) {
+            console.error('Failed to toggle visibility', err);
+            toast.error('Failed to update visibility settings');
+        }
+    };
+
+    const handleDeleteAccount = async () => {
+        try {
+            const res = await fetch('/api/auth/delete', { method: 'POST' });
+            if (!res.ok) throw new Error('Deletion failed');
+            await signOut();
+            router.push('/login');
+            toast.success('Account deleted successfully');
+        } catch (e) {
+            toast.error('Failed to delete account. Please try again.');
+            setShowDeleteModal(false);
+        }
+    };
+
+    const handleDownload = async () => {
+        if (!cardRef.current) return;
+
+        // Save original styles
+        const originalStyle = cardRef.current.style.cssText;
+        const originalClass = cardRef.current.className;
+
+        try {
+            // Apply capture-friendly styles to prevent overflow/clipping
+            // We force a specific width and remove transforms/margins during capture
+            cardRef.current.style.transform = 'none';
+            cardRef.current.style.margin = '0';
+            cardRef.current.style.boxShadow = 'none'; // Shadow sometimes clips
+
+            // Create a temporary container for clean capture
+            const container = document.createElement('div');
+            container.style.position = 'fixed';
+            container.style.top = '-9999px';
+            container.style.left = '-9999px';
+            container.style.width = '420px'; // Slightly larger to fit card comfortably
+            container.style.padding = '20px'; // Padding to capture shadow if needed (though we disabled it)
+            container.style.background = '#ffffff'; // White background for clean alpha
+            document.body.appendChild(container);
+
+            // Clone the card into the container
+            const clone = cardRef.current.cloneNode(true) as HTMLElement;
+            clone.style.transform = 'none';
+            clone.style.width = '100%';
+            clone.style.maxWidth = 'none';
+            container.appendChild(clone);
+
+            const canvas = await html2canvas(clone, {
+                backgroundColor: null,
+                scale: 3, // High resolution
+                logging: false,
+                useCORS: true,
+                allowTaint: true
+            } as any);
+
+            // Cleanup
+            document.body.removeChild(container);
+
+            const dataUrl = canvas.toDataURL('image/png');
+            const link = document.createElement('a');
+            link.href = dataUrl;
+            link.download = `Vital_Donor_Card_${user?.full_name || 'Member'}.png`;
+            link.click();
+        } catch (err) {
+            console.error('Download failed:', err);
+            toast.error('Could not generate image. Please try again.');
+        } finally {
+            // Restore styles (though we mostly used a clone, it's good practice)
+            cardRef.current.style.cssText = originalStyle;
+            cardRef.current.className = originalClass;
+        }
+    };
 
     useEffect(() => {
         if (user) {
-            setEditForm({
-                full_name: user.full_name || '',
-                phone: user.phone || '',
-                is_available: user.is_available || false,
-                permanent_zip: user.permanent_zip || '',
-                present_zip: user.present_zip || ''
-            });
             loadStats();
         }
     }, [user]);
@@ -70,40 +130,8 @@ export default function ProfilePage() {
         try {
             if (!user) return;
 
-            // Load donations count
-            const { data: donations, error: donationsError } = await supabase
-                .from('donations')
-                .select('created_at', { count: 'exact' })
-                .eq('donor_id', user.id);
-
-            if (donationsError) throw donationsError;
-
-            // Load requests count
-            const { data: requests, error: requestsError } = await supabase
-                .from('blood_requests')
-                .select('created_at', { count: 'exact' })
-                .eq('user_id', user.id);
-
-            if (requestsError) throw requestsError;
-
-            // Get last donation date
-            const lastDonation = donations?.sort((a, b) =>
-                new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-            )[0];
-
-            // Calculate achievements
-            const achievements = [];
-            if (donations?.length >= 1) achievements.push('First Time Donor');
-            if (donations?.length >= 5) achievements.push('Regular Donor');
-            if (donations?.length >= 10) achievements.push('Super Donor');
-            if (requests?.length >= 1) achievements.push('Life Saver');
-
-            setStats({
-                total_donations: donations?.length || 0,
-                total_requests: requests?.length || 0,
-                last_donation_date: lastDonation?.created_at || null,
-                achievements
-            });
+            const stats = await fetchUserStats(user.id);
+            setStats(stats);
         } catch (err: any) {
             console.error('Error loading stats');
             setError('Failed to load statistics');
@@ -112,24 +140,7 @@ export default function ProfilePage() {
         }
     };
 
-    const handleEdit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setError('');
 
-        try {
-            await updateProfile({
-                full_name: editForm.full_name,
-                phone: editForm.phone,
-                is_available: editForm.is_available,
-                permanent_zip: editForm.permanent_zip,
-                present_zip: editForm.present_zip
-            });
-            setIsEditing(false);
-        } catch (err: any) {
-            console.error('Error updating profile');
-            setError('Failed to update profile');
-        }
-    };
 
     const handleSignOut = async () => {
         try {
@@ -140,242 +151,152 @@ export default function ProfilePage() {
         }
     };
 
-    if (isLoading) {
-        return (
-            <div className="flex justify-center items-center min-h-[60vh]">
-                <Loader2 className="h-8 w-8 animate-spin text-primary-500" />
-            </div>
-        );
-    }
+    const copyPublicLink = async () => {
+        try {
+            await navigator.clipboard.writeText(`${window.location.origin}${publicPath}`);
+            toast.success('Link copied');
+        } catch {
+            toast.error('Couldn’t copy the link');
+        }
+    };
+
+    // Eligibility Logic using shared utility
+    const eligibility = calculateEligibility(stats?.last_donation_date || null);
+
+    const unlocked = stats?.achievements?.filter(a => a.unlocked) ?? [];
+    const row = (label: string, value: React.ReactNode) => (
+        <div className="grid grid-cols-3 gap-4 py-3.5">
+            <dt className="text-sm text-gray-500">{label}</dt>
+            <dd className="col-span-2 truncate text-gray-900">{value || <span className="text-gray-400">Not set</span>}</dd>
+        </div>
+    );
 
     return (
-        <div className="max-w-4xl mx-auto space-y-6">
-            {error && (
-                <Alert variant="error" className="mb-4">
-                    {error}
-                </Alert>
-            )}
+        <div className="space-y-12">
+            {error && <Alert variant="error">{error}</Alert>}
 
-            {/* Profile Header */}
-            <Card>
-                <CardBody className="relative">
-                    {!isEditing && (
-                        <Button
-                            variant="ghost"
-                            className="absolute top-4 right-4"
-                            onClick={() => setIsEditing(true)}
-                        >
-                            <Settings className="h-5 w-5" />
-                        </Button>
-                    )}
-                    <div className="flex items-center space-x-4">
-                        <div className="h-20 w-20 rounded-full bg-primary-100 flex items-center justify-center">
-                            <User className="h-10 w-10 text-primary-500" />
-                        </div>
-                        <div>
-                            <h1 className="text-2xl font-bold text-gray-900">
-                                {user?.full_name}
-                            </h1>
-                        </div>
-                        <div className="flex flex-col space-y-1 mt-2 text-gray-600 text-sm">
-                            <div className="flex items-center">
-                                <span className="font-semibold text-gray-700 w-28">Permanent Zip:</span>
-                                <span>{user?.permanent_zip || 'N/A'}</span>
-                            </div>
-                            <div className="flex items-center">
-                                <span className="font-semibold text-gray-700 w-28">Present Zip:</span>
-                                <span>{user?.present_zip || 'N/A'}</span>
-                            </div>
-                        </div>
-                        <div className="flex items-center space-x-4 text-gray-600 mt-2">
-                            <div className="flex items-center">
-                                <Droplet className="h-4 w-4 mr-1" />
-                                {user?.blood_group || 'N/A'}
-                            </div>
-                        </div>
-                    </div >
-
-                </CardBody >
-            </Card >
-
-            {/* Edit Form */}
-            {
-                isEditing && (
-                    <Card>
-                        <CardHeader>
-                            <h2 className="text-xl font-semibold">Edit Profile</h2>
-                        </CardHeader>
-                        <CardBody>
-                            <form onSubmit={handleEdit} className="space-y-4">
-                                <Input
-                                    label="Full Name"
-                                    value={editForm.full_name}
-                                    onChange={(e) => setEditForm({ ...editForm, full_name: e.target.value })}
-                                    required
-                                />
-                                <Input
-                                    label="Phone"
-                                    value={editForm.phone}
-                                    onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
-                                    required
-                                />
-                                <div className="grid grid-cols-2 gap-4">
-                                    <Input
-                                        label="Permanent Zip"
-                                        value={editForm.permanent_zip}
-                                        onChange={(e) => setEditForm({ ...editForm, permanent_zip: e.target.value })}
-                                        required
-                                        placeholder="e.g. 560001"
-                                    />
-                                    <Input
-                                        label="Present Zip"
-                                        value={editForm.present_zip}
-                                        onChange={(e) => setEditForm({ ...editForm, present_zip: e.target.value })}
-                                        required
-                                        placeholder="e.g. 560001"
-                                    />
-                                </div>
-                                <div className="flex items-center space-x-2">
-                                    <input
-                                        type="checkbox"
-                                        id="is_available"
-                                        checked={editForm.is_available}
-                                        onChange={(e) => setEditForm({ ...editForm, is_available: e.target.checked })}
-                                        className="rounded border-gray-300 text-primary-500 focus:ring-primary-500"
-                                    />
-                                    <label htmlFor="is_available" className="text-sm text-gray-700">
-                                        Available for donation
-                                    </label>
-                                </div>
-                                <div className="flex space-x-4">
-                                    <Button type="submit" variant="primary">
-                                        Save Changes
-                                    </Button>
-                                    <Button type="button" variant="secondary" onClick={() => setIsEditing(false)}>
-                                        Cancel
-                                    </Button>
-                                </div>
-                            </form>
-                        </CardBody>
-                    </Card>
-                )
-            }
-
-            {/* Contact Information */}
-            <Card>
-                <CardHeader>
-                    <h2 className="text-xl font-semibold">Contact Information</h2>
-                </CardHeader>
-                <CardBody>
-                    <div className="space-y-4">
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center">
-                                <Mail className="h-5 w-5 text-gray-400 mr-2" />
-                                <span>{user?.email}</span>
-                            </div>
-                            {session?.user && !session.user.email_confirmed_at && (
-                                <Button
-                                    size="sm"
-                                    variant="outline"
-                                    className="text-xs h-8"
-                                    onClick={async () => {
-                                        try {
-                                            const { error } = await supabase.auth.resend({
-                                                type: 'signup',
-                                                email: session.user.email!,
-                                                options: {
-                                                    emailRedirectTo: `${window.location.origin}/dashboard`
-                                                }
-                                            });
-                                            if (error) throw error;
-                                            alert('Verification email sent!');
-                                        } catch (err: any) {
-                                            console.error('Verification error');
-                                            alert('Failed to send verification email');
-                                        }
-                                    }}
-                                >
-                                    Verify
-                                </Button>
-                            )}
-                        </div>
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center">
-                                <Phone className="h-5 w-5 text-gray-400 mr-2" />
-                                <span>{user?.phone}</span>
-                            </div>
-                            {session?.user && (!session.user.phone_confirmed_at && user?.phone) && (
-                                <span className="text-xs text-yellow-600 bg-yellow-100 px-2 py-1 rounded">
-                                    Unverified
-                                </span>
-                            )}
-                        </div>
-                    </div>
-                </CardBody>
-            </Card>
-
-            {/* Statistics */}
-            <Card>
-                <CardHeader>
-                    <h2 className="text-xl font-semibold">Statistics</h2>
-                </CardHeader>
-                <CardBody>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div className="text-center p-4 bg-gray-50 rounded-lg">
-                            <Droplet className="h-8 w-8 text-primary-500 mx-auto mb-2" />
-                            <div className="text-2xl font-bold text-gray-900">{stats?.total_donations}</div>
-                            <div className="text-sm text-gray-600">Total Donations</div>
-                        </div>
-                        <div className="text-center p-4 bg-gray-50 rounded-lg">
-                            <Calendar className="h-8 w-8 text-primary-500 mx-auto mb-2" />
-                            <div className="text-2xl font-bold text-gray-900">
-                                {stats?.last_donation_date
-                                    ? new Date(stats.last_donation_date).toLocaleDateString()
-                                    : 'Never'}
-                            </div>
-                            <div className="text-sm text-gray-600">Last Donation</div>
-                        </div>
-                        <div className="text-center p-4 bg-gray-50 rounded-lg">
-                            <Award className="h-8 w-8 text-primary-500 mx-auto mb-2" />
-                            <div className="text-2xl font-bold text-gray-900">{stats?.achievements.length}</div>
-                            <div className="text-sm text-gray-600">Achievements</div>
-                        </div>
-                    </div>
-                </CardBody>
-            </Card>
-
-            {/* Achievements */}
-            {
-                stats?.achievements.length ? (
-                    <Card>
-                        <CardHeader>
-                            <h2 className="text-xl font-semibold">Achievements</h2>
-                        </CardHeader>
-                        <CardBody>
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                {stats.achievements.map((achievement, index) => (
-                                    <div key={index} className="text-center p-4 bg-gray-50 rounded-lg">
-                                        <Award className="h-6 w-6 text-primary-500 mx-auto mb-2" />
-                                        <div className="text-sm font-medium text-gray-900">{achievement}</div>
-                                    </div>
-                                ))}
-                            </div>
-                        </CardBody>
-                    </Card>
-                ) : null
-            }
-
-            {/* Sign Out Button */}
-            <div className="flex justify-center">
-                <Button
-                    variant="secondary"
-                    onClick={handleSignOut}
-                    className="text-red-600 hover:text-red-700"
+            <header className="flex flex-col justify-between gap-6 sm:flex-row sm:items-end">
+                <div>
+                    <p className="eyebrow">Profile</p>
+                    <h1 className="display mt-3 text-5xl leading-none">{user?.full_name || 'Your profile'}</h1>
+                    <p className="mt-3 flex items-center gap-2 text-sm text-gray-600">
+                        <span className={`h-2 w-2 rounded-full ${eligibility.isEligible ? 'bg-success-500' : 'bg-warning-500'}`} />
+                        {eligibility.isEligible
+                            ? 'Ready to donate'
+                            : `Recovering · eligible again on ${format(eligibility.nextEligibleDate, 'd MMM yyyy')}`}
+                    </p>
+                </div>
+                <Link
+                    href="/profile/edit"
+                    className="inline-flex h-9 items-center gap-1.5 self-start rounded-md border border-gray-300 bg-white px-3.5 text-sm font-medium text-gray-900 hover:border-gray-400 sm:self-auto"
                 >
-                    <LogOut className="h-5 w-5 mr-2" />
-                    Sign Out
-                </Button>
-            </div>
-        </div >
+                    <Pencil className="h-3.5 w-3.5" /> Edit profile
+                </Link>
+            </header>
+
+            <section className="grid gap-10 lg:grid-cols-[minmax(0,24rem)_1fr] lg:gap-14">
+                <div>
+                    {isLoading ? (
+                        <Skeleton className="h-[22rem] w-full max-w-sm rounded-xl" />
+                    ) : (
+                        <DonorCard
+                            ref={cardRef}
+                            user={user}
+                            totalDonations={stats?.total_donations || 0}
+                            donorNumber={user?.donor_number}
+                            badges={unlocked}
+                        />
+                    )}
+                    {user?.is_donor && (
+                        <div className="mt-4 flex max-w-sm flex-wrap gap-2">
+                            <Button size="sm" variant="secondary" onClick={handleDownload} leftIcon={<Download className="h-3.5 w-3.5" />}>
+                                Save image
+                            </Button>
+                            <Button size="sm" variant="secondary" onClick={handleLinkShare} leftIcon={<Send className="h-3.5 w-3.5" />}>
+                                WhatsApp
+                            </Button>
+                        </div>
+                    )}
+                </div>
+
+                <div className="space-y-10">
+                    <div>
+                        <h2 className="text-lg font-medium tracking-tight text-gray-900">Details</h2>
+                        <dl className="mt-3 divide-y divide-gray-200 border-y border-gray-200">
+                            {row('Blood group', formatBloodGroup(user?.blood_group))}
+                            {row('Email', user?.email)}
+                            {row('Phone', user?.phone)}
+                            {row('City', [user?.city, user?.present_zip].filter(Boolean).join(' · '))}
+                            {row('Donations', isLoading ? '…' : `${stats?.total_donations ?? 0} verified · ${stats?.total_requests ?? 0} requests posted`)}
+                        </dl>
+                    </div>
+
+                    <div>
+                        <div className="flex items-start justify-between gap-6">
+                            <div>
+                                <h2 className="text-lg font-medium tracking-tight text-gray-900">Public donor card</h2>
+                                <p className="mt-1 max-w-md text-sm leading-relaxed text-gray-600">
+                                    When on, anyone with your link can see your card: first name, blood group and donation count. Never your contact details.
+                                </p>
+                            </div>
+                            <label className="relative mt-1 inline-flex shrink-0 cursor-pointer items-center">
+                                <input
+                                    type="checkbox"
+                                    checked={user?.is_public_profile || false}
+                                    onChange={(e) => togglePublicProfile(e.target.checked)}
+                                    className="peer sr-only"
+                                    aria-label="Make donor card public"
+                                />
+                                <span className="h-6 w-11 rounded-full bg-gray-300 transition-colors after:absolute after:left-[3px] after:top-[3px] after:h-[18px] after:w-[18px] after:rounded-full after:bg-white after:transition-transform after:content-[''] peer-checked:bg-gray-900 peer-checked:after:translate-x-5 peer-focus-visible:ring-2 peer-focus-visible:ring-red-600 peer-focus-visible:ring-offset-2" />
+                            </label>
+                        </div>
+                        {user?.is_public_profile && (
+                            <div className="mt-4 flex items-center gap-2">
+                                <code className="min-w-0 flex-1 truncate rounded-md border border-gray-200 bg-white px-3 py-2 font-mono text-[13px] text-gray-700">
+                                    {host}{publicPath}
+                                </code>
+                                <Button size="sm" variant="secondary" onClick={copyPublicLink} aria-label="Copy link"><Copy className="h-3.5 w-3.5" /></Button>
+                                <a href={publicPath} target="_blank" rel="noreferrer" className="inline-flex h-8 items-center rounded-md border border-gray-300 bg-white px-3 text-gray-700 hover:border-gray-400" aria-label="Open public card">
+                                    <ExternalLink className="h-3.5 w-3.5" />
+                                </a>
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="flex items-start justify-between gap-6 border-t border-gray-200 pt-8">
+                        <div>
+                            <h2 className="text-lg font-medium tracking-tight text-gray-900">Alerts on this device</h2>
+                            <p className="mt-1 max-w-md text-sm leading-relaxed text-gray-600">
+                                Get a push notification when someone in your city needs a blood group you can give to.
+                            </p>
+                        </div>
+                        <div className="shrink-0 pt-1"><PushNotificationManager /></div>
+                    </div>
+                </div>
+            </section>
+
+            <section className="flex flex-col gap-4 border-t border-gray-200 pt-8 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                    <h2 className="font-medium text-gray-900">Delete account</h2>
+                    <p className="mt-1 text-sm text-gray-500">Removes your profile, requests and donation history for good.</p>
+                </div>
+                <div className="flex gap-2">
+                    <Button size="sm" variant="ghost" onClick={handleSignOut}>Sign out</Button>
+                    <Button size="sm" variant="secondary" className="text-red-700" onClick={() => setShowDeleteModal(true)}>
+                        Delete account
+                    </Button>
+                </div>
+            </section>
+
+            <ConfirmationModal
+                isOpen={showDeleteModal}
+                onClose={() => setShowDeleteModal(false)}
+                onConfirm={handleDeleteAccount}
+                title="Delete your account?"
+                description="This permanently deletes your account and everything in it. It can’t be undone."
+                confirmText="Delete my account"
+                variant="danger"
+            />
+        </div>
     );
 }

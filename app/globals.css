@@ -1,3 +1,78 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    @apply bg-paper text-ink antialiased;
+    font-feature-settings: "ss01", "cv11";
+  }
+
+  ::selection {
+    @apply bg-red-600 text-white;
+  }
+
+  :focus-visible {
+    @apply outline-none ring-2 ring-red-600 ring-offset-2 ring-offset-paper;
+  }
+
+  summary::-webkit-details-marker {
+    display: none;
+  }
+}
+
+@layer components {
+  /* Small uppercase label used for section kickers and field captions. */
+  .eyebrow {
+    @apply font-mono text-[11px] font-medium uppercase tracking-[0.14em] text-gray-500;
+  }
+
+  /* Large serif display type. */
+  .display {
+    @apply font-serif font-normal tracking-tight text-ink;
+  }
+
+  .hairline {
+    @apply border-gray-200;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+@layer components {
+  /* Muted map tiles to match the paper palette. */
+  .vital-tiles {
+    filter: grayscale(1) sepia(0.12) contrast(0.92) brightness(1.04);
+  }
+
+  .legal-body ul {
+    @apply list-none space-y-2 pl-0;
+  }
+  .legal-body li {
+    @apply relative pl-5;
+  }
+  .legal-body li::before {
+    content: '';
+    @apply absolute left-0 top-[0.75em] h-px w-2.5 bg-gray-400;
+  }
+  .legal-body strong {
+    @apply font-medium text-gray-900;
+  }
+  .legal-body a {
+    @apply text-gray-900 underline decoration-gray-300 underline-offset-4 hover:decoration-gray-900;
+  }
+}

@@ -1,53 +1,31 @@
 import React from 'react';
+import { cn } from '@/lib/cn';
 
-interface CardProps {
+interface SlotProps {
   children: React.ReactNode;
   className?: string;
 }
 
-export const Card: React.FC<CardProps> = ({ children, className = '' }) => {
-  return (
-    <div className={`bg-white rounded-lg shadow-md overflow-hidden ${className}`}>
-      {children}
-    </div>
-  );
-};
+export const Card: React.FC<SlotProps> = ({ children, className }) => (
+  <div className={cn('rounded-lg border border-gray-200 bg-white', className)}>
+    {children}
+  </div>
+);
 
-interface CardHeaderProps {
-  children: React.ReactNode;
-  className?: string;
-}
+export const CardHeader: React.FC<SlotProps> = ({ children, className }) => (
+  <div className={cn('border-b border-gray-200 px-5 py-4 sm:px-6', className)}>
+    {children}
+  </div>
+);
 
-export const CardHeader: React.FC<CardHeaderProps> = ({ children, className = '' }) => {
-  return (
-    <div className={`px-6 py-4 border-b border-gray-200 ${className}`}>
-      {children}
-    </div>
-  );
-};
+export const CardBody: React.FC<SlotProps> = ({ children, className }) => (
+  <div className={cn('px-5 py-5 sm:px-6', className)}>
+    {children}
+  </div>
+);
 
-interface CardBodyProps {
-  children: React.ReactNode;
-  className?: string;
-}
-
-export const CardBody: React.FC<CardBodyProps> = ({ children, className = '' }) => {
-  return (
-    <div className={`px-6 py-4 ${className}`}>
-      {children}
-    </div>
-  );
-};
-
-interface CardFooterProps {
-  children: React.ReactNode;
-  className?: string;
-}
-
-export const CardFooter: React.FC<CardFooterProps> = ({ children, className = '' }) => {
-  return (
-    <div className={`px-6 py-4 border-t border-gray-200 ${className}`}>
-      {children}
-    </div>
-  );
-};
+export const CardFooter: React.FC<SlotProps> = ({ children, className }) => (
+  <div className={cn('border-t border-gray-200 px-5 py-4 sm:px-6', className)}>
+    {children}
+  </div>
+);
