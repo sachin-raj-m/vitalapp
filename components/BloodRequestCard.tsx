@@ -1,175 +1,113 @@
 import React from 'react';
-import { formatDistanceToNow } from 'date-fns';
-import { MapPin, Clock, Activity, Droplet, Calendar } from 'lucide-react';
 import Link from 'next/link';
-import { motion } from 'framer-motion';
-import { Card, CardBody } from './ui/Card';
-import { Badge } from './ui/Badge';
+import { formatDistanceToNow, format, parseISO } from 'date-fns';
+import { Clock } from 'lucide-react';
 import { Button } from './ui/Button';
 import type { BloodRequest, BloodGroup, UrgencyLevel } from '../types';
-import { isBloodCompatible } from '@/lib/blood-compatibility';
+import { formatBloodGroup, isBloodCompatible } from '@/lib/blood-compatibility';
 import { ShareButton } from './ShareButton';
+import { cn } from '@/lib/cn';
 
 interface BloodRequestCardProps {
   request: BloodRequest;
   onRespond?: () => void;
-  onPendingClick?: () => void; // New prop for handling pending state click
-  userBloodGroup?: BloodGroup;
+  onPendingClick?: () => void;
+  userBloodGroup?: BloodGroup | null;
   hasOffered?: boolean;
   isOwnRequest?: boolean;
 }
 
-const getUrgencyStyles = (urgency: UrgencyLevel) => {
-  switch (urgency) {
-    case 'High':
-      return {
-        badgeVariant: 'error' as const,
-        cardBorder: 'border-l-4 border-l-error-500',
-        animation: 'animate-pulse-urgent',
-      };
-    case 'Medium':
-      return {
-        badgeVariant: 'warning' as const,
-        cardBorder: 'border-l-4 border-l-warning-500',
-        animation: '',
-      };
-    case 'Low':
-      return {
-        badgeVariant: 'success' as const,
-        cardBorder: 'border-l-4 border-l-success-500',
-        animation: '',
-      };
-    default:
-      return {
-        badgeVariant: 'neutral' as const,
-        cardBorder: '',
-        animation: '',
-      };
-  }
+const URGENCY: Record<UrgencyLevel, { label: string; dot: string; text: string }> = {
+  High: { label: 'Urgent', dot: 'bg-red-600', text: 'text-red-700' },
+  Medium: { label: 'Soon', dot: 'bg-warning-500', text: 'text-warning-700' },
+  Low: { label: 'Planned', dot: 'bg-gray-400', text: 'text-gray-600' },
 };
 
-const getBloodTypeColor = (bloodType: BloodGroup) => {
-  // Blood types with + are warmer colors, - are cooler colors
-  switch (bloodType) {
-    case 'A+':
-      return 'bg-red-100 text-red-800';
-    case 'A-':
-      return 'bg-red-50 text-red-800';
-    case 'B+':
-      return 'bg-orange-100 text-orange-800';
-    case 'B-':
-      return 'bg-orange-50 text-orange-800';
-    case 'AB+':
-      return 'bg-purple-100 text-purple-800';
-    case 'AB-':
-      return 'bg-purple-50 text-purple-800';
-    case 'O+':
-      return 'bg-blue-100 text-blue-800';
-    case 'O-':
-      return 'bg-blue-50 text-blue-800';
-    default:
-      return 'bg-gray-100 text-gray-800';
-  }
-};
-
-export const BloodRequestCard: React.FC<BloodRequestCardProps> = ({ request, onRespond, onPendingClick, userBloodGroup, hasOffered, isOwnRequest }) => {
-  const { badgeVariant, cardBorder, animation } = getUrgencyStyles(request.urgency_level);
-  const bloodTypeClass = getBloodTypeColor(request.blood_group);
+export const BloodRequestCard: React.FC<BloodRequestCardProps> = ({
+  request,
+  onRespond,
+  onPendingClick,
+  userBloodGroup,
+  hasOffered,
+  isOwnRequest,
+}) => {
+  const urgency = URGENCY[request.urgency_level] ?? URGENCY.Low;
+  const isUrgent = request.urgency_level === 'High';
   const timeAgo = formatDistanceToNow(new Date(request.created_at), { addSuffix: true });
+  const incompatible = !!userBloodGroup && !isBloodCompatible(userBloodGroup, request.blood_group);
+  const units = `${request.units_needed} unit${request.units_needed > 1 ? 's' : ''}`;
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      whileHover={{ scale: 1.02 }}
-      transition={{ duration: 0.3 }}
+    <article
+      className={cn(
+        'group relative flex gap-4 rounded-lg border bg-white p-4 transition-colors sm:gap-5 sm:p-5',
+        isUrgent ? 'border-red-200' : 'border-gray-200 hover:border-gray-300',
+      )}
     >
-      <Card className={`overflow-hidden ${cardBorder} ${animation}`}>
-        <CardBody className="p-0">
-          <div className="p-4">
-            <div className="flex justify-between items-start">
-              <div className="flex items-center">
-                <span className={`inline-flex items-center justify-center w-10 h-10 rounded-full font-bold text-lg ${bloodTypeClass}`}>
-                  {request.blood_group}
-                </span>
-                <div className="ml-3">
-                  <h3 className="text-lg font-semibold text-gray-900">
-                    {request.units_needed} unit{request.units_needed > 1 ? 's' : ''} needed
-                  </h3>
-                  <p className="text-sm text-gray-500">
-                    {request.contact_name}
-                  </p>
-                </div>
-              </div>
-              <Badge variant={badgeVariant} className="ml-2">
-                {request.urgency_level} Priority
-              </Badge>
-            </div>
+      <div
+        className={cn(
+          'flex h-16 w-16 shrink-0 items-center justify-center rounded-md font-serif text-[2rem] leading-none tracking-tight sm:h-[4.5rem] sm:w-[4.5rem] sm:text-[2.25rem]',
+          isUrgent ? 'bg-red-600 text-white' : 'bg-gray-100 text-gray-900',
+        )}
+        aria-label={`Blood group ${request.blood_group}`}
+      >
+        {formatBloodGroup(request.blood_group)}
+      </div>
 
-            <div className="mt-4 space-y-2">
-              <div className="flex items-center text-sm text-gray-500">
-                <MapPin className="h-4 w-4 mr-1 text-gray-400" />
-                <span>{request.hospital_name}</span>
-              </div>
-              <div className="flex items-center text-sm text-gray-500">
-                <Clock className="h-4 w-4 mr-1 text-gray-400" />
-                <span>Posted {timeAgo}</span>
-              </div>
-              {request.date_needed && (
-                <div className="flex items-center text-sm text-gray-500">
-                  <Calendar className="h-4 w-4 mr-1 text-gray-400" />
-                  <span>Needed by {new Date(request.date_needed).toLocaleDateString()}</span>
-                </div>
-              )}
-              {request.notes && (
-                <p className="text-sm text-gray-700 mt-2 bg-gray-50 p-2 rounded">
-                  "{request.notes}"
-                </p>
-              )}
-            </div>
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          <span className={cn('inline-flex items-center gap-1.5 font-mono text-[11px] uppercase tracking-[0.12em]', urgency.text)}>
+            <span className={cn('h-1.5 w-1.5 rounded-full', urgency.dot)} />
+            {urgency.label}
+          </span>
+          <span className="font-mono text-[11px] uppercase tracking-[0.12em] text-gray-400">{timeAgo}</span>
+        </div>
 
-            <div className="mt-4 flex justify-between items-center gap-2">
-              <ShareButton
-                title={`Urgent: ${request.blood_group} Blood Needed`}
-                text={`${request.hospital_name} needs ${request.units_needed} units of ${request.blood_group} blood. Please help!`}
-              />
-              <div className="flex justify-end items-center gap-2">
-                {isOwnRequest ? (
-                  <Button variant="outline" size="sm" disabled className="text-primary-600 border-primary-200 bg-primary-50">
-                    Your Request
-                  </Button>
-                ) : onRespond && (
-                  <>
-                    {hasOffered ? (
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        onClick={onPendingClick || onRespond} // Fallback to onRespond if onPendingClick not provided
-                        className="text-white bg-orange-500 hover:bg-orange-600 border-transparent shadow-sm flex items-center gap-1"
-                      >
-                        <Clock className="w-4 h-4" />
-                        Complete Donation
-                      </Button>
-                    ) : userBloodGroup && !isBloodCompatible(userBloodGroup, request.blood_group) ? (
-                      <Button variant="outline" size="sm" disabled className="text-red-400 border-red-100 bg-red-50 cursor-not-allowed w-full sm:w-auto">
-                        Incompatible ({userBloodGroup})
-                      </Button>
-                    ) : (
-                      <Button
-                        variant="primary"
-                        size="sm"
-                        onClick={onRespond}
-                      >
-                        I can donate
-                      </Button>
-                    )}
-                  </>
-                )}
-              </div>
-            </div>
-          </div>
-        </CardBody>
-      </Card>
-    </motion.div>
+        <h3 className="mt-1.5 text-[17px] font-medium leading-snug tracking-tight text-gray-900">
+          <Link href={`/requests/${request.id}`} className="after:absolute after:inset-0 after:content-[''] focus-visible:outline-none">
+            {units} at {request.hospital_name}
+          </Link>
+        </h3>
+
+        <p className="mt-1 text-sm text-gray-500">
+          {[request.city, request.date_needed && `needed by ${format(parseISO(request.date_needed), 'd MMM')}`, `for ${request.contact_name}`]
+            .filter(Boolean)
+            .join(' · ')}
+        </p>
+
+        {request.notes && (
+          <p className="mt-3 line-clamp-2 border-l-2 border-gray-200 pl-3 text-sm italic leading-relaxed text-gray-600">
+            {request.notes}
+          </p>
+        )}
+
+        {/* Actions sit above the stretched title link. */}
+        <div className="relative z-10 mt-4 flex flex-wrap items-center justify-between gap-3">
+          <ShareButton
+            title={`${formatBloodGroup(request.blood_group)} blood needed: ${units} at ${request.hospital_name}`}
+            text={`${request.hospital_name}${request.city ? `, ${request.city}` : ''} needs ${units} of ${formatBloodGroup(request.blood_group)}.`}
+            path={`/requests/${request.id}`}
+          />
+
+          {isOwnRequest ? (
+            <span className="font-mono text-[11px] uppercase tracking-[0.12em] text-gray-500">Your request</span>
+          ) : onRespond && (
+            hasOffered ? (
+              <Button size="sm" variant="secondary" onClick={onPendingClick || onRespond} leftIcon={<Clock className="h-3.5 w-3.5" />}>
+                You offered · view PIN
+              </Button>
+            ) : incompatible ? (
+              <span className="text-[13px] text-gray-400">
+                Not compatible with {formatBloodGroup(userBloodGroup)}
+              </span>
+            ) : (
+              <Button size="sm" variant={isUrgent ? 'primary' : 'ink'} onClick={onRespond}>
+                I can donate
+              </Button>
+            )
+          )}
+        </div>
+      </div>
+    </article>
   );
 };

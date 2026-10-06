@@ -1,93 +1,97 @@
 /** @type {import('tailwindcss').Config} */
+
+// Warm neutral scale. `gray` and `slate` both point here so every existing
+// neutral utility in the app lands on the same paper/ink palette.
+const neutral = {
+  50: '#FAF8F5',
+  100: '#F3F0EB',
+  200: '#E7E2DA',
+  300: '#D4CDC2',
+  400: '#A9A197',
+  500: '#7E776E',
+  600: '#5F5951',
+  700: '#47423C',
+  800: '#2E2A26',
+  900: '#1B1815',
+  950: '#110F0D',
+};
+
+// The one brand colour. `red` and `primary` share it.
+const blood = {
+  50: '#FDF3F2',
+  100: '#FBE4E2',
+  200: '#F5C4C0',
+  300: '#EC9690',
+  400: '#DF5B53',
+  500: '#CF2E28',
+  600: '#B5161B',
+  700: '#941016',
+  800: '#740D12',
+  900: '#550A0E',
+  950: '#310507',
+};
+
 export default {
   content: [
     "./app/**/*.{js,ts,jsx,tsx,mdx}",
-    "./src/**/*.{js,ts,jsx,tsx,mdx}",
-    "./pages/**/*.{js,ts,jsx,tsx,mdx}",
     "./components/**/*.{js,ts,jsx,tsx,mdx}",
   ],
   theme: {
     extend: {
       colors: {
-        primary: {
-          50: '#FCE5E5',
-          100: '#F9CCCC',
-          200: '#F29B9B',
-          300: '#EB6A6A',
-          400: '#E53E3E', // Main primary color
-          500: '#D32F2F',
-          600: '#B71C1C',
-          700: '#9A1717',
-          800: '#7D1313',
-          900: '#610F0F',
-        },
-        secondary: {
-          50: '#E6F0FA',
-          100: '#CCE0F5',
-          200: '#99C2EB',
-          300: '#66A3E0',
-          400: '#3182CE', // Main secondary color
-          500: '#2563EB',
-          600: '#1D4ED8',
-          700: '#1E40AF',
-          800: '#1E3A8A',
-          900: '#172554',
-        },
-        accent: {
-          50: '#E6FFFA',
-          100: '#B2F5EA',
-          200: '#81E6D9',
-          300: '#4FD1C5',
-          400: '#38B2AC', // Main accent color
-          500: '#319795',
-          600: '#2C7A7B',
-          700: '#285E61',
-          800: '#234E52',
-          900: '#1D4044',
-        },
+        gray: neutral,
+        slate: neutral,
+        red: blood,
+        primary: blood,
+        ink: neutral[900],
+        paper: neutral[50],
         success: {
-          50: '#F0FDF4',
-          100: '#DCFCE7',
-          200: '#BBF7D0',
-          300: '#86EFAC',
-          400: '#4ADE80',
-          500: '#22C55E', // Main success color
-          600: '#16A34A',
-          700: '#15803D',
-          800: '#166534',
-          900: '#14532D',
+          50: '#F1F7F2',
+          100: '#DDEDE1',
+          200: '#B9DBC2',
+          300: '#8CC29C',
+          400: '#5BA572',
+          500: '#3A8A55',
+          600: '#2C6F44',
+          700: '#245938',
+          800: '#1E472E',
+          900: '#183A26',
         },
         warning: {
-          50: '#FFFBEB',
-          100: '#FEF3C7',
-          200: '#FDE68A',
-          300: '#FCD34D',
-          400: '#FBBF24',
-          500: '#F59E0B', // Main warning color
-          600: '#D97706',
-          700: '#B45309',
-          800: '#92400E',
-          900: '#78350F',
+          50: '#FBF6EC',
+          100: '#F5E9CF',
+          200: '#EBD29C',
+          300: '#DFB566',
+          400: '#D29B3D',
+          500: '#B97F25',
+          600: '#99641D',
+          700: '#7A4E1A',
+          800: '#5F3D18',
+          900: '#4C3115',
         },
-        error: {
-          50: '#FEF2F2',
-          100: '#FEE2E2',
-          200: '#FECACA',
-          300: '#FCA5A5',
-          400: '#F87171',
-          500: '#EF4444', // Main error color
-          600: '#DC2626',
-          700: '#B91C1C',
-          800: '#991B1B',
-          900: '#7F1D1D',
+        error: blood,
+      },
+      fontFamily: {
+        sans: ['var(--font-sans)', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+        serif: ['var(--font-serif)', 'ui-serif', 'Georgia', 'serif'],
+        mono: ['var(--font-mono)', 'ui-monospace', 'SFMono-Regular', 'monospace'],
+      },
+      letterSpacing: {
+        tightest: '-0.04em',
+      },
+      keyframes: {
+        'fade-up': {
+          from: { opacity: '0', transform: 'translateY(8px)' },
+          to: { opacity: '1', transform: 'translateY(0)' },
+        },
+        beat: {
+          '0%, 100%': { transform: 'scale(1)', opacity: '1' },
+          '50%': { transform: 'scale(1.6)', opacity: '0' },
         },
       },
       animation: {
-        'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
-        'pulse-urgent': 'pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite',
-      },
-      boxShadow: {
-        'inner-lg': 'inset 0 2px 4px 0 rgba(0, 0, 0, 0.06)',
+        'fade-up': 'fade-up 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) both',
+        beat: 'beat 1.8s ease-out infinite',
       },
     },
   },

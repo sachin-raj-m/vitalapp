@@ -1,14 +1,6 @@
 import React from 'react';
+import { cn } from '@/lib/cn';
 
-interface SkeletonProps {
-    className?: string;
-    // You can add more props like width, height if you want to control inline styles
-}
-
-export const Skeleton: React.FC<SkeletonProps> = ({ className }) => {
-    return (
-        <div
-            className={`animate-pulse bg-gray-200 rounded-md ${className || ''}`}
-        />
-    );
-};
+export const Skeleton: React.FC<{ className?: string }> = ({ className }) => (
+    <div className={cn('animate-pulse rounded bg-gray-200/80', className)} />
+);

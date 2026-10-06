@@ -3,9 +3,8 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../context/AuthContext';
-import { isRegistrationComplete } from '../utils/auth';
-import { Card, CardBody } from './ui/Card';
-import { Loader2 } from 'lucide-react';
+import { isRegistrationComplete } from '../lib/auth-helpers';
+import { PageLoader } from './PageLoader';
 
 interface RegistrationGuardProps {
     children: React.ReactNode;
@@ -63,14 +62,7 @@ export function RegistrationGuard({ children }: RegistrationGuardProps) {
 
     if (isChecking) {
         return (
-            <div className="max-w-md mx-auto">
-                <Card>
-                    <CardBody className="text-center py-8">
-                        <h2 className="text-xl font-semibold mb-4">Checking Profile</h2>
-                        <Loader2 className="h-8 w-8 animate-spin text-primary-500 mx-auto" />
-                    </CardBody>
-                </Card>
-            </div>
+            <PageLoader />
         );
     }
 

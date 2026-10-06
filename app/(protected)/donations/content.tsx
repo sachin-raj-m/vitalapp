@@ -1,63 +1,108 @@
 "use client";
 
 import React, { useEffect, useState } from 'react';
-import { Card, CardHeader, CardBody } from '@/components/ui/Card';
+import Link from 'next/link';
+import { format } from 'date-fns';
+import { HeartPulse, Phone } from 'lucide-react';
 import { Badge } from '@/components/ui/Badge';
 import { useAuth } from '@/context/AuthContext';
 import { useRequests } from '@/context/RequestsContext';
 import { supabase } from '@/lib/supabase';
-import { Loader2, Calendar, XCircle, Heart } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Alert } from '@/components/ui/Alert';
+import { Skeleton } from '@/components/ui/Skeleton';
 import { EmptyState } from '@/components/EmptyState';
+import { ConfirmationModal } from '@/components/ui/ConfirmationModal';
+import { calculateEligibility, fetchUserStats, type UserStats } from '@/lib/stats';
+import { formatBloodGroup } from '@/lib/blood-compatibility';
+import { toast } from 'sonner';
+import { cn } from '@/lib/cn';
 
 interface DonationWithRequest {
     id: string;
     created_at: string;
     status: string;
     request: {
+        id: string;
         hospital_name: string;
+        hospital_address?: string;
+        blood_group?: string;
+        contact_name?: string;
+        contact_phone?: string;
+        status?: string;
     } | null;
 }
+
+type Filter = 'all' | 'pending' | 'verified' | 'closed';
+
+const getDisplayStatus = (donation: DonationWithRequest) => {
+    if (donation.status === 'completed') return { label: 'Verified', variant: 'success' as const, key: 'verified' as const };
+    if (donation.status === 'cancelled') return { label: 'Withdrawn', variant: 'neutral' as const, key: 'closed' as const };
+    if (donation.request?.status && donation.request.status !== 'active') {
+        return { label: 'Request closed', variant: 'neutral' as const, key: 'closed' as const };
+    }
+    return { label: 'Offered', variant: 'warning' as const, key: 'pending' as const };
+};
 
 export default function DonationsPage() {
     const { user } = useAuth();
     const { refreshRequests } = useRequests();
     const [donations, setDonations] = useState<DonationWithRequest[]>([]);
+    const [stats, setStats] = useState<UserStats | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState('');
-    const [withdrawingId, setWithdrawingId] = useState<string | null>(null);
+    const [donationToWithdraw, setDonationToWithdraw] = useState<string | null>(null);
+    const [isWithdrawing, setIsWithdrawing] = useState(false);
+    const [filter, setFilter] = useState<Filter>('all');
 
     useEffect(() => {
-        const fetchDonations = async () => {
-            if (!user) return;
+        if (!user) return;
 
+        const fetchDonations = async () => {
             try {
-                const { data, error } = await supabase
-                    .from('donations')
-                    .select(`
-                        id,
-                        created_at,
-                        status,
-                        request:blood_requests (
-                            hospital_name
-                        )
-                    `)
-                    .eq('donor_id', user.id)
-                    .order('created_at', { ascending: false });
+                const [{ data, error }, userStats] = await Promise.all([
+                    supabase
+                        .from('donations')
+                        .select(`
+                            id,
+                            created_at,
+                            status,
+                            request:blood_requests (
+                                id,
+                                hospital_name,
+                                hospital_address,
+                                blood_group,
+                                contact_name,
+                                status
+                            )
+                        `)
+                        .eq('donor_id', user.id)
+                        .order('created_at', { ascending: false }),
+                    fetchUserStats(user.id).catch(() => null),
+                ]);
 
                 if (error) throw error;
 
-                // Transform data to match interface (handle potential array from join)
-                const formattedData = (data || []).map((item: any) => ({
+                const rows: DonationWithRequest[] = (data || []).map((item: any) => ({
                     ...item,
-                    request: Array.isArray(item.request) ? item.request[0] : item.request
+                    request: Array.isArray(item.request) ? item.request[0] : item.request,
                 }));
 
-                setDonations(formattedData);
-            } catch (err: any) {
-                console.error('Error fetching donations');
-                setError('Failed to load donation history');
+                // Phone numbers aren't on the request row; fetch them for live offers only.
+                const live = rows.filter(r => r.status === 'pending' && r.request?.status === 'active' && r.request?.id);
+                const contacts = await Promise.all(
+                    live.map(r => supabase.rpc('get_request_contact', { p_request_id: r.request!.id }).then(({ data }) => [r.id, data?.[0]] as const))
+                );
+                const phoneByDonation = new Map(contacts.map(([id, c]) => [id, c?.contact_phone as string | undefined]));
+
+                setDonations(rows.map(r => (
+                    phoneByDonation.has(r.id) && r.request
+                        ? { ...r, request: { ...r.request, contact_phone: phoneByDonation.get(r.id) } }
+                        : r
+                )));
+                setStats(userStats);
+            } catch {
+                setError('Couldn’t load your donation history. Please refresh.');
             } finally {
                 setIsLoading(false);
             }
@@ -66,158 +111,157 @@ export default function DonationsPage() {
         fetchDonations();
     }, [user]);
 
-    const handleWithdraw = async (donationId: string) => {
-        if (!confirm('Are you sure you want to withdraw this donation offer?')) return;
-
-        setWithdrawingId(donationId);
+    const performWithdraw = async () => {
+        if (!donationToWithdraw) return;
+        setIsWithdrawing(true);
         try {
-            const { error } = await supabase
-                .from('donations')
-                .update({ status: 'cancelled' })
-                .eq('id', donationId);
-
+            const { error } = await supabase.from('donations').update({ status: 'cancelled' }).eq('id', donationToWithdraw);
             if (error) throw error;
 
-            // Update local state
-            setDonations(prev => prev.map(d =>
-                d.id === donationId ? { ...d, status: 'cancelled' } : d
-            ));
-
-            // Refresh global context to update "Offer Sent" buttons elsewhere
+            setDonations(prev => prev.map(d => (d.id === donationToWithdraw ? { ...d, status: 'cancelled' } : d)));
             await refreshRequests();
-        } catch (err: any) {
-            console.error('Error withdrawing donation', err);
-            setError('Failed to withdraw donation');
+            toast.success('Offer withdrawn');
+        } catch {
+            toast.error('Couldn’t withdraw the offer. Please try again.');
         } finally {
-            setWithdrawingId(null);
+            setIsWithdrawing(false);
+            setDonationToWithdraw(null);
         }
     };
 
-    const completedDonations = donations.filter(d => d.status === 'completed');
-    const totalDonations = completedDonations.length;
-    const pointsEarned = totalDonations * 50; // 50 points per donation
-
-    const getLastDonationDate = () => {
-        if (completedDonations.length === 0) return null;
-        return new Date(completedDonations[0].created_at);
-    };
-
-    const getNextAvailableDate = () => {
-        const lastDate = getLastDonationDate();
-        if (!lastDate) return new Date(); // Available now if never donated
-
-        const nextDate = new Date(lastDate);
-        nextDate.setDate(nextDate.getDate() + 56); // 56 days gap
-        return nextDate;
-    };
-
-    const nextAvailable = getNextAvailableDate();
-    const isAvailableNow = nextAvailable <= new Date();
-
-    if (isLoading) {
-        return (
-            <div className="flex justify-center items-center min-h-[60vh]">
-                <Loader2 className="h-8 w-8 animate-spin text-primary-500" />
-            </div>
-        );
-    }
+    const eligibility = calculateEligibility(stats?.last_donation_date || null);
+    const counts = donations.reduce<Record<Filter, number>>(
+        (acc, d) => { acc.all++; acc[getDisplayStatus(d).key]++; return acc; },
+        { all: 0, pending: 0, verified: 0, closed: 0 },
+    );
+    const filtered = donations.filter(d => filter === 'all' || getDisplayStatus(d).key === filter);
 
     return (
-        <div className="space-y-8">
-            <h1 className="text-3xl font-bold text-gray-900">My Donations</h1>
+        <div className="space-y-10">
+            <header>
+                <p className="eyebrow">My donations</p>
+                <h1 className="display mt-3 text-5xl leading-none">Every offer you’ve made.</h1>
+            </header>
 
-            {error && (
-                <Alert variant="error" className="mb-4">
-                    {error}
-                </Alert>
-            )}
+            {error && <Alert variant="error">{error}</Alert>}
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <Card>
-                    <CardHeader>
-                        <h3 className="text-lg font-medium text-gray-900">Total Donations</h3>
-                    </CardHeader>
-                    <CardBody>
-                        <div className="text-3xl font-bold text-primary-500">{totalDonations}</div>
-                        <p className="text-sm text-gray-500">Lives impacted</p>
-                    </CardBody>
-                </Card>
+            <dl className="grid overflow-hidden rounded-lg border border-gray-200 bg-white sm:grid-cols-3 sm:divide-x sm:divide-gray-200">
+                {[
+                    { label: 'Verified donations', value: isLoading ? null : String(stats?.total_donations ?? counts.verified) },
+                    { label: 'Points', value: isLoading ? null : String(stats?.total_points ?? 0) },
+                    {
+                        label: 'Next eligible',
+                        value: isLoading ? null : eligibility.isEligible ? 'Now' : format(eligibility.nextEligibleDate, 'd MMM'),
+                    },
+                ].map((item, i) => (
+                    <div key={item.label} className={cn('p-5 sm:p-6', i > 0 && 'border-t border-gray-200 sm:border-t-0')}>
+                        <dt className="eyebrow">{item.label}</dt>
+                        <dd className="mt-3 font-serif text-4xl leading-none tracking-tight text-gray-900">
+                            {item.value ?? <Skeleton className="h-9 w-16" />}
+                        </dd>
+                    </div>
+                ))}
+            </dl>
 
-                <Card>
-                    <CardHeader>
-                        <h3 className="text-lg font-medium text-gray-900">Points Earned</h3>
-                    </CardHeader>
-                    <CardBody>
-                        <div className="text-3xl font-bold text-secondary-500">{pointsEarned}</div>
-                        <p className="text-sm text-gray-500">Reward points</p>
-                    </CardBody>
-                </Card>
+            <section className="space-y-4">
+                <div className="flex flex-wrap gap-1.5" role="group" aria-label="Filter donations">
+                    {(['all', 'pending', 'verified', 'closed'] as const).map(tab => (
+                        <button
+                            key={tab}
+                            onClick={() => setFilter(tab)}
+                            aria-pressed={filter === tab}
+                            className={cn(
+                                'h-8 rounded-full border px-3 text-[13px] capitalize transition-colors',
+                                filter === tab ? 'border-gray-900 bg-gray-900 text-gray-50' : 'border-gray-300 bg-white text-gray-700 hover:border-gray-400',
+                            )}
+                        >
+                            {tab === 'pending' ? 'Offered' : tab} <span className="ml-1 font-mono text-[11px] opacity-60">{counts[tab]}</span>
+                        </button>
+                    ))}
+                </div>
 
-                <Card>
-                    <CardHeader>
-                        <h3 className="text-lg font-medium text-gray-900">Next Available</h3>
-                    </CardHeader>
-                    <CardBody>
-                        <div className={`text-3xl font-bold ${isAvailableNow ? 'text-success-500' : 'text-orange-500'}`}>
-                            {isAvailableNow ? 'Ready' : nextAvailable.toLocaleDateString()}
-                        </div>
-                        <p className="text-sm text-gray-500">
-                            {isAvailableNow ? 'You can donate again' : 'Next eligible date'}
-                        </p>
-                    </CardBody>
-                </Card>
-            </div>
+                {isLoading ? (
+                    <div className="space-y-3">{[1, 2].map(i => <Skeleton key={i} className="h-24 w-full rounded-lg" />)}</div>
+                ) : filtered.length === 0 ? (
+                    <EmptyState
+                        icon={HeartPulse}
+                        title={filter === 'all' ? 'No offers yet' : 'Nothing here'}
+                        description={filter === 'all' ? 'When you offer to donate for a request, it will show up here with the family’s contact and your PIN.' : 'Try a different filter.'}
+                        actionLabel={filter === 'all' ? 'See open requests' : undefined}
+                        onAction={() => { window.location.href = '/requests'; }}
+                    />
+                ) : (
+                    <ul className="divide-y divide-gray-200 overflow-hidden rounded-lg border border-gray-200 bg-white">
+                        {filtered.map(donation => {
+                            const status = getDisplayStatus(donation);
+                            const isPending = status.key === 'pending';
+                            return (
+                                <li key={donation.id} className="p-5">
+                                    <div className="flex items-start gap-4">
+                                        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-md bg-gray-100 font-serif text-2xl tracking-tight text-gray-900">
+                                            {formatBloodGroup(donation.request?.blood_group)}
+                                        </div>
+                                        <div className="min-w-0 flex-1">
+                                            <div className="flex flex-wrap items-center gap-2">
+                                                {donation.request?.id ? (
+                                                    <Link href={`/requests/${donation.request.id}`} className="font-medium text-gray-900 hover:underline hover:underline-offset-4">
+                                                        {donation.request.hospital_name}
+                                                    </Link>
+                                                ) : (
+                                                    <span className="font-medium text-gray-900">Request removed</span>
+                                                )}
+                                                <Badge variant={status.variant} size="sm">{status.label}</Badge>
+                                            </div>
+                                            <p className="mt-0.5 text-sm text-gray-500">Offered on {format(new Date(donation.created_at), 'd MMM yyyy')}</p>
 
-            <Card>
-                <CardHeader>
-                    <h3 className="text-lg font-medium text-gray-900">Donation History</h3>
-                </CardHeader>
-                <CardBody>
-                    {donations.length === 0 ? (
-                        <EmptyState
-                            icon={Heart}
-                            title="Be a Hero Today"
-                            description="Your donation journey starts with a single step. Find a request and help save a life."
-                            actionLabel="Find Requests"
-                            className="bg-white border-none shadow-none py-8"
-                            onAction={() => window.location.href = '/requests'}
-                        />
-                    ) : (
-                        <div className="space-y-4">
-                            {donations.map((donation) => (
-                                <div key={donation.id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 border-b last:border-0 gap-3">
-                                    <div>
-                                        <p className="font-medium">
-                                            {donation.request?.hospital_name || 'Unknown Hospital'}
-                                        </p>
-                                        <p className="text-sm text-gray-500 flex items-center mt-1">
-                                            <Calendar className="h-3 w-3 mr-1" />
-                                            {new Date(donation.created_at).toLocaleDateString()}
-                                        </p>
-                                    </div>
-                                    <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-start">
-                                        <Badge variant={donation.status === 'completed' ? 'success' : donation.status === 'cancelled' ? 'neutral' : 'warning'}>
-                                            {donation.status.charAt(0).toUpperCase() + donation.status.slice(1)}
-                                        </Badge>
-
-                                        {donation.status === 'pending' && (
+                                            {isPending && (
+                                                <div className="mt-4 flex flex-col gap-4 rounded-md bg-gray-100/70 p-4 sm:flex-row sm:items-center sm:justify-between">
+                                                    <div className="text-sm">
+                                                        <p className="text-gray-500">Contact</p>
+                                                        <p className="mt-0.5 text-gray-900">{donation.request?.contact_name}</p>
+                                                        {donation.request?.contact_phone && (
+                                                            <a href={`tel:${donation.request.contact_phone}`} className="mt-1 inline-flex items-center gap-1.5 font-medium text-red-700 hover:text-red-800">
+                                                                <Phone className="h-3.5 w-3.5" /> {donation.request.contact_phone}
+                                                            </a>
+                                                        )}
+                                                    </div>
+                                                    {user?.donor_pin && (
+                                                        <div className="sm:text-right">
+                                                            <p className="text-sm text-gray-500">Your PIN</p>
+                                                            <p className="mt-0.5 font-mono text-2xl tracking-[0.3em] text-gray-900">{user.donor_pin}</p>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
+                                        {isPending && (
                                             <Button
-                                                variant="outline"
+                                                variant="ghost"
                                                 size="sm"
-                                                className="text-red-600 border-red-200 hover:bg-red-50"
-                                                onClick={() => handleWithdraw(donation.id)}
-                                                isLoading={withdrawingId === donation.id}
+                                                className="shrink-0 text-gray-500"
+                                                onClick={() => setDonationToWithdraw(donation.id)}
                                             >
                                                 Withdraw
                                             </Button>
                                         )}
                                     </div>
-                                </div>
-                            ))}
-                        </div>
-                    )}
-                </CardBody>
-            </Card>
+                                </li>
+                            );
+                        })}
+                    </ul>
+                )}
+            </section>
+
+            <ConfirmationModal
+                isOpen={!!donationToWithdraw}
+                onClose={() => setDonationToWithdraw(null)}
+                onConfirm={performWithdraw}
+                title="Withdraw this offer?"
+                description="The family will no longer see you as an incoming donor. If you can still help, it’s kind to call and let them know either way."
+                confirmText="Withdraw offer"
+                variant="danger"
+                isLoading={isWithdrawing}
+            />
         </div>
     );
 }

@@ -3,9 +3,8 @@
 import React from 'react';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { RegistrationGuard } from '@/components/RegistrationGuard';
-import { VerificationBanner } from '@/components/VerificationBanner';
-
 import { RequestsProvider } from '@/context/RequestsContext';
+import { AppShell } from '@/components/SidebarWrapper';
 
 export default function ProtectedLayout({
     children,
@@ -16,10 +15,7 @@ export default function ProtectedLayout({
         <ProtectedRoute>
             <RegistrationGuard>
                 <RequestsProvider>
-                    <div className="flex flex-col min-h-screen">
-                        <VerificationBanner />
-                        {children}
-                    </div>
+                    <AppShell>{children}</AppShell>
                 </RequestsProvider>
             </RegistrationGuard>
         </ProtectedRoute>
