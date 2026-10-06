@@ -1,67 +1,42 @@
-import { createServerClient } from '@supabase/ssr';
-import { createClient } from '@supabase/supabase-js';
-import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
+import { getVerifiedUser, serviceClient } from '@/lib/supabase-route';
 
+/**
+ * Deletes the caller's account and everything tied to it. The user is verified
+ * with getUser() (a forged session cookie must never reach the service role).
+ */
 export async function POST(request: Request) {
+    const { user } = await getVerifiedUser(request);
+    if (!user) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const admin = serviceClient();
+    const userId = user.id;
+
     try {
-        const cookieStore = await cookies();
-
-        // Client for verification (using user's cookies)
-        const supabase = createServerClient(
-            process.env.NEXT_PUBLIC_SUPABASE_URL!,
-            process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-            {
-                cookies: {
-                    get(name: string) {
-                        return cookieStore.get(name)?.value;
-                    },
-                },
-            }
-        );
-
-        const { data: { session } } = await supabase.auth.getSession();
-
-        if (!session) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        // Children first, so foreign keys don't block the profile delete.
+        const { data: ownRequests } = await admin.from('blood_requests').select('id').eq('user_id', userId);
+        const requestIds = (ownRequests || []).map(r => r.id);
+        if (requestIds.length) {
+            await admin.from('donations').delete().in('request_id', requestIds);
+            await admin.from('request_contacts').delete().in('request_id', requestIds);
+            await admin.from('blood_requests').delete().in('id', requestIds);
         }
+        await admin.from('donations').delete().eq('donor_id', userId);
+        await admin.from('push_subscriptions').delete().eq('user_id', userId);
+        await admin.from('notifications').delete().eq('user_id', userId);
+        await admin.from('donor_secrets').delete().eq('user_id', userId);
 
-        const userId = session.user.id;
+        const { error: profileError } = await admin.from('profiles').delete().eq('id', userId);
+        if (profileError) throw profileError;
 
-
-        // Initialize Service Role Client to perform deletion
-        // Note: Using standard supabase-js client for admin operations
-        const serviceRoleSupabase = createClient(
-            process.env.NEXT_PUBLIC_SUPABASE_URL!,
-            process.env.SUPABASE_SERVICE_ROLE_KEY!,
-            {
-                auth: {
-                    autoRefreshToken: false,
-                    persistSession: false
-                }
-            }
-        );
-
-        // Delete the user from Supabase Auth (this should cascade to profiles if configured, or leave profile)
-        // Ideally we should delete profile row first if no cascade.
-        // Let's attempt profile delete first to be clean.
-        await serviceRoleSupabase.from('profiles').delete().eq('id', userId);
-
-        const { error: deleteError } = await serviceRoleSupabase.auth.admin.deleteUser(
-            userId
-        );
-
-        if (deleteError) {
-            console.error('Delete User Error:', deleteError);
-            throw deleteError;
-        }
+        const { error: deleteError } = await admin.auth.admin.deleteUser(userId);
+        if (deleteError) throw deleteError;
 
         return NextResponse.json({ success: true });
-    } catch (error: any) {
+    } catch (error) {
         console.error('Error deleting account:', error);
-        return NextResponse.json(
-            { error: error.message || 'Failed to delete account' },
-            { status: 500 }
-        );
+        return NextResponse.json({ error: 'Failed to delete account' }, { status: 500 });
     }
 }

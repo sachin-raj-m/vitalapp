@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { SITE_URL } from '@/lib/site';
 import { NextResponse } from 'next/server';
 import { getResetPasswordEmailHtml } from '@/lib/email-templates';
 import { sendEmail } from '@/lib/email';
@@ -26,7 +27,7 @@ export async function POST(request: Request) {
             type: 'recovery',
             email: email,
             options: {
-                redirectTo: `${request.headers.get('origin') || 'https://vitalapp.vercel.app'}/auth/callback?next=/dashboard/profile` // Redirect after reset flow
+                redirectTo: `${SITE_URL}/auth/callback?next=/profile/edit`
             }
         });
 
@@ -52,6 +53,7 @@ export async function POST(request: Request) {
 
     } catch (error: any) {
         console.error('Recovery error:', error);
-        return NextResponse.json({ error: error.message }, { status: 500 });
+        // Same response whether or not the email exists, so this can't be used to probe accounts.
+        return NextResponse.json({ success: true });
     }
 }

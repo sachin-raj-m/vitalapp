@@ -1,161 +1,119 @@
-import { createServerClient } from '@supabase/ssr'
 import { NextResponse } from 'next/server'
-import { cookies } from 'next/headers'
 import webpush from 'web-push'
 import { getBloodRequestEmailHtml } from '@/lib/email-templates'
 import { sendEmail } from '@/lib/email'
+import { getCompatibleDonors, formatBloodGroup } from '@/lib/blood-compatibility'
+import { getVerifiedUser, serviceClient } from '@/lib/supabase-route'
+import { SITE_URL } from '@/lib/site'
+import type { BloodGroup } from '@/types'
 
-// Medical Compatibility Rules for Donors
-// Key: Patient Blood Group (Recipient)
-// Value: List of Compatible Donor Blood Groups
-// Source: Red Cross
-const COMPATIBLE_DONORS: Record<string, string[]> = {
-    'A+': ['A+', 'A-', 'O+', 'O-'],
-    'O+': ['O+', 'O-'],
-    'B+': ['B+', 'B-', 'O+', 'O-'],
-    'AB+': ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'], // Universal Recipient
-    'A-': ['A-', 'O-'],
-    'O-': ['O-'],
-    'B-': ['B-', 'O-'],
-    'AB-': ['AB-', 'A-', 'B-', 'O-']
-}
-
+/**
+ * Alerts compatible donors in the request's city. The caller only sends a
+ * requestId; everything else is loaded from the database, and the request must
+ * belong to the caller and not have been broadcast before.
+ */
 export async function POST(request: Request) {
-    const cookieStore = await cookies()
-    const supabase = createServerClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-        {
-            cookies: {
-                getAll() {
-                    return cookieStore.getAll()
-                },
-                setAll(cookiesToSet) {
-                    try {
-                        cookiesToSet.forEach(({ name, value, options }) =>
-                            cookieStore.set(name, value, options)
-                        )
-                    } catch {
-                        // Ignored
-                    }
-                },
-            },
-        }
-    )
-
-    const { data: { user } } = await supabase.auth.getUser()
+    const { supabase, user } = await getVerifiedUser(request)
     if (!user) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { requestId, bloodGroup, hospitalName, city, urgencyLevel } = await request.json()
+    const { requestId } = await request.json().catch(() => ({}))
+    if (typeof requestId !== 'string') {
+        return NextResponse.json({ error: 'requestId is required' }, { status: 400 })
+    }
+
+    // Read as the caller so RLS confirms ownership.
+    const { data: bloodRequest } = await supabase
+        .from('blood_requests')
+        .select('id, user_id, blood_group, hospital_name, city, urgency_level, status, created_at')
+        .eq('id', requestId)
+        .maybeSingle()
+
+    if (!bloodRequest || bloodRequest.user_id !== user.id) {
+        return NextResponse.json({ error: 'Request not found' }, { status: 404 })
+    }
+    if (bloodRequest.status !== 'active') {
+        return NextResponse.json({ error: 'Request is not open' }, { status: 409 })
+    }
+    // One broadcast per request: only right after it is created.
+    if (Date.now() - new Date(bloodRequest.created_at).getTime() > 10 * 60 * 1000) {
+        return NextResponse.json({ error: 'Alerts are only sent when a request is first posted' }, { status: 409 })
+    }
+
+    const admin = serviceClient()
+    const groups = getCompatibleDonors(bloodRequest.blood_group as BloodGroup)
+    const group = formatBloodGroup(bloodRequest.blood_group)
 
     try {
-        // 1. Determine Compatible Donor Groups
-        // Who can give blood to this patient?
-        const groupsToNotify = COMPATIBLE_DONORS[bloodGroup] || [bloodGroup, 'O-'] // Fallback to Exact + Universal
-
-        // 2. Find matching donors
-        // Criteria: 
-        // - Blood Group is compatible
-        // - Location (City) matches the request (Demographic)
-        // - Is registered as a donor
-        let query = supabase
+        let query = admin
             .from('profiles')
-            .select('id, full_name, email, distance_km: id') // Placeholder for future geo-calc if needed
-            .in('blood_group', groupsToNotify)
+            .select('id, full_name, email')
+            .in('blood_group', groups)
             .eq('is_donor', true)
-
-        // Demographic Filtering: City Match (Case Insensitive)
-        if (city) {
-            query = query.ilike('city', city)
-        }
+            .eq('is_available', true)
+            .neq('id', user.id)
+        if (bloodRequest.city) query = query.ilike('city', bloodRequest.city)
 
         const { data: donors, error: donorError } = await query
-
         if (donorError) throw donorError
-
-        if (!donors || donors.length === 0) {
-
-            return NextResponse.json({ message: 'No matching donors found', count: 0 })
+        if (!donors?.length) {
+            return NextResponse.json({ matchedDonors: 0, notificationsSent: 0, emailsSent: 0 })
         }
 
-        const donorIds = donors.map(d => d.id)
-
-        // 3. Send Emails (SMTP via Zoho)
+        const requestLink = `${SITE_URL}/requests/${bloodRequest.id}`
         let emailsSent = 0
-        const SMTP_USER = process.env.SMTP_USER; // Check if configured
-
-        if (SMTP_USER) {
-            const emailPromises = donors.map(donor => {
-                if (!donor.email) return Promise.resolve()
-
-                const html = getBloodRequestEmailHtml({
-                    donorName: donor.full_name,
-                    bloodGroup,
-                    hospitalName,
-                    city,
-                    urgencyLevel,
-                    requestLink: `${process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://vitalapp.vercel.app'}/requests/${requestId}`
-                });
-
-                return sendEmail({
-                    to: donor.email,
-                    subject: `URGENT: ${bloodGroup} Blood Needed in ${city}`,
-                    html
-                })
-                    .then(() => emailsSent++)
-                    .catch(e => console.error('Email error', e))
-            })
-            // Fire emails in background
-            await Promise.allSettled(emailPromises)
+        if (process.env.SMTP_USER) {
+            await Promise.allSettled(donors.filter(d => d.email).map(donor =>
+                sendEmail({
+                    to: donor.email!,
+                    subject: `${group} blood needed${bloodRequest.city ? ` in ${bloodRequest.city}` : ''}`,
+                    html: getBloodRequestEmailHtml({
+                        donorName: donor.full_name || 'there',
+                        bloodGroup: group,
+                        hospitalName: bloodRequest.hospital_name,
+                        city: bloodRequest.city || '',
+                        urgencyLevel: bloodRequest.urgency_level,
+                        requestLink,
+                    }),
+                }).then(() => { emailsSent++ })
+            ))
         }
-
-        // 4. Fetch subscriptions for Push (Parallel track)
-        const { data: subscriptions, error: subError } = await supabase
-            .from('push_subscriptions')
-            .select('subscription, user_id')
-            .in('user_id', donorIds)
-
-        if (subError) throw subError
 
         let pushSent = 0
-        if (subscriptions && subscriptions.length > 0) {
+        const { data: subscriptions, error: subError } = await admin
+            .from('push_subscriptions')
+            .select('id, subscription')
+            .in('user_id', donors.map(d => d.id))
+        if (subError) throw subError
+
+        if (subscriptions?.length && process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
             webpush.setVapidDetails(
-                process.env.VAPID_SUBJECT || 'mailto:admin@vitalapp.com',
-                process.env.VAPID_PUBLIC_KEY!,
-                process.env.VAPID_PRIVATE_KEY!
+                process.env.VAPID_SUBJECT || 'mailto:sachin@vitalapp.in',
+                process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY,
+                process.env.VAPID_PRIVATE_KEY
             )
-
             const payload = JSON.stringify({
-                title: `URGENT: ${bloodGroup} Blood Needed Nearby!`,
-                body: `${city}: ${hospitalName} needs help. You are a match!`,
-                icon: '/icon-192x192.png',
-                url: `/requests/${requestId}` // Deep link
+                title: `${group} blood needed nearby`,
+                body: `${bloodRequest.hospital_name}${bloodRequest.city ? `, ${bloodRequest.city}` : ''} needs your blood group.`,
+                url: `/requests/${bloodRequest.id}`,
             })
-
-            const promises = subscriptions.map(sub =>
+            await Promise.allSettled(subscriptions.map(sub =>
                 webpush.sendNotification(sub.subscription as any, payload)
-                    .then(() => pushSent++)
+                    .then(() => { pushSent++ })
                     .catch(err => {
+                        // Expired subscription: remove just this one.
                         if (err.statusCode === 410 || err.statusCode === 404) {
-                            return supabase.from('push_subscriptions').delete().eq('user_id', sub.user_id)
+                            return admin.from('push_subscriptions').delete().eq('id', sub.id)
                         }
                         console.error('Push error:', err)
                     })
-            )
-            await Promise.allSettled(promises)
+            ))
         }
 
-        return NextResponse.json({
-            success: true,
-            matchedDonors: donorIds.length,
-            notificationsSent: pushSent,
-            emailsSent: emailsSent
-        })
-
+        return NextResponse.json({ matchedDonors: donors.length, notificationsSent: pushSent, emailsSent })
     } catch (error: any) {
         console.error('Error in notify/donors:', error)
-        return NextResponse.json({ error: error.message }, { status: 500 })
+        return NextResponse.json({ error: 'Could not notify donors' }, { status: 500 })
     }
 }

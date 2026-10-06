@@ -1,3 +1,5 @@
+import { SITE_URL, escapeHtml } from './site';
+
 export const getBloodRequestEmailHtml = ({
     donorName,
     bloodGroup,
@@ -42,10 +44,10 @@ export const getBloodRequestEmailHtml = ({
                                 <span style="color: #e11d48; font-weight: 700; font-size: 14px; text-transform: uppercase; letter-spacing: 1px;">Urgent Request</span>
                             </div>
                             <h2 style="color: #1f2937; margin: 0 0 16px 0; font-size: 24px; font-weight: 700;">
-                                ${bloodGroup} Blood Needed
+                                ${escapeHtml(bloodGroup)} Blood Needed
                             </h2>
                             <p style="color: #4b5563; font-size: 16px; line-height: 24px; margin: 0;">
-                                Hi <strong>${donorName}</strong>, a patient nearby urgently needs your help. You are a registered donor and a medical match.
+                                Hi <strong>${escapeHtml(donorName)}</strong>, a patient nearby urgently needs your help. You are a registered donor and a medical match.
                             </p>
                         </td>
                     </tr>
@@ -60,19 +62,19 @@ export const getBloodRequestEmailHtml = ({
                                             <tr>
                                                 <td style="padding-bottom: 16px;">
                                                     <p style="margin: 0; color: #6b7280; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; font-weight: 600;">Hospital</p>
-                                                    <p style="margin: 4px 0 0 0; color: #1f2937; font-size: 16px; font-weight: 500;">${hospitalName}</p>
+                                                    <p style="margin: 4px 0 0 0; color: #1f2937; font-size: 16px; font-weight: 500;">${escapeHtml(hospitalName)}</p>
                                                 </td>
                                             </tr>
                                             <tr>
                                                 <td style="padding-bottom: 16px;">
                                                     <p style="margin: 0; color: #6b7280; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; font-weight: 600;">Location</p>
-                                                    <p style="margin: 4px 0 0 0; color: #1f2937; font-size: 16px; font-weight: 500;">${city}</p>
+                                                    <p style="margin: 4px 0 0 0; color: #1f2937; font-size: 16px; font-weight: 500;">${escapeHtml(city)}</p>
                                                 </td>
                                             </tr>
                                             <tr>
                                                 <td>
                                                     <p style="margin: 0; color: #6b7280; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; font-weight: 600;">Urgency Level</p>
-                                                    <p style="margin: 4px 0 0 0; color: #e11d48; font-size: 16px; font-weight: 700;">${urgencyLevel}</p>
+                                                    <p style="margin: 4px 0 0 0; color: #e11d48; font-size: 16px; font-weight: 700;">${escapeHtml(urgencyLevel)}</p>
                                                 </td>
                                             </tr>
                                         </table>
@@ -85,11 +87,11 @@ export const getBloodRequestEmailHtml = ({
                     <!-- CTA -->
                     <tr>
                         <td style="padding: 40px 32px; text-align: center;">
-                            <a href="${requestLink}" style="background-color: #e11d48; color: #ffffff; display: inline-block; padding: 16px 32px; border-radius: 50px; text-decoration: none; font-weight: 600; font-size: 16px; box-shadow: 0 4px 6px rgba(225, 29, 72, 0.25);">
+                            <a href="${escapeHtml(requestLink)}" style="background-color: #e11d48; color: #ffffff; display: inline-block; padding: 16px 32px; border-radius: 50px; text-decoration: none; font-weight: 600; font-size: 16px; box-shadow: 0 4px 6px rgba(225, 29, 72, 0.25);">
                                 View Request Details
                             </a>
                             <p style="margin-top: 24px; color: #9ca3af; font-size: 14px;">
-                                <a href="${requestLink}" style="color: #6b7280; text-decoration: underline;">Open in App</a>
+                                <a href="${escapeHtml(requestLink)}" style="color: #6b7280; text-decoration: underline;">Open in App</a>
                             </p>
                         </td>
                     </tr>
@@ -142,7 +144,7 @@ export const getWelcomeEmailHtml = ({ name }: { name: string }) => {
                                 Welcome to the Community!
                             </h2>
                             <p style="color: #4b5563; font-size: 16px; line-height: 24px; margin: 0;">
-                                Hi <strong>${name}</strong>,<br><br>
+                                Hi <strong>${escapeHtml(name)}</strong>,<br><br>
                                 Thank you for joining VitalApp. Your decision to be part of this community could save a life.
                             </p>
                             <div style="background-color: #f3f4f6; margin: 32px 0; padding: 24px; border-radius: 12px; text-align: left;">
@@ -153,7 +155,7 @@ export const getWelcomeEmailHtml = ({ name }: { name: string }) => {
                                     <li>Share the app with friends to grow our network.</li>
                                 </ul>
                             </div>
-                            <a href="${process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://vitalapp.vercel.app'}" style="background-color: #e11d48; color: #ffffff; display: inline-block; padding: 16px 32px; border-radius: 50px; text-decoration: none; font-weight: 600; font-size: 16px;">
+                            <a href="${SITE_URL}/dashboard" style="background-color: #e11d48; color: #ffffff; display: inline-block; padding: 16px 32px; border-radius: 50px; text-decoration: none; font-weight: 600; font-size: 16px;">
                                 Go to Dashboard
                             </a>
                         </td>
@@ -191,7 +193,7 @@ export const getResetPasswordEmailHtml = ({ resetLink }: { resetLink: string }) 
                             <p style="color: #4b5563; font-size: 16px; line-height: 24px; margin-bottom: 32px;">
                                 We received a request to reset your password. Click the button below to create a new one.
                             </p>
-                            <a href="${resetLink}" style="background-color: #e11d48; color: #ffffff; display: inline-block; padding: 16px 32px; border-radius: 50px; text-decoration: none; font-weight: 600;">
+                            <a href="${escapeHtml(resetLink)}" style="background-color: #e11d48; color: #ffffff; display: inline-block; padding: 16px 32px; border-radius: 50px; text-decoration: none; font-weight: 600;">
                                 Reset Password
                             </a>
                             <p style="margin-top: 32px; color: #9ca3af; font-size: 14px;">

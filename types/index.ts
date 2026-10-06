@@ -28,6 +28,7 @@ export interface User {
     address: string;
   };
   role?: 'user' | 'admin' | string;
+  /** Loaded from donor_secrets for the signed-in user only; never cached. */
   donor_pin?: string;
   donor_number?: number;
   created_at: string;
@@ -43,7 +44,8 @@ export interface BloodRequest {
   urgency_level: UrgencyLevel;
   notes?: string;
   contact_name: string;
-  contact_phone: string;
+  /** No longer stored on the request row; read it via the get_request_contact RPC. */
+  contact_phone?: string | null;
   location: {
     latitude: number;
     longitude: number;

@@ -29,3 +29,15 @@ export function isBloodCompatible(donorGroup: BloodGroup, recipientGroup: BloodG
 export function getCompatibleDonors(recipientGroup: BloodGroup): BloodGroup[] {
     return COMPATIBILITY_CHART[recipientGroup] || [];
 }
+
+export const BLOOD_GROUPS: BloodGroup[] = ['O-', 'O+', 'A-', 'A+', 'B-', 'B+', 'AB-', 'AB+'];
+
+/** Returns every recipient group this donor can give red cells to. */
+export function getCompatibleRecipients(donorGroup: BloodGroup): BloodGroup[] {
+    return BLOOD_GROUPS.filter(recipient => isBloodCompatible(donorGroup, recipient));
+}
+
+/** Typeset a group with a true minus sign (O− rather than O-). */
+export function formatBloodGroup(group?: string | null): string {
+    return group ? group.replace('-', '−') : '—';
+}
