@@ -21,7 +21,64 @@ import { EmptyState } from '@/components/EmptyState';
 import { logActivity } from '@/lib/logger';
 
 interface RequestWithDonations extends BloodRequest {
-    donations: (Donation & { profiles: { full_name: string; phone: string | null } | null, units_donated: number })[];
+    donations: (Donation & { profiles: { full_name: string; phone: string | null } | null, units_donated: number | null })[];
+}
+
+type Tab = 'active' | 'past';
+
+// The tab lives in the URL (?tab=past), not only in component state.
+// ProtectedRoute swaps this page for a loader whenever the auth profile
+// refetches (Supabase fires SIGNED_IN on every hidden -> visible tab switch),
+// which unmounts the page; plain useState would snap back to 'active'.
+const readTabFromUrl = (): Tab => {
+    if (typeof window === 'undefined') return 'active';
+    try {
+        return new URLSearchParams(window.location.search).get('tab') === 'past' ? 'past' : 'active';
+    } catch {
+        return 'active';
+    }
+};
+
+const writeTabToUrl = (tab: Tab) => {
+    try {
+        const url = new URL(window.location.href);
+        if (tab === 'past') url.searchParams.set('tab', 'past');
+        else url.searchParams.delete('tab');
+        window.history.replaceState(window.history.state, '', url);
+    } catch { /* ignore */ }
+};
+
+// Never let one malformed date take the whole list down.
+const formatDay = (value: string | null | undefined, parse: (v: string) => Date = (v) => new Date(v)) => {
+    if (!value) return null;
+    try {
+        const date = parse(value);
+        return Number.isNaN(date.getTime()) ? null : format(date, 'd MMM');
+    } catch {
+        return null;
+    }
+};
+
+// Per-card boundary: a render error in one request card shows a fallback for
+// that card only, instead of unmounting the page (and freezing the tabs).
+class RequestCardBoundary extends React.Component<{ children: React.ReactNode }, { failed: boolean }> {
+    state = { failed: false };
+    static getDerivedStateFromError() {
+        return { failed: true };
+    }
+    componentDidCatch(error: unknown) {
+        console.error('Error rendering request card', error);
+    }
+    render() {
+        if (this.state.failed) {
+            return (
+                <div className="rounded-lg border border-gray-200 bg-white p-5 text-sm text-gray-500">
+                    This request couldn’t be displayed. Please refresh the page.
+                </div>
+            );
+        }
+        return this.props.children;
+    }
 }
 
 export function MyRequestsContent() {
@@ -29,14 +86,19 @@ export function MyRequestsContent() {
     const [requests, setRequests] = useState<RequestWithDonations[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState('');
-    const [activeTab, setActiveTab] = useState<'active' | 'past'>('active');
+    const [activeTab, setActiveTabState] = useState<Tab>(readTabFromUrl);
+    const setActiveTab = (tab: Tab) => {
+        setActiveTabState(tab);
+        writeTabToUrl(tab);
+    };
 
     // New state for delete operation
     const [requestToDelete, setRequestToDelete] = useState<string | null>(null);
 
     const filteredRequests = requests.filter(req => {
         if (activeTab === 'active') return req.status === 'active';
-        return req.status === 'fulfilled' || req.status === 'cancelled';
+        // Same rule as the tab count: anything that is no longer open.
+        return req.status !== 'active';
     });
 
     // Verification State
@@ -46,9 +108,11 @@ export function MyRequestsContent() {
     const [verifying, setVerifying] = useState(false);
     const [verifyError, setVerifyError] = useState('');
 
+    // Keyed on the id: a profile refetch gives a new `user` object but the
+    // same person, and must not reload the list.
     useEffect(() => {
         loadRequests();
-    }, [user]);
+    }, [user?.id]);
 
     const loadRequests = async () => {
         if (!user) return;
@@ -74,7 +138,8 @@ export function MyRequestsContent() {
             );
             setRequests((data || []).map((r: any) => ({
                 ...r,
-                donations: (r.donations || []).map((d: any) => ({ ...d, profiles: byDonation.get(d.id) ?? null })),
+                units_needed: Number(r.units_needed) || 0,
+                donations: (Array.isArray(r.donations) ? r.donations : []).map((d: any) => ({ ...d, profiles: byDonation.get(d.id) ?? null })),
             })));
         } catch (err: any) {
             console.error('Error fetching requests', err);
@@ -196,6 +261,7 @@ export function MyRequestsContent() {
                 {(['active', 'past'] as const).map(tab => (
                     <button
                         key={tab}
+                        type="button"
                         role="tab"
                         aria-selected={activeTab === tab}
                         onClick={() => setActiveTab(tab)}
@@ -224,18 +290,23 @@ export function MyRequestsContent() {
             ) : (
                 <div className="space-y-4">
                     {filteredRequests.map((request) => {
-                        const collected = request.donations
+                        const donations = request.donations ?? [];
+                        const collected = donations
                             .filter(d => d.status === 'completed')
-                            .reduce((sum, d) => sum + (d.units_donated ?? 0), 0);
+                            .reduce((sum, d) => sum + (Number(d.units_donated) || 0), 0);
                         const isActive = request.status === 'active';
                         // Same semantics as verify_donation(): NULL units count as 0.
                         const remaining = Math.max(0, request.units_needed - collected);
                         const overCollected = collected > request.units_needed;
                         const progress = Math.min(100, Math.max(0, (collected / Math.max(1, request.units_needed)) * 100));
-                        const offers = request.donations.filter(d => d.status !== 'cancelled');
+                        const offers = donations.filter(d => d.status !== 'cancelled');
+                        const postedOn = formatDay(request.created_at);
+                        const neededBy = formatDay(request.date_needed, parseISO);
+                        const fulfilledOn = request.status === 'fulfilled' ? formatDay(request.updated_at) : null;
 
                         return (
-                            <article key={request.id} className="overflow-hidden rounded-lg border border-gray-200 bg-white">
+                            <RequestCardBoundary key={request.id}>
+                            <article className="overflow-hidden rounded-lg border border-gray-200 bg-white">
                                 <div className="flex items-start gap-4 p-5">
                                     <div className={cn(
                                         'flex h-14 w-14 shrink-0 items-center justify-center rounded-md font-serif text-3xl tracking-tight',
@@ -253,9 +324,9 @@ export function MyRequestsContent() {
                                             </Badge>
                                         </div>
                                         <p className="mt-0.5 text-sm text-gray-500">
-                                            Posted {format(new Date(request.created_at), 'd MMM')}
-                                            {request.date_needed && ` · Needed by ${format(parseISO(request.date_needed), 'd MMM')}`}
-                                            {request.status === 'fulfilled' && ` · Fulfilled ${format(new Date(request.updated_at), 'd MMM')}`}
+                                            {postedOn ? `Posted ${postedOn}` : 'Posted'}
+                                            {neededBy && ` · Needed by ${neededBy}`}
+                                            {fulfilledOn && ` · Fulfilled ${fulfilledOn}`}
                                         </p>
 
                                         <div className="mt-4 max-w-xs">
@@ -332,6 +403,7 @@ export function MyRequestsContent() {
                                     )}
                                 </div>
                             </article>
+                            </RequestCardBoundary>
                         );
                     })}
                 </div>

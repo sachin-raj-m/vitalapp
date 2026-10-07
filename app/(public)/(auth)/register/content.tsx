@@ -149,7 +149,7 @@ export default function RegisterPage() {
                         checked={agreed}
                         onChange={(e) => { setAgreed(e.target.checked); if (e.target.checked) setFieldErrors(({ consent: _c, ...rest }) => rest); }}
                         aria-invalid={!!fieldErrors.consent}
-                        aria-describedby={fieldErrors.consent ? 'consent-error' : undefined}
+                        aria-describedby={fieldErrors.consent ? 'consent-error' : !agreed ? 'consent-hint' : undefined}
                         className="mt-1 h-4 w-4 shrink-0 rounded-[4px] border-gray-400 accent-gray-900"
                     />
                     <span className="text-sm leading-relaxed text-gray-600">
@@ -157,10 +157,15 @@ export default function RegisterPage() {
                         {' '}<Link href="/privacy" target="_blank" className={authLinkClass}>Privacy notice</Link>.
                     </span>
                 </label>
-                {fieldErrors.consent && <p id="consent-error" className="ml-7 mt-1.5 text-[13px] text-red-700">{fieldErrors.consent}</p>}
+                {fieldErrors.consent
+                    ? <p id="consent-error" className="ml-7 mt-1.5 text-[13px] text-red-700">{fieldErrors.consent}</p>
+                    : !agreed && <p id="consent-hint" className="ml-7 mt-1.5 text-[13px] text-gray-500">Tick the box to continue. The buttons below stay off until you do.</p>}
             </div>
 
-            <GoogleButton onClick={handleGoogleSignUp} isLoading={isGoogleLoading} />
+            {/* A disabled fieldset disables the Google button until consent is ticked. */}
+            <fieldset disabled={!agreed} aria-describedby={!agreed ? 'consent-hint' : undefined} className="m-0 min-w-0 border-0 p-0">
+                <GoogleButton onClick={handleGoogleSignUp} isLoading={isGoogleLoading} />
+            </fieldset>
             <OrDivider />
 
             <form onSubmit={handleSubmit} className="space-y-4" noValidate>
@@ -185,7 +190,15 @@ export default function RegisterPage() {
                     helperText="At least 8 characters."
                     error={fieldErrors.password}
                 />
-                <Button type="submit" variant="primary" size="lg" className="w-full !mt-6" isLoading={isLoading}>
+                <Button
+                    type="submit"
+                    variant="primary"
+                    size="lg"
+                    className="w-full !mt-6"
+                    isLoading={isLoading}
+                    disabled={!agreed}
+                    aria-describedby={!agreed ? 'consent-hint' : undefined}
+                >
                     Create account
                 </Button>
             </form>
