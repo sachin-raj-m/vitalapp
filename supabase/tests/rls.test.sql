@@ -331,10 +331,14 @@ SELECT tests.allowed($q$INSERT INTO public.profiles (id, email, full_name, phone
   ON CONFLICT (id) DO UPDATE SET full_name = EXCLUDED.full_name, phone = EXCLUDED.phone,
     is_donor = EXCLUDED.is_donor, is_available = EXCLUDED.is_available, role = EXCLUDED.role$q$, 1,
   'guest: upserts own profile as non-donor');
-INSERT INTO public.profiles (id, email, full_name, phone, is_donor, is_available, role)
-VALUES (auth.uid(), 'guest@example.com', 'Gita Guest', '0000000005', false, false, 'admin')
+-- As the form does it: the consent ticked in the verify step is stamped on the profile.
+INSERT INTO public.profiles (id, email, full_name, phone, is_donor, is_available, role,
+  consent_agreed, consent_at, consent_version)
+VALUES (auth.uid(), 'guest@example.com', 'Gita Guest', '0000000005', false, false, 'admin',
+  true, now(), '2026-10-06')
 ON CONFLICT (id) DO UPDATE SET full_name = EXCLUDED.full_name, phone = EXCLUDED.phone,
-  is_donor = EXCLUDED.is_donor, is_available = EXCLUDED.is_available, role = EXCLUDED.role;
+  is_donor = EXCLUDED.is_donor, is_available = EXCLUDED.is_available, role = EXCLUDED.role,
+  consent_agreed = EXCLUDED.consent_agreed, consent_at = EXCLUDED.consent_at, consent_version = EXCLUDED.consent_version;
 SELECT tests.is(tests.val($q$SELECT role FROM public.profiles WHERE id = auth.uid()$q$), 'user',
   'trigger: upsert cannot smuggle role = admin');
 
@@ -452,5 +456,96 @@ SELECT tests.is(tests.val($q$SELECT count(*)::text FROM information_schema.colum
   'catalog: blood_requests.contact_phone is gone');
 SELECT tests.is(tests.val($q$SELECT count(*)::text FROM public.profiles WHERE donor_pin IS NOT NULL$q$), '0',
   'catalog: no PINs left in profiles.donor_pin');
+
+-- =========================================================================
+-- 9. Consent enforcement (20261008000400)
+-- =========================================================================
+SELECT tests.login('postgres');
+INSERT INTO tests.users (name, id) VALUES
+  ('fresh',  '77777777-7777-4777-8777-777777777777'),
+  ('legacy', '88888888-8888-4888-8888-888888888888');
+INSERT INTO auth.users (id, email, raw_user_meta_data) VALUES
+  ('77777777-7777-4777-8777-777777777777', 'fresh@example.com',  '{"full_name":"Finn Fresh"}'),
+  ('88888888-8888-4888-8888-888888888888', 'legacy@example.com', '{"full_name":"Lee Legacy"}');
+-- A donor from before consent was recorded (bypass the trigger to recreate legacy data).
+ALTER TABLE public.profiles DISABLE TRIGGER enforce_donor_consent;
+UPDATE public.profiles SET is_donor = true, is_available = true, blood_group = 'AB+'
+WHERE id = '88888888-8888-4888-8888-888888888888';
+ALTER TABLE public.profiles ENABLE TRIGGER enforce_donor_consent;
+
+-- Becoming a donor
+SELECT tests.login('fresh');
+SELECT tests.throws($q$UPDATE public.profiles SET is_donor = true WHERE id = auth.uid()$q$,
+  '23514.*donor', 'consent: cannot become a donor without consent');
+SELECT tests.throws($q$UPDATE public.profiles SET is_donor = true, consent_agreed = false, consent_at = now(), consent_version = '2026-10-06' WHERE id = auth.uid()$q$,
+  '23514', 'consent: consent_agreed = false does not count');
+SELECT tests.throws($q$UPDATE public.profiles SET is_donor = true, consent_agreed = true, consent_at = now(), consent_version = '' WHERE id = auth.uid()$q$,
+  '23514', 'consent: blank consent_version does not count');
+SELECT tests.throws($q$INSERT INTO public.profiles (id, email, is_donor) VALUES (auth.uid(), 'fresh@example.com', true)
+  ON CONFLICT (id) DO UPDATE SET is_donor = EXCLUDED.is_donor$q$,
+  '23514', 'consent: upsert as donor without consent is rejected');
+SELECT tests.allowed($q$UPDATE public.profiles SET is_donor = true, consent_agreed = true, consent_at = now(), consent_version = '2026-10-06' WHERE id = auth.uid()$q$, 1,
+  'consent: can become a donor with consent in the same write');
+
+-- Posting a request
+SELECT tests.throws($q$INSERT INTO public.blood_requests (user_id, blood_group, units_needed, hospital_name, hospital_address, urgency_level, contact_name, location)
+  VALUES (auth.uid(), 'A+', 1, 'x', 'x', 'Low', 'x', '{}')$q$,
+  '23514.*request', 'consent: cannot post a request without consent');
+SELECT tests.login('service');
+SELECT tests.throws($q$INSERT INTO public.blood_requests (user_id, blood_group, units_needed, hospital_name, hospital_address, urgency_level, contact_name, location)
+  VALUES ('77777777-7777-4777-8777-777777777777', 'A+', 1, 'x', 'x', 'Low', 'x', '{}')$q$,
+  '23514', 'consent: service role cannot post for an un-consented user either');
+SELECT tests.login('fresh');
+UPDATE public.profiles SET consent_agreed = true, consent_at = now(), consent_version = '2026-10-06' WHERE id = auth.uid();
+SELECT tests.allowed($q$INSERT INTO public.blood_requests (user_id, blood_group, units_needed, hospital_name, hospital_address, urgency_level, contact_name, location)
+  VALUES (auth.uid(), 'A+', 1, 'x', 'x', 'Low', 'x', '{}')$q$, 1,
+  'consent: can post a request once consent is recorded');
+
+-- Existing donors
+SELECT tests.login('legacy');
+SELECT tests.allowed($q$UPDATE public.profiles SET full_name = 'Lee L', is_available = false WHERE id = auth.uid()$q$, 1,
+  'consent: legacy donor without consent can still edit their profile');
+SELECT tests.is(tests.val($q$SELECT is_donor::text FROM public.profiles WHERE id = auth.uid()$q$), 'true',
+  'consent: legacy donor row is untouched');
+SELECT tests.allowed($q$UPDATE public.profiles SET is_donor = true, consent_agreed = true, consent_at = now(), consent_version = '2026-10-06' WHERE id = auth.uid()$q$, 1,
+  'consent: legacy donor can re-consent');
+SELECT tests.login('donor');
+SELECT tests.throws($q$UPDATE public.profiles SET consent_at = NULL WHERE id = auth.uid()$q$,
+  '23514', 'consent: a consented donor cannot clear their consent while staying a donor');
+SELECT tests.allowed($q$UPDATE public.profiles SET is_donor = false, consent_at = NULL WHERE id = auth.uid()$q$, 1,
+  'consent: a donor can step down');
+SELECT tests.login('admin');
+SELECT tests.throws($q$UPDATE public.profiles SET is_donor = true WHERE id = '44444444-4444-4444-8444-444444444444'$q$,
+  '23514', 'consent: admin cannot mark an un-consented user as a donor');
+
+-- Auth hook: Before User Created
+SELECT tests.login('postgres');
+SELECT tests.is(tests.val($q$SELECT public.hook_before_user_created(
+  '{"user": {"email": "a@example.com", "app_metadata": {"provider": "email"}, "user_metadata": {"registration_completed": false}}}')->'error'->>'http_code'$q$),
+  '400', 'hook: rejects email sign-up without consent');
+SELECT tests.is(tests.val($q$SELECT public.hook_before_user_created(
+  '{"user": {"email": "a@example.com", "app_metadata": {"provider": "email"}, "user_metadata": null}}') ? 'error'$q$),
+  'true', 'hook: rejects email sign-up with null metadata');
+SELECT tests.is(tests.val($q$SELECT public.hook_before_user_created(
+  '{"user": {"email": "a@example.com", "app_metadata": {"provider": "email"}, "user_metadata": {"consent_agreed": false, "consent_version": "2026-10-06"}}}') ? 'error'$q$),
+  'true', 'hook: rejects consent_agreed = false');
+SELECT tests.is(tests.val($q$SELECT public.hook_before_user_created(
+  '{"user": {"email": "a@example.com", "app_metadata": {"provider": "email"}, "user_metadata": {"consent_agreed": true, "consent_at": "2026-10-07T00:00:00Z", "consent_version": "2026-10-06"}}}')::text$q$),
+  '{}', 'hook: allows consented email sign-up');
+SELECT tests.is(tests.val($q$SELECT public.hook_before_user_created(
+  '{"user": {"email": "a@example.com", "raw_app_meta_data": {"provider": "email"}, "raw_user_meta_data": {"consent_agreed": "true", "consent_version": "2026-10-06"}}}')::text$q$),
+  '{}', 'hook: also reads raw_*_meta_data');
+SELECT tests.is(tests.val($q$SELECT public.hook_before_user_created(
+  '{"user": {"email": "g@example.com", "app_metadata": {"provider": "google", "providers": ["google"]}, "user_metadata": {"full_name": "G"}}}')::text$q$),
+  '{}', 'hook: allows Google sign-up (consent taken in complete-registration)');
+SELECT tests.is(tests.val($q$SELECT public.hook_before_user_created(
+  '{"user": {"email": "g@example.com", "identities": [{"provider": "google"}], "user_metadata": {}}}')::text$q$),
+  '{}', 'hook: falls back to the identity provider');
+SELECT tests.is(tests.val($q$SELECT public.hook_before_user_created('{"user": {"email": "x@example.com"}}') ? 'error'$q$),
+  'true', 'hook: unknown provider is treated as email (strict)');
+SELECT tests.is(tests.val($q$SELECT has_function_privilege('anon', 'public.hook_before_user_created(jsonb)', 'EXECUTE')
+  OR has_function_privilege('authenticated', 'public.hook_before_user_created(jsonb)', 'EXECUTE')
+  OR has_function_privilege('service_role', 'public.hook_before_user_created(jsonb)', 'EXECUTE')$q$),
+  'false', 'hook: not executable by anon / authenticated / service_role');
 
 \o

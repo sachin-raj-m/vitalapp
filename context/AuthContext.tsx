@@ -316,10 +316,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               }));
             }
 
-            // Wait a moment before fetching profile to avoid race conditions
+            // Wait a moment before fetching profile to avoid race conditions.
+            // Silent: Supabase also fires SIGNED_IN when the tab regains focus,
+            // and a non-silent fetch would flip `loading` and remount pages.
             setTimeout(async () => {
               try {
-                await fetchUserProfile(session.user.id);
+                await fetchUserProfile(session.user.id, { silent: true });
               } catch (err) {
                 console.error('Error fetching profile after sign in:', err);
                 setState(prev => ({ ...prev, loading: false }));

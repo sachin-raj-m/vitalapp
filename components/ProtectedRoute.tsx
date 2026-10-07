@@ -30,7 +30,10 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
     }
   }, [user, session, loading, retryCount, router, pathname]);
 
-  if (loading) {
+  // Only block the page while there's no user yet. Background profile refreshes
+  // (e.g. Supabase re-announcing SIGNED_IN when the tab regains focus) must not
+  // unmount the page, or its local state (tabs, forms, open dialogs) is lost.
+  if (loading && !user) {
     return (
       <PageLoader />
     );

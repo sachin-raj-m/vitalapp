@@ -9,6 +9,9 @@
 --   admin      Ada Admin        role = admin
 --   guest      (no name yet)    fresh email-code account: auth trigger made a bare profile
 --
+-- requester, donor and unrelated have consent recorded (required to be a donor
+-- or post a request since 20261008000400); admin and guest have none.
+--
 -- Requests
 --   R1  requester  A+  2 units  active     contact 0000000101
 --   R2  requester  O-  1 unit   fulfilled  contact 0000000102
@@ -38,16 +41,19 @@ INSERT INTO auth.users (id, email, raw_user_meta_data) VALUES
 
 -- Fill in profiles as the superuser (auth.uid() is NULL, so the privileged
 -- column trigger lets role / donor_number through).
-UPDATE public.profiles SET phone = '0000000001', blood_group = 'A+', is_donor = false, is_available = false,
+UPDATE public.profiles SET consent_agreed = true, consent_at = '2026-10-06T00:00:00Z', consent_version = '2026-10-06',
+  phone = '0000000001', blood_group = 'A+', is_donor = false, is_available = false,
   city = 'Testville', government_id = 'FAKE-GOV-1'
 WHERE id = '11111111-1111-4111-8111-111111111111';
 
-UPDATE public.profiles SET phone = '0000000002', blood_group = 'O-', is_donor = true, is_available = true,
+UPDATE public.profiles SET consent_agreed = true, consent_at = '2026-10-06T00:00:00Z', consent_version = '2026-10-06',
+  phone = '0000000002', blood_group = 'O-', is_donor = true, is_available = true,
   is_public_profile = false, donor_number = 9002, city = 'Testville', present_zip = '999002',
   location = '{"latitude": 9.981234, "longitude": 76.281234}', government_id = 'FAKE-GOV-2', dob = '1990-01-01'
 WHERE id = '22222222-2222-4222-8222-222222222222';
 
-UPDATE public.profiles SET phone = '0000000003', blood_group = 'B+', is_donor = true, is_available = true,
+UPDATE public.profiles SET consent_agreed = true, consent_at = '2026-10-06T00:00:00Z', consent_version = '2026-10-06',
+  phone = '0000000003', blood_group = 'B+', is_donor = true, is_available = true,
   is_public_profile = true, donor_number = 9003, city = 'Testville', present_zip = '999003',
   location = '{"latitude": 9.971234, "longitude": 76.291234}', government_id = 'FAKE-GOV-3'
 WHERE id = '33333333-3333-4333-8333-333333333333';

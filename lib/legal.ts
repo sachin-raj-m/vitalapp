@@ -21,6 +21,16 @@ export const consentStamp = () => ({
     consent_version: PRIVACY_VERSION,
 });
 
+export type ConsentFields = { consent_agreed?: boolean | null; consent_at?: string | null; consent_version?: string | null };
+
+/**
+ * Mirrors public.consent_is_recorded() in the database: consent counts once it
+ * is agreed, timestamped and versioned. The database requires it before a
+ * profile becomes a donor or posts a request.
+ */
+export const hasRecordedConsent = (c: ConsentFields | null | undefined) =>
+    !!(c?.consent_agreed && c.consent_at && c.consent_version?.trim());
+
 /**
  * Keep the earliest consent timestamp for the current policy version, so a
  * later form save doesn't overwrite when the person first agreed. A consent

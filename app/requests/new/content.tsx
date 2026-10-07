@@ -15,7 +15,7 @@ import type { BloodGroup, UrgencyLevel } from '@/types';
 import dynamic from 'next/dynamic';
 import { logActivity } from '@/lib/logger';
 import { toast } from 'sonner';
-import { consentStamp, earliestConsentAt } from '@/lib/legal';
+import { consentStamp, earliestConsentAt, hasRecordedConsent, type ConsentFields } from '@/lib/legal';
 
 const Map = dynamic(() => import('@/components/Map'), {
     ssr: false,
@@ -68,6 +68,20 @@ export default function CreateRequestPage() {
     const [guestConsent, setGuestConsent] = useState(false);
     const userId = user?.id ?? verifiedUserId;
 
+    // Posting needs consent recorded on the profile (enforced in the database).
+    // Signed-in people who never gave it (older accounts, or Google sign-ins that
+    // skipped registration) tick a box here instead.
+    const [profileConsent, setProfileConsent] = useState<ConsentFields | null | undefined>(undefined);
+    const [signedInConsent, setSignedInConsent] = useState(false);
+    useEffect(() => {
+        if (!user) return;
+        let cancelled = false;
+        supabase.from('profiles').select('consent_agreed, consent_at, consent_version').eq('id', user.id).maybeSingle()
+            .then(({ data }) => { if (!cancelled) setProfileConsent(data ?? null); });
+        return () => { cancelled = true; };
+    }, [user]);
+    const needsSignedInConsent = !!user && profileConsent !== undefined && !hasRecordedConsent(profileConsent);
+
     const sendCode = async () => {
         setError('');
         if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(verifyEmail)) {
@@ -81,7 +95,13 @@ export default function CreateRequestPage() {
         setVerifyBusy(true);
         const { error: otpError } = await supabase.auth.signInWithOtp({
             email: verifyEmail,
-            options: { shouldCreateUser: true, emailRedirectTo: `${window.location.origin}/requests/new` },
+            options: {
+                shouldCreateUser: true,
+                emailRedirectTo: `${window.location.origin}/requests/new`,
+                // Recorded in auth.users when the code creates a new account
+                // (the sign-up hook rejects email sign-ups without it).
+                data: consentStamp(),
+            },
         });
         setVerifyBusy(false);
         if (otpError) {
@@ -120,6 +140,10 @@ export default function CreateRequestPage() {
             setError('Verify your email below before posting.');
             return;
         }
+        if (needsSignedInConsent && !signedInConsent) {
+            setError('Tick the box to agree to the Terms and Privacy notice before posting.');
+            return;
+        }
         if (!hasLocation) {
             setError('Mark the hospital on the map, or use your location, so nearby donors can find it.');
             window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -132,8 +156,19 @@ export default function CreateRequestPage() {
         try {
             // First-time requesters need a profile row (requests reference it).
             // They're marked as non-donors until they choose to register as one.
+            if (user && needsSignedInConsent) {
+                const { error: consentError } = await supabase.from('profiles').update(consentStamp()).eq('id', userId);
+                if (consentError) throw consentError;
+                setProfileConsent(consentStamp());
+            }
             if (!user) {
-                const { data: existing } = await supabase.from('profiles').select('id, blood_group, consent_at, consent_version').eq('id', userId).maybeSingle();
+                const { data: existing } = await supabase.from('profiles').select('id, blood_group, consent_agreed, consent_at, consent_version').eq('id', userId).maybeSingle();
+                if (existing?.blood_group && !hasRecordedConsent(existing)) {
+                    // A registered account that signed in with a code: record the
+                    // consent ticked in the verify step.
+                    const { error: consentError } = await supabase.from('profiles').update(consentStamp()).eq('id', userId);
+                    if (consentError) throw consentError;
+                }
                 if (!existing?.blood_group) {
                     // Consent was given explicitly in the verify step; keep an earlier
                     // consent to the same Privacy notice version if there is one.
@@ -385,6 +420,7 @@ export default function CreateRequestPage() {
                                     checked={guestConsent}
                                     onChange={(e) => setGuestConsent(e.target.checked)}
                                     disabled={codeSent}
+                                    aria-describedby={!guestConsent && !codeSent ? 'guest-consent-hint' : undefined}
                                     className="mt-1 h-4 w-4 shrink-0 rounded-[4px] border-gray-400 accent-gray-900"
                                 />
                                 <span className="text-sm leading-relaxed text-gray-600">
@@ -395,11 +431,16 @@ export default function CreateRequestPage() {
                                     . My name and contact phone are stored with this request and shown to donors who offer.
                                 </span>
                             </label>
+                            {!guestConsent && !codeSent && (
+                                <p id="guest-consent-hint" className="ml-7 text-[13px] text-gray-500">Tick the box to get a code.</p>
+                            )}
                             <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
                                 <div className="flex-1">
                                     <Input label="Your email" type="email" autoComplete="email" value={verifyEmail} onChange={(e) => setVerifyEmail(e.target.value)} disabled={codeSent} />
                                 </div>
-                                <Button type="button" variant="secondary" onClick={codeSent ? () => { setCodeSent(false); setCode(''); } : sendCode} isLoading={verifyBusy && !codeSent}>
+                                <Button type="button" variant="secondary" onClick={codeSent ? () => { setCodeSent(false); setCode(''); } : sendCode} isLoading={verifyBusy && !codeSent}
+                                    disabled={!codeSent && !guestConsent}
+                                    aria-describedby={!codeSent && !guestConsent ? 'guest-consent-hint' : undefined}>
                                     {codeSent ? 'Change email' : 'Send code'}
                                 </Button>
                             </div>
@@ -432,6 +473,26 @@ export default function CreateRequestPage() {
                     <Link href="/terms" className="text-gray-900 underline decoration-gray-300 underline-offset-4">Terms</Link>.
                 </p>
 
+                {needsSignedInConsent && (
+                    <label className="mt-4 flex cursor-pointer items-start gap-3">
+                        <input
+                            type="checkbox"
+                            checked={signedInConsent}
+                            onChange={(e) => setSignedInConsent(e.target.checked)}
+                            aria-describedby={!signedInConsent ? 'signed-in-consent-hint' : undefined}
+                            className="mt-1 h-4 w-4 shrink-0 rounded-[4px] border-gray-400 accent-gray-900"
+                        />
+                        <span className="text-sm leading-relaxed text-gray-600">
+                            I agree to the{' '}
+                            <Link href="/terms" target="_blank" className="text-gray-900 underline decoration-gray-300 underline-offset-4">Terms</Link>
+                            {' '}and have read the{' '}
+                            <Link href="/privacy" target="_blank" className="text-gray-900 underline decoration-gray-300 underline-offset-4">Privacy notice</Link>
+                            . My name and contact phone are stored with this request and shown to donors who offer.
+                            {!signedInConsent && <span id="signed-in-consent-hint" className="mt-1 block text-[13px] text-gray-500">Tick the box to post your request.</span>}
+                        </span>
+                    </label>
+                )}
+
                 <div className="mt-4 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
                     <Button type="button" variant="ghost" onClick={() => router.push('/requests')}>Cancel</Button>
                     <Button
@@ -439,7 +500,7 @@ export default function CreateRequestPage() {
                         variant="primary"
                         size="lg"
                         isLoading={isLoading}
-                        disabled={!formData.bloodGroup || !formData.urgencyLevel || !userId}
+                        disabled={!formData.bloodGroup || !formData.urgencyLevel || !userId || (needsSignedInConsent && !signedInConsent)}
                     >
                         Post request
                     </Button>
