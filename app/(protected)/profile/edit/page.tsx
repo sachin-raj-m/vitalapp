@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/Button';
 import { Alert } from '@/components/ui/Alert';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
+import { authedFetch } from '@/lib/api';
 import { ArrowLeft } from 'lucide-react';
 import { SecuritySettings } from '@/app/(protected)/profile/SecuritySettings';
 
@@ -46,12 +47,20 @@ export default function ProfileEditPage() {
         }
     }, [user]);
 
+    // After a save that changed the PIN code, re-derive the map position on the
+    // server. Fire-and-forget: a failure only means ranking by PIN area.
+    const refreshLocationIfPinChanged = (previousZip: string | null | undefined) => {
+        if ((previousZip || '').trim() === editForm.present_zip.trim()) return;
+        authedFetch('/api/profile/location', { method: 'POST', keepalive: true }).catch(() => {});
+    };
+
     const handleSave = async (e: React.FormEvent) => {
         e.preventDefault();
         e.stopPropagation();
         setError('');
         setSuccess('');
         setIsLoading(true);
+        const previousZip = user?.present_zip;
 
         try {
 
@@ -87,6 +96,7 @@ export default function ProfileEditPage() {
                 is_public_profile: editForm.is_public_profile
                 // phone is not updated here directly if not changed
             });
+            refreshLocationIfPinChanged(previousZip);
             setSuccess('Your changes have been saved.');
             setTimeout(() => router.push('/profile'), 1500);
         } catch (err: any) {
@@ -101,6 +111,7 @@ export default function ProfileEditPage() {
         e.stopPropagation();
         setError('');
         setIsLoading(true);
+        const previousZip = user?.present_zip;
 
         try {
             const { data, error: verifyError } = await supabase.auth.verifyOtp({
@@ -120,6 +131,7 @@ export default function ProfileEditPage() {
                 present_zip: editForm.present_zip,
                 is_public_profile: editForm.is_public_profile
             });
+            refreshLocationIfPinChanged(previousZip);
 
             setSuccess('Phone number verified.');
             setIsVerifying(false);
