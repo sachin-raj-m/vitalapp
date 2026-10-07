@@ -47,9 +47,8 @@ export default function ForgotPasswordContent() {
     if (isSuccess) {
         return (
             <AuthFrame
-                eyebrow="Check your inbox"
-                title={<>Link <em>sent.</em></>}
-                subtitle={<>If an account exists for <span className="text-gray-900">{email}</span>, a reset link is on its way. It can take a few minutes, so check spam too.</>}
+                title="Check your email"
+                subtitle={<>If there is an account for <span className="font-medium text-gray-900">{email}</span>, we have sent it a link to reset your password. It can take a few minutes to arrive, and may land in your spam folder.</>}
                 footer={<Link href="/login" className={authLinkClass}>Back to sign in</Link>}
             >
                 {null}
@@ -59,9 +58,8 @@ export default function ForgotPasswordContent() {
 
     return (
         <AuthFrame
-            eyebrow="Reset password"
-            title={<>Forgot it? <em>Happens.</em></>}
-            subtitle="Enter the email you registered with and we’ll send you a reset link."
+            title="Reset your password"
+            subtitle="Enter the email address you registered with and we will send you a link to set a new password."
             footer={<Link href="/login" className={authLinkClass}>Back to sign in</Link>}
         >
             {error && <Alert variant="error" className="mb-6">{error}</Alert>}

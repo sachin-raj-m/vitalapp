@@ -94,8 +94,8 @@ export default function LoginPage() {
 
     return (
         <AuthFrame
-            eyebrow="Sign in"
-            title={<>Welcome <em>back.</em></>}
+            title="Sign in"
+            subtitle="Use the email address you registered with, or continue with Google."
             footer={
                 <div className="flex flex-wrap justify-between gap-3">
                     <span>

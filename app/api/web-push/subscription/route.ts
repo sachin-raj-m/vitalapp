@@ -1,97 +1,38 @@
-import { createServerClient } from '@supabase/ssr'
 import { NextResponse } from 'next/server'
-import { cookies } from 'next/headers'
+import { getVerifiedUser } from '@/lib/supabase-route'
+import { rateLimit, tooManyRequests } from '@/lib/rate-limit'
 
+/** Saves the caller's push subscription (RLS: owner only). */
 export async function POST(request: Request) {
-    const subscription = await request.json()
-
-    if (!subscription) {
-        return NextResponse.json({ error: 'No subscription provided' }, { status: 400 })
-    }
-
-    const cookieStore = await cookies()
-
-    const supabase = createServerClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-        {
-            cookies: {
-                getAll() {
-                    return cookieStore.getAll()
-                },
-                setAll(cookiesToSet) {
-                    try {
-                        cookiesToSet.forEach(({ name, value, options }) =>
-                            cookieStore.set(name, value, options)
-                        )
-                    } catch {
-                        // The `setAll` method was called from a Server Component.
-                        // This can be ignored if you have middleware refreshing
-                        // user sessions.
-                    }
-                },
-            },
-        }
-    )
-
-    const { data: { user } } = await supabase.auth.getUser()
-
+    const { supabase, user } = await getVerifiedUser(request)
     if (!user) {
-        // Fallback: Try Authorization header
-        const authHeader = request.headers.get('Authorization')
-        if (authHeader) {
-            const token = authHeader.replace('Bearer ', '')
-            // Verify token validity
-            const { data: { user: headerUser }, error: headerError } = await supabase.auth.getUser(token)
-
-            if (headerUser && !headerError) {
-                // RLS Fix: Create a new client authenticated with this token
-                // The original 'supabase' client is anonymous because cookies failed.
-                const { createClient } = await import('@supabase/supabase-js')
-                const authenticatedSupabase = createClient(
-                    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-                    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-                    {
-                        global: {
-                            headers: {
-                                Authorization: `Bearer ${token}`
-                            }
-                        }
-                    }
-                )
-
-                await upsertSubscription(authenticatedSupabase, headerUser.id, subscription);
-                return NextResponse.json({ success: true })
-            }
-        }
-
-        console.error('Push Subscription 401: User not found. Cookies present:', cookieStore.getAll().map(c => c.name).join(', '));
-        return NextResponse.json({ error: 'Unauthorized', details: 'User not found' }, { status: 401 })
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    try {
-        await upsertSubscription(supabase, user.id, subscription);
-        return NextResponse.json({ success: true })
-    } catch (error: any) {
-        console.error('Error in subscription route:', error)
-        return NextResponse.json({
-            error: error.message || 'Internal Server Error',
-            details: error.details || error.hint || 'No details'
-        }, { status: 500 })
+    const subscription = await request.json().catch(() => null)
+    const endpoint = subscription?.endpoint
+    if (
+        typeof endpoint !== 'string' || !endpoint.startsWith('https://') || endpoint.length > 1000 ||
+        typeof subscription?.keys?.p256dh !== 'string' || typeof subscription?.keys?.auth !== 'string' ||
+        JSON.stringify(subscription).length > 4000
+    ) {
+        return NextResponse.json({ error: 'Invalid push subscription' }, { status: 400 })
     }
-}
 
-async function upsertSubscription(supabase: any, userId: string, subscription: any) {
+    if (!(await rateLimit(`push-sub:${user.id}`, 60 * 60, 20))) {
+        return tooManyRequests(60 * 60)
+    }
+
     const { error } = await supabase
         .from('push_subscriptions')
-        .upsert({
-            user_id: userId,
-            subscription: subscription
-        }, { onConflict: 'user_id, subscription' })
+        .upsert(
+            { user_id: user.id, subscription: { endpoint, expirationTime: subscription.expirationTime ?? null, keys: { p256dh: subscription.keys.p256dh, auth: subscription.keys.auth } } },
+            { onConflict: 'user_id, subscription' }
+        )
 
     if (error) {
-        console.error('Error saving subscription:', error) // Keep this
-        throw error // Throw the Supabase error object directly
+        console.error('Error saving push subscription:', error)
+        return NextResponse.json({ error: 'Could not save subscription' }, { status: 500 })
     }
+    return NextResponse.json({ success: true })
 }
-

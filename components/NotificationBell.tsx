@@ -104,7 +104,7 @@ export const NotificationBell = () => {
 
                     <div className="max-h-[300px] overflow-y-auto">
                         {notifications.length === 0 ? (
-                            <div className="p-8 text-center text-gray-400">
+                            <div className="p-8 text-center text-gray-500">
                                 <Bell className="h-8 w-8 mx-auto mb-2 opacity-20" />
                                 <p className="text-sm">No notifications yet</p>
                             </div>
@@ -125,7 +125,7 @@ export const NotificationBell = () => {
                                         <p className="text-xs text-gray-500 line-clamp-2 mt-0.5">
                                             {notification.message}
                                         </p>
-                                        <p className="text-[10px] text-gray-400 mt-1">
+                                        <p className="text-[10px] text-gray-500 mt-1">
                                             {formatDistanceToNow(new Date(notification.created_at), { addSuffix: true })}
                                         </p>
                                     </div>

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getWelcomeEmailHtml } from '@/lib/email-templates';
 import { sendEmail } from '@/lib/email';
 import { getVerifiedUser } from '@/lib/supabase-route';
+import { rateLimit } from '@/lib/rate-limit';
 
 /** Sends the welcome email to the signed-in user only (never an arbitrary address). */
 export async function POST(request: Request) {
@@ -12,6 +13,11 @@ export async function POST(request: Request) {
 
     // Only within the first hour of the account existing, so it can't be replayed.
     if (Date.now() - new Date(user.created_at).getTime() > 60 * 60 * 1000) {
+        return NextResponse.json({ success: true, skipped: true });
+    }
+
+    // One welcome email per account (the window above covers the rest).
+    if (!(await rateLimit(`welcome:${user.id}`, 60 * 60, 1))) {
         return NextResponse.json({ success: true, skipped: true });
     }
 

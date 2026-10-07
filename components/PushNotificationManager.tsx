@@ -116,7 +116,7 @@ export function PushNotificationManager() {
     };
 
     if (loading) {
-        return <Loader2 className="h-4 w-4 animate-spin text-gray-400" />;
+        return <Loader2 className="h-4 w-4 animate-spin text-gray-500" />;
     }
 
     if (!isSupported) {

@@ -1,7 +1,6 @@
 import React from 'react';
 
 interface AuthFrameProps {
-    eyebrow: string;
     title: React.ReactNode;
     subtitle?: React.ReactNode;
     children: React.ReactNode;
@@ -9,14 +8,13 @@ interface AuthFrameProps {
 }
 
 /** Shared layout for sign in, sign up and password reset. */
-export function AuthFrame({ eyebrow, title, subtitle, children, footer }: AuthFrameProps) {
+export function AuthFrame({ title, subtitle, children, footer }: AuthFrameProps) {
     return (
         <div className="mx-auto w-full max-w-[400px] px-5 py-14 sm:py-20 animate-fade-up">
-            <p className="eyebrow">{eyebrow}</p>
-            <h1 className="display mt-4 text-5xl leading-[1]">{title}</h1>
-            {subtitle && <p className="mt-4 leading-relaxed text-gray-600">{subtitle}</p>}
-            <div className="mt-10">{children}</div>
-            {footer && <div className="mt-10 border-t border-gray-200 pt-6 text-sm text-gray-600">{footer}</div>}
+            <h1 className="display text-4xl sm:text-[2.75rem]">{title}</h1>
+            {subtitle && <p className="mt-3 leading-relaxed text-gray-600">{subtitle}</p>}
+            {children && <div className="mt-9">{children}</div>}
+            {footer && <div className="mt-8 text-sm text-gray-600">{footer}</div>}
         </div>
     );
 }

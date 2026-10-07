@@ -1,5 +1,6 @@
 "use client";
 
+import { authedFetch } from '@/lib/api';
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -97,7 +98,7 @@ export default function RegisterPage() {
 
             // Trigger Welcome Email in background
             // Welcome email goes to the signed-in user's own address (server-side).
-            fetch('/api/notify/welcome', { method: 'POST' }).catch(() => {});
+            authedFetch('/api/notify/welcome', { method: 'POST' }).catch(() => {});
 
             // Direct onboarding: auto-login logic (handled by supabase client usually if confirm is off)
             // Redirect to completion page immediately
@@ -113,9 +114,8 @@ export default function RegisterPage() {
 
     return (
         <AuthFrame
-            eyebrow="Become a donor"
-            title={<>Join the <em className="text-red-600">network.</em></>}
-            subtitle="Create an account, then tell us your blood group and where you are. Two minutes, start to finish."
+            title="Register as a donor"
+            subtitle="First create an account. On the next screen you will add your blood group and where you live. It takes about two minutes."
             footer={<>Already registered? <Link href="/login" className={authLinkClass}>Sign in</Link></>}
         >
             {error && <Alert variant="error" className="mb-6">{error}</Alert>}
@@ -152,8 +152,9 @@ export default function RegisterPage() {
 
             <p className="mt-6 text-[13px] leading-relaxed text-gray-500">
                 By creating an account you agree to the <Link href="/terms" className={authLinkClass}>Terms</Link> and
-                {' '}<Link href="/privacy" className={authLinkClass}>Privacy notice</Link>. Vital is voluntary: you’ll never
-                be paid, and never be asked to pay.
+                {' '}<Link href="/privacy" className={authLinkClass}>Privacy notice</Link>. Vital only connects people. It does not
+                arrange, verify or guarantee donations, and is not involved in any payment. Any arrangement is between
+                you and the other person, at your own discretion.
             </p>
         </AuthFrame>
     );

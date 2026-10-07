@@ -44,7 +44,7 @@ export const VerificationBanner = () => {
             setSent('email');
         } catch (err: any) {
             console.error('Error sending verification email');
-            setError(err.message || 'Failed to send verification email');
+            setError(err.message || 'Couldn’t send the verification email. Please try again.');
         } finally {
             setLoading(null);
         }
@@ -56,22 +56,22 @@ export const VerificationBanner = () => {
     };
 
     const message = !emailVerified && needsPhoneVerification
-        ? 'Confirm your email and phone number so families can trust your offers.'
+        ? 'Please verify your email address and phone number.'
         : !emailVerified
-            ? 'Confirm your email address so families can trust your offers.'
-            : 'Confirm your phone number so families can trust your offers.';
+            ? 'Please verify your email address.'
+            : 'Please verify your phone number.';
 
     return (
         <div className="flex flex-col gap-3 rounded-md border-l-2 border-warning-500 bg-warning-50 px-4 py-3 text-sm sm:flex-row sm:items-center">
             <div className="flex-1 text-warning-800">
                 <p>{message}</p>
                 {error && <p className="mt-1 text-[13px] text-red-700">{error}</p>}
-                {sent === 'email' && <p className="mt-1 text-[13px] text-success-700">Sent. Check your inbox.</p>}
+                {sent === 'email' && <p className="mt-1 text-[13px] text-success-700">Verification email sent. Check your inbox.</p>}
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
                 {!emailVerified && sent !== 'email' && (
                     <Button size="sm" variant="secondary" onClick={handleVerifyEmail} isLoading={loading === 'email'} leftIcon={<Mail className="h-3.5 w-3.5" />}>
-                        Send email
+                        Send verification email
                     </Button>
                 )}
                 {needsPhoneVerification && (

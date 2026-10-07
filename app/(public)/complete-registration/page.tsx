@@ -236,11 +236,10 @@ export default function CompleteRegistration() {
         </div>
     );
 
-    const section = (n: string, title: string, hint: string, children: React.ReactNode) => (
+    const section = (title: string, hint: string, children: React.ReactNode) => (
         <section className="grid gap-6 border-t border-gray-200 py-8 md:grid-cols-3 md:gap-10">
             <div>
-                <p className="font-mono text-xs text-red-600">{n}</p>
-                <h2 className="mt-2 font-medium text-gray-900">{title}</h2>
+                <h2 className="font-medium text-gray-900">{title}</h2>
                 <p className="mt-1 text-sm leading-relaxed text-gray-500">{hint}</p>
             </div>
             <div className="space-y-4 md:col-span-2">{children}</div>
@@ -248,11 +247,11 @@ export default function CompleteRegistration() {
     );
 
     if (status === 'loading' || status === 'creating_profile' || status === 'finalizing' || status === 'completed') {
-        const label = status === 'loading' ? 'One moment…' : status === 'completed' ? 'You’re in. Taking you to your dashboard…' : 'Setting up your profile…';
+        const label = status === 'loading' ? 'Loading…' : status === 'completed' ? 'Registration complete. Opening your dashboard…' : 'Setting up your profile…';
         return (
             <div className="mx-auto flex min-h-[60vh] max-w-md flex-col justify-center px-5">
-                <p className="eyebrow">{status === 'completed' ? 'Done' : 'Please wait'}</p>
-                <p className="display mt-3 text-4xl leading-tight">{label}</p>
+                <p className="text-sm text-gray-500">{status === 'completed' ? 'Done' : 'Please wait'}</p>
+                <p className="display mt-2 text-3xl sm:text-4xl">{label}</p>
                 {status !== 'loading' && (
                     <div className="mt-8 h-1 overflow-hidden rounded-full bg-gray-200">
                         <div className="h-full rounded-full bg-red-600 transition-[width] duration-500" style={{ width: `${progress}%` }} />
@@ -265,8 +264,7 @@ export default function CompleteRegistration() {
     if (status === 'error') {
         return (
             <div className="mx-auto flex min-h-[60vh] max-w-md flex-col justify-center px-5">
-                <p className="font-mono text-xs text-red-600">Error</p>
-                <p className="display mt-3 text-4xl leading-tight">That didn’t save.</p>
+                <p className="display text-3xl sm:text-4xl">We couldn’t save your details</p>
                 <p className="mt-4 text-gray-600">{error}</p>
                 <Button variant="ink" className="mt-8 self-start" onClick={() => setStatus('form')}>Back to the form</Button>
             </div>
@@ -276,17 +274,17 @@ export default function CompleteRegistration() {
     return (
         <div className="mx-auto max-w-4xl px-5 py-12 sm:px-8 sm:py-16">
             <header className="pb-8">
-                <p className="eyebrow">Step 2 of 2</p>
-                <h1 className="display mt-3 text-5xl leading-none">A little about <em>you.</em></h1>
-                <p className="mt-4 max-w-xl leading-relaxed text-gray-600">
-                    This is what lets Vital alert you only when your blood group is needed in your city, and not otherwise.
+                <p className="text-sm text-gray-500">Step 2 of 2</p>
+                <h1 className="display mt-2 text-4xl sm:text-[2.75rem]">Complete your profile</h1>
+                <p className="mt-3 max-w-xl leading-relaxed text-gray-600">
+                    We use these details to notify you only when your blood group is needed in your city.
                 </p>
             </header>
 
             {error && <Alert variant="error" className="mb-6">{error}</Alert>}
 
             <form onSubmit={handleSubmit} noValidate>
-                {section('01', 'You', 'Your name and number are only shared with a family after you offer to help them.', <>
+                {section('Personal details', 'Your name and number are shared with a requester only after you offer to donate.', <>
                     <Input label="Full name" value={formData.fullName} onChange={e => set('fullName', e.target.value)} required autoComplete="name" error={fieldErrors.fullName} />
                     <div className="grid gap-4 sm:grid-cols-2">
                         <Input label="Date of birth" type="date" value={formData.dob} onChange={e => set('dob', e.target.value)} required error={fieldErrors.dob} />
@@ -307,7 +305,7 @@ export default function CompleteRegistration() {
                     <Input label="Mobile number" type="tel" value={formData.phone} onChange={e => set('phone', e.target.value)} required autoComplete="tel" placeholder="+91 98765 43210" error={fieldErrors.phone} />
                 </>)}
 
-                {section('02', 'Your blood', 'If you’re not sure, it’s on any blood test report, or a blood bank can tell you for free.', <>
+                {section('Blood group', 'If you are not sure, check a recent blood test report or ask a blood bank.', <>
                     <div className="grid grid-cols-4 gap-1.5" role="radiogroup" aria-label="Blood group">
                         {BLOOD_GROUPS.map(g => (
                             <button
@@ -324,16 +322,16 @@ export default function CompleteRegistration() {
                     </div>
                     {fieldErrors.bloodGroup && <p className="text-[13px] text-red-700">{fieldErrors.bloodGroup}</p>}
                     <Input
-                        label="Last donated (if you have before)"
+                        label="Date of last donation (if any)"
                         type="date"
                         value={formData.lastDonationDate}
                         max={new Date().toISOString().split('T')[0]}
                         onChange={e => set('lastDonationDate', e.target.value)}
-                        helperText="Used to work out when you can donate next."
+                        helperText="Used to calculate when you can donate next."
                     />
                 </>)}
 
-                {section('03', 'Where you are', 'Requests are matched by city, so this decides which alerts you get.', <>
+                {section('Location', 'Requests are matched by city, so this determines which alerts you receive.', <>
                     <div className="grid gap-4 sm:grid-cols-2">
                         <Input label="City" value={formData.city} onChange={e => set('city', e.target.value)} required placeholder="e.g. Kochi" error={fieldErrors.city} />
                         <Input label="District" value={formData.district} onChange={e => set('district', e.target.value)} required placeholder="e.g. Ernakulam" error={fieldErrors.district} />
@@ -344,7 +342,7 @@ export default function CompleteRegistration() {
                         <Input label="Permanent PIN code" inputMode="numeric" value={formData.permanentZip} onChange={e => set('permanentZip', e.target.value)} required placeholder="e.g. 682011" error={fieldErrors.permanentZip} />
                     </div>
                     <div>
-                        <p className="mb-2 text-[13px] font-medium text-gray-800">Usually free on</p>
+                        <p className="mb-2 text-[13px] font-medium text-gray-800">Usually available on</p>
                         <div className="flex gap-1.5">
                             {['Weekdays', 'Weekends'].map(day => {
                                 const on = formData.availability.includes(day);
@@ -364,21 +362,23 @@ export default function CompleteRegistration() {
                     </div>
                 </>)}
 
-                {section('04', 'Confirm', 'Both are required to join as a donor.', <>
+                {section('Eligibility and consent', 'Both are required to register as a donor. These are your own declarations; Vital does not check them.', <>
                     {checkbox(
                         !formData.hasConditions,
                         v => set('hasConditions', !v),
-                        'I’m fit to donate',
-                        'I don’t have a serious chronic illness, haven’t had recent major surgery, and don’t have any other condition that rules out donating.',
+                        'I declare that, to my knowledge, I’m fit to donate',
+                        'I don’t have a serious chronic illness, haven’t had recent major surgery, and don’t have any other condition that rules out donating. This is my own declaration. Vital does not verify it, and the hospital or blood bank decides whether I can donate.',
                     )}
                     {checkbox(
                         formData.consent,
                         v => set('consent', v),
                         'I agree to share my details for donation',
                         <>
-                            My name and mobile are shared with a family only when I offer to help them. I’ve read the{' '}
+                            My name and mobile number are shared with a requester only when I offer to donate. I’ve read the{' '}
                             <Link href="/privacy" target="_blank" className="text-gray-900 underline decoration-gray-300 underline-offset-4">Privacy notice</Link>
-                            {' '}and can withdraw by deleting my account.
+                            {' '}and{' '}
+                            <Link href="/terms" target="_blank" className="text-gray-900 underline decoration-gray-300 underline-offset-4">Terms</Link>
+                            , and can withdraw by deleting my account. I understand Vital only connects people, and any contact or donation is my own decision.
                         </>,
                         fieldErrors.consent,
                     )}
@@ -386,7 +386,7 @@ export default function CompleteRegistration() {
 
                 <div className="flex justify-end border-t border-gray-200 pt-6">
                     <Button type="submit" variant="primary" size="lg">
-                        Join the network
+                        Complete registration
                     </Button>
                 </div>
             </form>

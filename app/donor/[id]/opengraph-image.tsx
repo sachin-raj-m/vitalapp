@@ -1,60 +1,65 @@
 import { ImageResponse } from 'next/og';
-import { supabase } from '@/lib/supabase';
+import { createClient } from '@supabase/supabase-js';
 import { parseDonorSlug } from '@/lib/donor-slug';
-import { OG_COLORS as C, OG_SIZE, formatGroup, loadSerif, ogFonts } from '@/lib/og';
+import { DATA_IMAGE_HEADERS, GroupMark, OG_COLORS as C, OG_SIZE, SITE_HOST, loadOgFonts } from '@/lib/og';
 
 export const runtime = 'edge';
-export const revalidate = 60;
 export const alt = 'Donor card on Vital';
 export const size = OG_SIZE;
 export const contentType = 'image/png';
 
+type PublicDonor = { first_name: string | null; blood_group: string | null; donor_number: number | null };
+
+async function fetchPublicDonor(slug: string): Promise<PublicDonor | null> {
+    const parsed = parseDonorSlug(slug);
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    if (!parsed || !url || !key) return null;
+    try {
+        const supabase = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
+        const { data } = await supabase
+            .rpc('public_donor_card', parsed.isUuid ? { p_id: parsed.lookupId } : { p_donor_number: parseInt(parsed.lookupId) })
+            .maybeSingle<{ display_name: string | null; blood_group: string | null; donor_number: number; is_public_profile: boolean }>();
+        // Never put a private profile's details in a share preview.
+        if (!data?.is_public_profile) return null;
+        return { first_name: data.display_name?.split(' ')[0] ?? null, blood_group: data.blood_group, donor_number: data.donor_number };
+    } catch {
+        return null;
+    }
+}
+
 export default async function Image({ params }: { params: Promise<{ id: string }> }) {
     const { id } = await params;
-    const parsed = parseDonorSlug(decodeURIComponent(id));
-
-    let profile: { full_name: string | null; blood_group: string | null; donor_number: number | null } | null = null;
-
-    if (parsed) {
-        const query = supabase.from('public_donors').select('display_name, blood_group, donor_number, is_public_profile');
-        const { data } = await (parsed.isUuid
-            ? query.eq('id', parsed.lookupId)
-            : query.eq('donor_number', parseInt(parsed.lookupId))
-        ).maybeSingle();
-        // Never put a private profile's details in a share preview.
-        if (data?.is_public_profile) profile = { full_name: data.display_name, blood_group: data.blood_group, donor_number: data.donor_number };
-    }
-
-    const serif = await loadSerif();
-    const serifFamily = serif ? 'Instrument Serif' : 'serif';
-    const firstName = profile?.full_name?.split(' ')[0];
+    const [donor, f] = await Promise.all([fetchPublicDonor(decodeURIComponent(id)), loadOgFonts()]);
 
     return new ImageResponse(
         (
-            <div style={{ display: 'flex', flexDirection: 'column', width: '100%', height: '100%', background: C.ink, color: '#fff', padding: '64px 72px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div style={{ display: 'flex', fontFamily: serifFamily, fontSize: 48 }}>vital</div>
-                    <div style={{ display: 'flex', fontSize: 20, letterSpacing: 3, textTransform: 'uppercase', color: C.muted }}>
-                        {profile?.donor_number ? `Donor #${profile.donor_number}` : 'Donor card'}
-                    </div>
-                </div>
-                <div style={{ display: 'flex', flex: 1, alignItems: 'flex-end', justifyContent: 'space-between' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', maxWidth: 640 }}>
-                        <div style={{ display: 'flex', fontFamily: serifFamily, fontSize: 84, lineHeight: 1, letterSpacing: -2 }}>
-                            {firstName ? `${firstName} is a blood donor.` : 'Be someone’s blood donor.'}
-                        </div>
-                        <div style={{ display: 'flex', marginTop: 24, fontSize: 28, color: C.muted }}>
-                            Free, voluntary, and nearby. Join the network.
+            <div style={{ display: 'flex', width: '100%', height: '100%', background: C.white, color: C.ink, fontFamily: f.sans, padding: 48 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', flex: 1, borderRadius: 36, background: C.ink, color: C.white, padding: '48px 56px', position: 'relative' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <div style={{ display: 'flex', fontFamily: f.serif, fontSize: 56, fontWeight: 600, lineHeight: 1 }}>vital</div>
+                        <div style={{ display: 'flex', fontSize: 22, fontWeight: 800, letterSpacing: 3, textTransform: 'uppercase', color: 'rgba(255,255,255,0.7)' }}>
+                            {donor?.donor_number ? `Donor #${donor.donor_number}` : 'Blood donor card'}
                         </div>
                     </div>
-                    {profile?.blood_group && (
-                        <div style={{ display: 'flex', fontFamily: serifFamily, fontSize: 260, lineHeight: 0.8, color: '#DF5B53', letterSpacing: -8 }}>
-                            {formatGroup(profile.blood_group)}
+                    <div style={{ display: 'flex', flex: 1, alignItems: 'flex-end', justifyContent: 'space-between' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', maxWidth: 620 }}>
+                            <div style={{ display: 'flex', fontFamily: f.serif, fontSize: 88, fontWeight: 600, lineHeight: 1.02, letterSpacing: -1.5 }}>
+                                {donor?.first_name ? `${donor.first_name} is a blood donor.` : 'Be someone’s blood donor.'}
+                            </div>
+                            <div style={{ display: 'flex', marginTop: 20, fontSize: 28, color: 'rgba(255,255,255,0.72)' }}>
+                                {`Free and voluntary. Join at ${SITE_HOST}`}
+                            </div>
                         </div>
-                    )}
+                        {donor?.blood_group && (
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 300, height: 300, borderRadius: 150, background: C.red }}>
+                                <GroupMark group={donor.blood_group} size={donor.blood_group.length > 2 ? 104 : 136} color={C.white} />
+                            </div>
+                        )}
+                    </div>
                 </div>
             </div>
         ),
-        { ...size, fonts: ogFonts(serif) }
+        { ...size, fonts: f.fonts, headers: DATA_IMAGE_HEADERS }
     );
 }

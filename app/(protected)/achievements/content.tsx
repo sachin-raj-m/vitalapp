@@ -27,27 +27,25 @@ export default function AchievementsPage() {
     return (
         <div className="space-y-10">
             <header>
-                <p className="eyebrow">Milestones</p>
-                <h1 className="display mt-3 text-5xl leading-none">
-                    {stats ? <>{earned} of {achievements.length} <em>reached.</em></> : 'Milestones'}
-                </h1>
+                <h1 className="display text-4xl sm:text-[2.75rem]">Milestones</h1>
                 <p className="mt-3 max-w-lg text-gray-600">
-                    Small markers along the way. Points are just for you. They don’t buy anything, and nobody else sees them.
+                    {stats && `You have reached ${earned} of ${achievements.length} milestones. `}
+                    Points are visible only to you and can’t be exchanged for anything.
                 </p>
             </header>
 
             {error && <Alert variant="error">{error}</Alert>}
 
-            <dl className="grid grid-cols-2 overflow-hidden rounded-lg border border-gray-200 bg-white sm:grid-cols-3 sm:divide-x sm:divide-gray-200">
+            <dl className="grid grid-cols-2 gap-6 border-y border-gray-200 py-6 sm:grid-cols-3 sm:gap-8">
                 {[
                     ['Donations', stats?.total_donations],
                     ['Points', stats?.total_points],
                     ['Requests posted', stats?.total_requests],
-                ].map(([label, value], i) => (
-                    <div key={label as string} className={cn('p-5 sm:p-6', i === 2 && 'col-span-2 border-t border-gray-200 sm:col-span-1 sm:border-t-0', i === 1 && 'border-l border-gray-200 sm:border-l-0')}>
-                        <dt className="eyebrow">{label}</dt>
-                        <dd className="mt-3 font-serif text-4xl leading-none tracking-tight text-gray-900">
-                            {stats ? value ?? 0 : <Skeleton className="h-9 w-14" />}
+                ].map(([label, value]) => (
+                    <div key={label as string}>
+                        <dt className="text-sm text-gray-500">{label}</dt>
+                        <dd className="mt-1.5 text-2xl font-medium tabular-nums text-gray-900">
+                            {stats ? value ?? 0 : <Skeleton className="h-8 w-12" />}
                         </dd>
                     </div>
                 ))}
@@ -67,7 +65,7 @@ export default function AchievementsPage() {
                             <li key={a.id} className="flex items-start gap-4 p-5">
                                 <div
                                     className={cn(
-                                        'flex h-10 w-10 shrink-0 items-center justify-center rounded-full font-mono text-xs',
+                                        'flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-xs font-medium',
                                         a.unlocked ? 'bg-gray-900 text-gray-50' : 'border border-dashed border-gray-300 text-gray-400',
                                     )}
                                 >
@@ -76,20 +74,20 @@ export default function AchievementsPage() {
                                 <div className="min-w-0 flex-1">
                                     <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
                                         <h2 className={cn('font-medium', a.unlocked ? 'text-gray-900' : 'text-gray-700')}>{a.name}</h2>
-                                        <span className="font-mono text-xs text-gray-500">+{a.points} pts</span>
+                                        <span className="text-sm text-gray-500">{a.points} points</span>
                                     </div>
                                     <p className="mt-0.5 text-sm text-gray-500">
                                         {a.description}
-                                        {a.unlocked && a.unlockedDate && ` · ${format(new Date(a.unlockedDate), 'd MMM yyyy')}`}
+                                        {a.unlocked && a.unlockedDate && `. Reached ${format(new Date(a.unlockedDate), 'd MMM yyyy')}`}
                                     </p>
                                     {a.unlocked ? (
-                                        <p className="mt-2 font-serif text-lg italic text-gray-700">“{a.motto}”</p>
+                                        <p className="mt-2 text-sm text-gray-700">“{a.motto}”</p>
                                     ) : a.threshold ? (
                                         <div className="mt-3 flex items-center gap-3">
                                             <div className="h-1 max-w-xs flex-1 overflow-hidden rounded-full bg-gray-200">
                                                 <div className="h-full rounded-full bg-red-600" style={{ width: `${pct}%` }} />
                                             </div>
-                                            <span className="font-mono text-xs text-gray-500">{a.progress}/{a.threshold}</span>
+                                            <span className="text-sm tabular-nums text-gray-500">{a.progress} of {a.threshold}</span>
                                         </div>
                                     ) : null}
                                 </div>

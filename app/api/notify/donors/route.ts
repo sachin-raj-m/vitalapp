@@ -4,8 +4,17 @@ import { getBloodRequestEmailHtml } from '@/lib/email-templates'
 import { sendEmail } from '@/lib/email'
 import { getCompatibleDonors, formatBloodGroup } from '@/lib/blood-compatibility'
 import { getVerifiedUser, serviceClient } from '@/lib/supabase-route'
+import { rateLimit, tooManyRequests } from '@/lib/rate-limit'
 import { SITE_URL } from '@/lib/site'
 import type { BloodGroup } from '@/types'
+
+/**
+ * Exact, case-insensitive match pattern for ilike: escapes LIKE wildcards
+ * (% _ and PostgREST's * alias) so a city like "%" can't match every city.
+ */
+function exactIlikePattern(value: string) {
+    return value.replace(/[\\%_*]/g, ch => `\\${ch}`)
+}
 
 /**
  * Alerts compatible donors in the request's city. The caller only sends a
@@ -16,6 +25,11 @@ export async function POST(request: Request) {
     const { supabase, user } = await getVerifiedUser(request)
     if (!user) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // A broadcast per request is enforced below; this caps requests per user.
+    if (!(await rateLimit(`notify-donors:${user.id}`, 60 * 60, 5))) {
+        return tooManyRequests(60 * 60)
     }
 
     const { requestId } = await request.json().catch(() => ({}))
@@ -41,21 +55,25 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'Alerts are only sent when a request is first posted' }, { status: 409 })
     }
 
+    // Alerts go to donors in the same city only; without one there is no audience.
+    const city = bloodRequest.city?.trim()
+    if (!city) {
+        return NextResponse.json({ matchedDonors: 0, notificationsSent: 0, emailsSent: 0, skipped: 'no city' })
+    }
+
     const admin = serviceClient()
     const groups = getCompatibleDonors(bloodRequest.blood_group as BloodGroup)
     const group = formatBloodGroup(bloodRequest.blood_group)
 
     try {
-        let query = admin
+        const { data: donors, error: donorError } = await admin
             .from('profiles')
             .select('id, full_name, email')
             .in('blood_group', groups)
             .eq('is_donor', true)
             .eq('is_available', true)
             .neq('id', user.id)
-        if (bloodRequest.city) query = query.ilike('city', bloodRequest.city)
-
-        const { data: donors, error: donorError } = await query
+            .ilike('city', exactIlikePattern(city))
         if (donorError) throw donorError
         if (!donors?.length) {
             return NextResponse.json({ matchedDonors: 0, notificationsSent: 0, emailsSent: 0 })

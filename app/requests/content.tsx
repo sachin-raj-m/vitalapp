@@ -100,13 +100,13 @@ export default function RequestsPage() {
         }
 
         if (!user.blood_group) {
-            setError('Please update your profile with your Blood Group to donate.');
+            setError('Add your blood group to your profile before offering to donate.');
             return;
         }
 
         // Check Blood Compatibility
         if (!isBloodCompatible(user.blood_group, request.blood_group)) {
-            setError(`Medical Safety: Your blood group (${user.blood_group}) is not compatible with the patient (${request.blood_group}).`);
+            setError(`Your blood group (${user.blood_group}) is not compatible with this patient (${request.blood_group}), so you can’t donate for this request.`);
             return;
         }
 
@@ -219,10 +219,12 @@ export default function RequestsPage() {
         <div className="space-y-8">
             <div className="flex flex-col justify-between gap-6 sm:flex-row sm:items-end">
                 <div>
-                    <p className="eyebrow">Open requests</p>
-                    <h1 className="display mt-3 text-5xl leading-none">
-                        {loading ? 'Requests' : <>{filteredRequests.length} {filteredRequests.length === 1 ? 'person needs' : 'people need'} <em className="text-red-600">blood.</em></>}
-                    </h1>
+                    <h1 className="display text-4xl sm:text-[2.75rem]">Open requests</h1>
+                    <p className="mt-3 max-w-lg text-gray-600">
+                        {loading || filteredRequests.length === 0
+                            ? 'People who need blood donors, most recent first.'
+                            : `${filteredRequests.length} open ${filteredRequests.length === 1 ? 'request' : 'requests'}. Filter by blood group, location or urgency.`}
+                    </p>
                 </div>
                 <div className="flex items-center gap-2">
                     <div className="flex rounded-md border border-gray-300 bg-white p-0.5" role="tablist" aria-label="View">
@@ -279,7 +281,7 @@ export default function RequestsPage() {
                         options={[
                             { value: 'all', label: 'Any urgency' },
                             { value: 'High', label: 'Urgent' },
-                            { value: 'Medium', label: 'Soon' },
+                            { value: 'Medium', label: 'Needed soon' },
                             { value: 'Low', label: 'Planned' },
                         ]}
                     />
@@ -297,9 +299,9 @@ export default function RequestsPage() {
             ) : filteredRequests.length === 0 ? (
                 <EmptyState
                     icon={Inbox}
-                    title={allRequests.length === 0 ? 'No open requests right now' : 'Nothing matches those filters'}
+                    title={allRequests.length === 0 ? 'No open requests right now' : 'No requests match these filters'}
                     description={allRequests.length === 0
-                        ? 'That’s good news. When someone needs blood, it will show up here.'
+                        ? 'New requests will appear here as soon as they are posted.'
                         : 'Try another blood group or clear the search.'}
                     actionLabel={allRequests.length === 0 ? undefined : 'Clear filters'}
                     onAction={() => setFilters({ bloodGroup: 'all', urgency: 'all', locationSearch: '' })}
@@ -338,12 +340,12 @@ export default function RequestsPage() {
             <Modal
                 isOpen={createPinModal.isOpen}
                 onClose={() => setCreatePinModal({ isOpen: false, request: null })}
-                title="Create Donor PIN"
+                title="Create your donor PIN"
             >
                 <div className="space-y-4">
                     <p className="leading-relaxed text-gray-600">
-                        The family enters this PIN at the hospital to confirm you donated. You’ll use the same PIN every time,
-                        so pick one you’ll remember.
+                        The person who posted the request enters this PIN to mark your donation as completed in Vital. You use the same PIN
+                        for every donation, so choose one you will remember.
                     </p>
 
                     <Input
@@ -387,7 +389,7 @@ export default function RequestsPage() {
                             ['Blood group', formatBloodGroup(confirmModal.request?.blood_group)],
                             ['Units', `${confirmModal.request?.units_needed ?? ''}`],
                             ['Hospital', [confirmModal.request?.hospital_name, confirmModal.request?.hospital_address].filter(Boolean).join(', ')],
-                            ['Contact', `${confirmModal.request?.contact_name ?? ''} · number shown once you offer`],
+                            ['Contact', `${confirmModal.request?.contact_name ?? ''} · number shown after you offer`],
                             ...(confirmModal.request?.notes ? [['Notes', confirmModal.request.notes]] : []),
                         ].map(([k, v]) => (
                             <div key={k} className="grid grid-cols-3 gap-4 py-3">
@@ -398,8 +400,10 @@ export default function RequestsPage() {
                     </dl>
 
                     <p className="leading-relaxed text-gray-600">
-                        By offering, you’re telling this family you’ll go to the hospital and donate. Their number
-                        appears in My donations as soon as you offer. Please call them first.
+                        By offering, you choose to contact the requester directly. Their number will appear in My
+                        donations once you offer. Vital does not arrange or verify this donation; any arrangement is
+                        between you and the requester, at your own discretion, and the hospital or blood bank decides
+                        whether you can donate.
                     </p>
 
                     <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
@@ -407,7 +411,7 @@ export default function RequestsPage() {
                             Not now
                         </Button>
                         <Button onClick={handleConfirmDonation}>
-                            I’ll donate
+                            Confirm offer
                         </Button>
                     </div>
                 </div>
@@ -428,7 +432,7 @@ export default function RequestsPage() {
                         // by clicking "I can donate" again, which is now cleaner UX than auto-triggering.
                     }
                 }}
-                message="Sign in to offer your blood"
+                message="Sign in to offer to donate"
             />
 
             {/* PIN Success Modal */}
@@ -439,22 +443,18 @@ export default function RequestsPage() {
             >
                 <div className="space-y-6">
                     <div className="rounded-lg bg-gray-950 px-6 py-8 text-center">
-                        <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-gray-500">Show this at {otpModal.hospitalName}</p>
+                        <p className="text-sm text-gray-500">Share this PIN at {otpModal.hospitalName}</p>
                         <p className="mt-3 font-mono text-5xl tracking-[0.3em] text-white">{otpModal.pin}</p>
                     </div>
 
-                    <ol className="space-y-3">
-                        {[
-                            'Call the family. Their number is in My donations.',
-                            'Go to the hospital and donate.',
-                            'Tell them this PIN so they can confirm it in Vital.',
-                        ].map((step, i) => (
-                            <li key={step} className="flex gap-3">
-                                <span className="font-mono text-xs leading-6 text-red-600">0{i + 1}</span>
-                                <span className="leading-6 text-gray-700">{step}</span>
-                            </li>
-                        ))}
-                    </ol>
+                    <div>
+                        <h3 className="font-medium text-gray-900">Next steps</h3>
+                        <ol className="mt-2 list-decimal space-y-1.5 pl-5 text-gray-700 marker:text-gray-400">
+                            <li>Call the contact person. Their number is in My donations.</li>
+                            <li>If you both go ahead, donate at the hospital or blood bank.</li>
+                            <li>After donating, share this PIN so they can mark the donation as completed in Vital.</li>
+                        </ol>
+                    </div>
 
                     <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
                         <Button variant="secondary" onClick={() => setOtpModal({ ...otpModal, isOpen: false })}>
@@ -464,7 +464,7 @@ export default function RequestsPage() {
                             href="/donations"
                             className="inline-flex h-10 items-center justify-center rounded-md bg-gray-900 px-4 text-sm font-medium text-gray-50 hover:bg-gray-800"
                         >
-                            Go to My donations
+                            Open My donations
                         </Link>
                     </div>
                 </div>

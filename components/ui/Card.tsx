@@ -7,7 +7,7 @@ interface SlotProps {
 }
 
 export const Card: React.FC<SlotProps> = ({ children, className }) => (
-  <div className={cn('rounded-lg border border-gray-200 bg-white', className)}>
+  <div className={cn('rounded-xl border border-gray-200 bg-white shadow-[0_1px_2px_rgba(22,24,29,0.04)]', className)}>
     {children}
   </div>
 );

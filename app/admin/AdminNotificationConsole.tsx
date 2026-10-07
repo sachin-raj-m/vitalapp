@@ -413,7 +413,7 @@ export function AdminNotificationConsole() {
                                 style={{ width: `${(progress.sent + progress.failed) / (progress.total || 1) * 100}%` }}
                             />
                         </div>
-                        <p className="text-xs text-center text-gray-400">
+                        <p className="text-xs text-center text-gray-500">
                             Sent: {progress.sent} | Failed: {progress.failed} | Total: {progress.total}
                         </p>
                     </div>

@@ -78,7 +78,7 @@ export function MyRequestsContent() {
             })));
         } catch (err: any) {
             console.error('Error fetching requests', err);
-            setError('Failed to load your requests');
+            setError('Couldn’t load your requests. Please refresh.');
         } finally {
             setIsLoading(false);
         }
@@ -104,10 +104,10 @@ export function MyRequestsContent() {
             });
 
             setRequests(requests.filter(r => r.id !== requestToDelete));
-            toast.success('Request deleted successfully.');
+            toast.success('Request deleted');
         } catch (err) {
             console.error('Delete error', err);
-            toast.error('Failed to delete request.');
+            toast.error('Couldn’t delete the request. Please try again.');
         } finally {
             setRequestToDelete(null);
         }
@@ -151,7 +151,7 @@ export function MyRequestsContent() {
             toast.success(
                 result?.fulfilled
                     ? 'Donation confirmed. Your request is fulfilled and now closed.'
-                    : `Donation confirmed. ${result?.total_collected ?? ''}/${result?.units_needed ?? ''} units collected.`
+                    : `Donation confirmed. ${result?.total_collected ?? ''} of ${result?.units_needed ?? ''} units collected.`
             );
         } catch (err: any) {
             console.error('Verification error', err);
@@ -170,8 +170,10 @@ export function MyRequestsContent() {
         <div className="space-y-10">
             <header className="flex flex-col justify-between gap-6 sm:flex-row sm:items-end">
                 <div>
-                    <p className="eyebrow">My requests</p>
-                    <h1 className="display mt-3 text-5xl leading-none">Blood you’ve asked for.</h1>
+                    <h1 className="display text-4xl sm:text-[2.75rem]">My requests</h1>
+                    <p className="mt-3 max-w-lg text-gray-600">
+                        Track offers from donors and confirm each donation with the donor’s PIN.
+                    </p>
                 </div>
                 <Link
                     href="/requests/new"
@@ -195,7 +197,7 @@ export function MyRequestsContent() {
                             activeTab === tab ? 'border-gray-900 bg-gray-900 text-gray-50' : 'border-gray-300 bg-white text-gray-700 hover:border-gray-400',
                         )}
                     >
-                        {tab} <span className="ml-1 font-mono text-[11px] opacity-60">{isLoading ? '·' : counts[tab]}</span>
+                        {tab} <span className="ml-1 tabular-nums opacity-60">{isLoading ? '·' : counts[tab]}</span>
                     </button>
                 ))}
             </div>
@@ -207,8 +209,8 @@ export function MyRequestsContent() {
                     icon={FileText}
                     title={activeTab === 'active' ? 'No open requests' : 'No past requests'}
                     description={activeTab === 'active'
-                        ? 'If you or someone close to you needs blood, post a request and compatible donors nearby will be alerted.'
-                        : 'Requests you close or that get fulfilled will show up here.'}
+                        ? 'When you post a request, compatible donors nearby are notified.'
+                        : 'Fulfilled and closed requests will appear here.'}
                     actionLabel={activeTab === 'active' ? 'Request blood' : undefined}
                     onAction={() => { window.location.href = '/requests/new'; }}
                 />
@@ -242,14 +244,14 @@ export function MyRequestsContent() {
                                         </div>
                                         <p className="mt-0.5 text-sm text-gray-500">
                                             Posted {format(new Date(request.created_at), 'd MMM')}
-                                            {request.date_needed && ` · needed by ${format(parseISO(request.date_needed), 'd MMM')}`}
-                                            {request.status === 'fulfilled' && ` · fulfilled ${format(new Date(request.updated_at), 'd MMM')}`}
+                                            {request.date_needed && ` · Needed by ${format(parseISO(request.date_needed), 'd MMM')}`}
+                                            {request.status === 'fulfilled' && ` · Fulfilled ${format(new Date(request.updated_at), 'd MMM')}`}
                                         </p>
 
                                         <div className="mt-4 max-w-xs">
                                             <div className="flex justify-between text-[13px]">
                                                 <span className="text-gray-500">Collected</span>
-                                                <span className="font-mono text-gray-900">{collected} / {request.units_needed} units</span>
+                                                <span className="tabular-nums text-gray-900">{collected} of {request.units_needed} units</span>
                                             </div>
                                             <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-gray-200">
                                                 <div className="h-full rounded-full bg-success-500" style={{ width: `${progress}%` }} />
@@ -264,7 +266,7 @@ export function MyRequestsContent() {
                                 </div>
 
                                 <div className="border-t border-gray-200 bg-gray-50/60 px-5 py-4">
-                                    <p className="eyebrow">Donors who offered · {offers.length}</p>
+                                    <h3 className="text-sm font-medium text-gray-900">Donor offers <span className="font-normal text-gray-500">({offers.length})</span></h3>
                                     {offers.length > 0 ? (
                                         <ul className="mt-3 divide-y divide-gray-200">
                                             {offers.map(donation => (
@@ -280,7 +282,7 @@ export function MyRequestsContent() {
                                                                     <Phone className="h-3 w-3" /> {donation.profiles.phone}
                                                                 </a>
                                                             ) : (
-                                                                <p className="text-[13px] text-gray-400">Contact hidden after closing</p>
+                                                                <p className="text-[13px] text-gray-500">Contact hidden after closing</p>
                                                             )}
                                                         </div>
                                                     </div>
@@ -311,7 +313,7 @@ export function MyRequestsContent() {
                                         </ul>
                                     ) : (
                                         <p className="mt-2 text-sm text-gray-500">
-                                            No offers yet. Sharing the request on WhatsApp is the fastest way to reach more people.
+                                            No offers yet. Sharing the request link can help it reach more donors.
                                         </p>
                                     )}
                                 </div>
@@ -328,7 +330,7 @@ export function MyRequestsContent() {
             >
                 <div className="space-y-5">
                     <p className="leading-relaxed text-gray-600">
-                        Ask the donor for their 4-digit PIN once they’ve donated, and enter it here.
+                        After the donor has donated, ask for their 4-digit PIN and enter it below.
                     </p>
                     <Input
                         label="Donor PIN"
@@ -352,7 +354,7 @@ export function MyRequestsContent() {
                             >
                                 −
                             </button>
-                            <span className="w-10 text-center font-mono text-lg text-gray-900">{unitsDonatedInput}</span>
+                            <span className="w-10 text-center text-lg tabular-nums text-gray-900">{unitsDonatedInput}</span>
                             <button
                                 type="button"
                                 className="h-10 w-10 text-lg text-gray-600 hover:text-gray-900 disabled:opacity-30"
@@ -377,7 +379,7 @@ export function MyRequestsContent() {
                 onClose={() => setRequestToDelete(null)}
                 onConfirm={handleDelete}
                 title="Delete this request?"
-                description="It will disappear from the feed and donors who offered won’t see it any more. This can’t be undone."
+                description="The request will be removed from the feed and donors who offered will no longer see it. This cannot be undone."
                 confirmText="Delete request"
                 variant="danger"
             />

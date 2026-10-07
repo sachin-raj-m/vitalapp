@@ -80,7 +80,7 @@ export function PWAInstallPrompt() {
         <div role="region" aria-label="Install Vital" className="fixed bottom-4 left-4 right-4 z-50 md:left-auto md:right-4 md:w-96 rounded-lg border border-gray-200 bg-white p-4 shadow-[0_8px_30px_rgba(27,24,21,0.08)] animate-fade-up">
             <button
                 onClick={handleDismiss}
-                className="absolute top-2 right-2 text-gray-400 hover:text-gray-600"
+                className="absolute top-2 right-2 text-gray-500 hover:text-gray-600"
                 aria-label="Dismiss"
             >
                 <X size={20} />

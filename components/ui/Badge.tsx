@@ -11,9 +11,9 @@ interface BadgeProps {
 
 const variantStyles = {
   primary: 'bg-red-50 text-red-700 ring-red-200',
-  error: 'bg-red-50 text-red-700 ring-red-200',
+  error: 'bg-red-600 text-white ring-red-600',
   secondary: 'bg-gray-100 text-gray-700 ring-gray-200',
-  accent: 'bg-gray-900 text-gray-50 ring-gray-900',
+  accent: 'bg-gray-900 text-white ring-gray-900',
   success: 'bg-success-50 text-success-700 ring-success-200',
   warning: 'bg-warning-50 text-warning-700 ring-warning-200',
   neutral: 'bg-gray-100 text-gray-600 ring-gray-200',
@@ -33,7 +33,7 @@ export const Badge: React.FC<BadgeProps> = ({
 }) => (
   <span
     className={cn(
-      'inline-flex items-center gap-1 rounded-full font-medium ring-1 ring-inset whitespace-nowrap',
+      'inline-flex items-center gap-1 rounded-full font-semibold ring-1 ring-inset whitespace-nowrap',
       variantStyles[variant],
       sizeStyles[size],
       className,
