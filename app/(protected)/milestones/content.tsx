@@ -4,7 +4,8 @@ import React, { useEffect, useState } from 'react';
 import { format } from 'date-fns';
 import { Check } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
-import { fetchUserStats, type UserStats } from '@/lib/stats';
+import { fetchUserStats, describePoints, type UserStats } from '@/lib/stats';
+import { POINTS_PER_DONATION } from '@/lib/constants';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { Alert } from '@/components/ui/Alert';
 import { cn } from '@/lib/cn';
@@ -30,6 +31,7 @@ export default function AchievementsPage() {
                 <h1 className="display text-4xl sm:text-[2.75rem]">Milestones</h1>
                 <p className="mt-3 max-w-lg text-gray-600">
                     {stats && `You have reached ${earned} of ${achievements.length} milestones. `}
+                    You earn {POINTS_PER_DONATION} points for each completed donation, plus a one-time bonus for each milestone you reach.
                     Points are visible only to you and can’t be exchanged for anything.
                 </p>
             </header>
@@ -50,6 +52,9 @@ export default function AchievementsPage() {
                     </div>
                 ))}
             </dl>
+            {stats && (
+                <p className="-mt-6 text-sm tabular-nums text-gray-500">Points: {describePoints(stats.points)}</p>
+            )}
 
             <ol className="divide-y divide-gray-200 overflow-hidden rounded-lg border border-gray-200 bg-white">
                 {!stats
@@ -74,7 +79,9 @@ export default function AchievementsPage() {
                                 <div className="min-w-0 flex-1">
                                     <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
                                         <h2 className={cn('font-medium', a.unlocked ? 'text-gray-900' : 'text-gray-700')}>{a.name}</h2>
-                                        <span className="text-sm text-gray-500">{a.points} points</span>
+                                        <span className={cn('text-sm', a.unlocked ? 'text-gray-700' : 'text-gray-500')}>
+                                            {a.unlocked ? `+${a.points} bonus earned` : `+${a.points} bonus`}
+                                        </span>
                                     </div>
                                     <p className="mt-0.5 text-sm text-gray-500">
                                         {a.description}

@@ -15,10 +15,28 @@ export interface Achievement {
     type: 'count' | 'special';
 }
 
+/**
+ * Points breakdown. Scoring rule (points are private to the user and have no
+ * exchange value):
+ *   - POINTS_PER_DONATION (50) for every completed donation, regardless of
+ *     units given (cancelled and pending offers score nothing), plus
+ *   - a one-time bonus for every milestone reached (ACHIEVEMENTS[*].points).
+ * So one completed donation = 50 + 50 (First Drop bonus) = 100 points.
+ */
+export interface PointsBreakdown {
+    donations: number;      // completed donations counted
+    donation_points: number; // donations * POINTS_PER_DONATION
+    bonus_points: number;   // sum of unlocked milestone bonuses
+    milestones: number;     // milestones reached
+    total: number;          // donation_points + bonus_points
+}
+
 export interface UserStats {
     total_donations: number;
     total_requests: number;
+    /** Always equals points.total. */
     total_points: number;
+    points: PointsBreakdown;
     last_donation_date: string | null;
     achievements: Achievement[];
 }
@@ -43,30 +61,48 @@ export async function fetchUserStats(userId: string): Promise<UserStats> {
 
     const completedDonations = (donations || []).filter(d => d.status === 'completed');
     const achievements = calculateAchievements(donations || []);
-
-    // Calculate total points
-    // Base points for donations
-    let totalPoints = completedDonations.length * POINTS_PER_DONATION;
-    // Add bonus points for unlocked achievements
-    achievements.forEach(ach => {
-        if (ach.unlocked) {
-            totalPoints += ach.points;
-        }
-    });
+    const points = calculatePoints(completedDonations.length, achievements);
 
     const lastDonation = completedDonations[0];
 
     return {
         total_donations: completedDonations.length,
         total_requests: requests?.length || 0,
-        total_points: totalPoints,
+        total_points: points.total,
+        points,
         last_donation_date: lastDonation?.created_at || null,
         achievements
     };
 }
 
+/** Pure scoring: see PointsBreakdown for the rule. */
+export function calculatePoints(completedDonations: number, achievements: Pick<Achievement, 'unlocked' | 'points'>[]): PointsBreakdown {
+    const reached = achievements.filter(a => a.unlocked);
+    const donation_points = completedDonations * POINTS_PER_DONATION;
+    const bonus_points = reached.reduce((sum, a) => sum + a.points, 0);
+    return {
+        donations: completedDonations,
+        donation_points,
+        bonus_points,
+        milestones: reached.length,
+        total: donation_points + bonus_points,
+    };
+}
+
+/** "50 for 1 donation + 50 milestone bonus = 100 points" */
+export function describePoints(p: PointsBreakdown): string {
+    if (p.total === 0) return '0 points';
+    const parts = [`${p.donation_points} for ${p.donations} ${p.donations === 1 ? 'donation' : 'donations'}`];
+    if (p.bonus_points > 0) parts.push(`${p.bonus_points} milestone bonus`);
+    return `${parts.join(' + ')} = ${p.total} points`;
+}
+
 export function calculateAchievements(donations: any[]): Achievement[] {
-    const completedDonations = donations.filter(d => d.status === 'completed');
+    // Newest first, so the Nth donation (and its date) is found regardless of input order.
+    // Note: dates are when the offer was made; donations has no completion timestamp.
+    const completedDonations = donations
+        .filter(d => d.status === 'completed')
+        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
     return Object.values(ACHIEVEMENTS).map(badge => {
         let unlocked = false;
@@ -90,7 +126,8 @@ export function calculateAchievements(donations: any[]): Achievement[] {
         } else if (badge.type === 'special') {
             // For now only 'urgent_donation'
             if ((badge as any).criteria === 'urgent_donation') {
-                const urgentDonation = completedDonations.find(d => {
+                // Earliest completed donation on a High-urgency request.
+                const urgentDonation = [...completedDonations].reverse().find(d => {
                     const request = Array.isArray(d.blood_requests) ? d.blood_requests[0] : d.blood_requests;
                     return request?.urgency_level === 'High';
                 });

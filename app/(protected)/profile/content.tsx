@@ -21,7 +21,7 @@ import { motion } from 'framer-motion';
 import { PushNotificationManager } from '@/components/PushNotificationManager';
 import DonorCard from '@/components/DonorCard';
 import { toast } from 'sonner';
-import { ConfirmationModal } from '@/components/ui/ConfirmationModal';
+import { TypeToConfirmModal } from '@/components/ui/TypeToConfirmModal';
 
 export default function ProfilePage() {
     const router = useRouter();
@@ -30,6 +30,9 @@ export default function ProfilePage() {
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState('');
     const [showDeleteModal, setShowDeleteModal] = useState(false);
+    // Resolved when this page unmounts, so sign-out can wait for the redirect.
+    const leftPageRef = useRef<(() => void) | null>(null);
+    useEffect(() => () => leftPageRef.current?.(), []);
     const cardRef = useRef<HTMLDivElement>(null);
 
     const publicPath = user ? donorProfilePath(user) : '';
@@ -58,16 +61,31 @@ export default function ProfilePage() {
         }
     };
 
+    // Throws on failure so the dialog stays open and shows the server's message.
     const handleDeleteAccount = async () => {
+        let res: Response;
         try {
-            const res = await authedFetch('/api/auth/delete', { method: 'POST' });
-            if (!res.ok) throw new Error('Deletion failed');
+            res = await authedFetch('/api/auth/delete', { method: 'POST' });
+        } catch {
+            throw new Error('Could not reach the server. Check your connection and try again.');
+        }
+        if (!res.ok) {
+            const body = await res.json().catch(() => null);
+            throw new Error(body?.error || 'Could not delete your account. Please try again.');
+        }
+
+        // Leave the protected area first; signing out while still here would let
+        // ProtectedRoute bounce to /login instead of the home page.
+        toast.success('Your account and data have been deleted.');
+        const left = new Promise<void>(resolve => { leftPageRef.current = resolve; });
+        router.replace('/');
+        await Promise.race([left, new Promise(r => setTimeout(r, 3000))]);
+        try {
             await signOut();
-            router.push('/login');
-            toast.success('Account deleted successfully');
-        } catch (e) {
-            toast.error('Failed to delete account. Please try again.');
-            setShowDeleteModal(false);
+        } catch {
+            // The auth user is already gone, so a server-side logout can fail; clear locally.
+            await supabase.auth.signOut({ scope: 'local' }).catch(() => {});
+            try { localStorage.removeItem('vital_user_profile'); } catch { /* ignore */ }
         }
     };
 
@@ -294,25 +312,33 @@ export default function ProfilePage() {
 
             <section className="flex flex-col gap-4 border-t border-gray-200 pt-8 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                    <h2 className="font-medium text-gray-900">Delete account</h2>
-                    <p className="mt-1 text-sm text-gray-500">Removes your profile, requests and donation history for good.</p>
+                    <h2 className="font-medium text-gray-900">Account</h2>
+                    <p className="mt-1 text-sm text-gray-500">Deleting your account removes your profile, requests and donation history for good.</p>
                 </div>
                 <div className="flex gap-2">
                     <Button size="sm" variant="ghost" onClick={handleSignOut}>Sign out</Button>
-                    <Button size="sm" variant="secondary" className="text-red-700" onClick={() => setShowDeleteModal(true)}>
+                    <Button size="sm" variant="secondary" className="text-red-700" aria-haspopup="dialog" onClick={() => setShowDeleteModal(true)}>
                         Delete account
                     </Button>
                 </div>
             </section>
 
-            <ConfirmationModal
+            <TypeToConfirmModal
                 isOpen={showDeleteModal}
                 onClose={() => setShowDeleteModal(false)}
                 onConfirm={handleDeleteAccount}
                 title="Delete your account?"
-                description="This permanently deletes your account and everything in it. It can’t be undone."
+                description="This permanently deletes your Vital account and everything tied to it:"
+                items={[
+                    'Your profile and public donor card',
+                    'Your donor PIN',
+                    'Blood requests you posted, with their contact details',
+                    'Your donation offers and history',
+                    'Your notifications',
+                    'Push alert subscriptions on all your devices',
+                ]}
                 confirmText="Delete my account"
-                variant="danger"
+                loadingText="Deleting account…"
             />
         </div>
     );

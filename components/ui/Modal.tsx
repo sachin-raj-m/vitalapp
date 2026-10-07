@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useEffect, useId, useRef } from 'react';
+import React, { useEffect, useId, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 
 interface ModalProps {
@@ -16,11 +17,14 @@ export const Modal = ({ isOpen, onClose, title, children }: ModalProps) => {
     // Keep the latest onClose without re-running the effect on every render.
     const onCloseRef = useRef(onClose);
     onCloseRef.current = onClose;
+    // Portal target only exists in the browser; render nothing until mounted.
+    const [mounted, setMounted] = useState(false);
+    useEffect(() => setMounted(true), []);
 
     // Focus management: move focus in, trap Tab inside, Escape closes, and
     // return focus to whatever opened the dialog. Also locks page scroll.
     useEffect(() => {
-        if (!isOpen) return;
+        if (!isOpen || !mounted) return;
         const opener = document.activeElement as HTMLElement | null;
         const panel = panelRef.current;
         const focusables = () =>
@@ -58,11 +62,13 @@ export const Modal = ({ isOpen, onClose, title, children }: ModalProps) => {
             window.removeEventListener('keydown', onKey);
             opener?.focus?.();
         };
-    }, [isOpen]);
+    }, [isOpen, mounted]);
 
-    if (!isOpen) return null;
+    if (!isOpen || !mounted) return null;
 
-    return (
+    // Portalled to <body> so no ancestor transform, filter or overflow can
+    // clip the overlay or turn `position: fixed` into position-relative-to-ancestor.
+    return createPortal(
         <div className="fixed inset-0 z-[60] flex items-end justify-center sm:items-center sm:p-6">
             <div className="absolute inset-0 bg-gray-950/40 backdrop-blur-[2px]" onClick={onClose} aria-hidden />
             <div
@@ -87,6 +93,7 @@ export const Modal = ({ isOpen, onClose, title, children }: ModalProps) => {
                 </div>
                 <div className="px-5 py-5 text-sm text-gray-700 sm:px-6">{children}</div>
             </div>
-        </div>
+        </div>,
+        document.body,
     );
 };

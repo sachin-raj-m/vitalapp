@@ -13,7 +13,7 @@ import { Alert } from '@/components/ui/Alert';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { EmptyState } from '@/components/EmptyState';
 import { ConfirmationModal } from '@/components/ui/ConfirmationModal';
-import { calculateEligibility, fetchUserStats, type UserStats } from '@/lib/stats';
+import { calculateEligibility, describePoints, fetchUserStats, type UserStats } from '@/lib/stats';
 import { formatBloodGroup } from '@/lib/blood-compatibility';
 import { toast } from 'sonner';
 import { cn } from '@/lib/cn';
@@ -164,6 +164,9 @@ export default function DonationsPage() {
                     </div>
                 ))}
             </dl>
+            {!isLoading && stats?.points && stats.points.total > 0 && (
+                <p className="-mt-6 text-sm text-gray-500">{describePoints(stats.points)}</p>
+            )}
 
             <section className="space-y-4">
                 <div className="flex flex-wrap gap-1.5" role="group" aria-label="Filter donations">

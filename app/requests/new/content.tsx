@@ -15,6 +15,7 @@ import type { BloodGroup, UrgencyLevel } from '@/types';
 import dynamic from 'next/dynamic';
 import { logActivity } from '@/lib/logger';
 import { toast } from 'sonner';
+import { consentStamp, earliestConsentAt } from '@/lib/legal';
 
 const Map = dynamic(() => import('@/components/Map'), {
     ssr: false,
@@ -64,12 +65,17 @@ export default function CreateRequestPage() {
     const [code, setCode] = useState('');
     const [verifyBusy, setVerifyBusy] = useState(false);
     const [verifiedUserId, setVerifiedUserId] = useState<string | null>(null);
+    const [guestConsent, setGuestConsent] = useState(false);
     const userId = user?.id ?? verifiedUserId;
 
     const sendCode = async () => {
         setError('');
         if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(verifyEmail)) {
             setError('Enter a valid email address to get a code.');
+            return;
+        }
+        if (!guestConsent) {
+            setError('Tick the box to agree to the Terms and Privacy notice before we send a code.');
             return;
         }
         setVerifyBusy(true);
@@ -127,8 +133,11 @@ export default function CreateRequestPage() {
             // First-time requesters need a profile row (requests reference it).
             // They're marked as non-donors until they choose to register as one.
             if (!user) {
-                const { data: existing } = await supabase.from('profiles').select('id, blood_group').eq('id', userId).maybeSingle();
+                const { data: existing } = await supabase.from('profiles').select('id, blood_group, consent_at, consent_version').eq('id', userId).maybeSingle();
                 if (!existing?.blood_group) {
+                    // Consent was given explicitly in the verify step; keep an earlier
+                    // consent to the same Privacy notice version if there is one.
+                    const consent = consentStamp();
                     const { error: profileError } = await supabase.from('profiles').upsert({
                         id: userId,
                         email: verifyEmail,
@@ -136,6 +145,8 @@ export default function CreateRequestPage() {
                         phone: formData.contactPhone,
                         is_donor: false,
                         is_available: false,
+                        ...consent,
+                        consent_at: earliestConsentAt(existing, consent) ?? consent.consent_at,
                     }, { onConflict: 'id' });
                     if (profileError) throw profileError;
                 }
@@ -368,6 +379,22 @@ export default function CreateRequestPage() {
                                 You don’t need an account. We will email you a one-time code, which also lets you manage this request later.
                                 Already registered? <Link href="/login?redirect=/requests/new" className="text-gray-900 underline decoration-gray-300 underline-offset-4">Sign in</Link>.
                             </p>
+                            <label className="flex cursor-pointer items-start gap-3">
+                                <input
+                                    type="checkbox"
+                                    checked={guestConsent}
+                                    onChange={(e) => setGuestConsent(e.target.checked)}
+                                    disabled={codeSent}
+                                    className="mt-1 h-4 w-4 shrink-0 rounded-[4px] border-gray-400 accent-gray-900"
+                                />
+                                <span className="text-sm leading-relaxed text-gray-600">
+                                    I agree to the{' '}
+                                    <Link href="/terms" target="_blank" className="text-gray-900 underline decoration-gray-300 underline-offset-4">Terms</Link>
+                                    {' '}and have read the{' '}
+                                    <Link href="/privacy" target="_blank" className="text-gray-900 underline decoration-gray-300 underline-offset-4">Privacy notice</Link>
+                                    . My name and contact phone are stored with this request and shown to donors who offer.
+                                </span>
+                            </label>
                             <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
                                 <div className="flex-1">
                                     <Input label="Your email" type="email" autoComplete="email" value={verifyEmail} onChange={(e) => setVerifyEmail(e.target.value)} disabled={codeSent} />

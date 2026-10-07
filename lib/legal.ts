@@ -13,3 +13,23 @@ export const PLATFORM_DISCLAIMER =
 /** Longer platform position for legal pages, forms and modals. */
 export const PLATFORM_DISCLAIMER_LONG =
     'Vital is a free platform where people can post blood requests and voluntary donors can see and respond to them. Vital does not arrange, supervise, verify, promote or guarantee any donation, donor or request, and is not involved in any payment. Any contact or arrangement is entirely between the people involved, at their own discretion and responsibility, and blood is collected only by hospitals and licensed blood banks, which decide who can donate.';
+
+/** The consent fields stored on a profile (and in auth user metadata) when someone ticks the consent box. */
+export const consentStamp = () => ({
+    consent_agreed: true as const,
+    consent_at: new Date().toISOString(),
+    consent_version: PRIVACY_VERSION,
+});
+
+/**
+ * Keep the earliest consent timestamp for the current policy version, so a
+ * later form save doesn't overwrite when the person first agreed. A consent
+ * given to an older version is replaced (that is a re-consent).
+ */
+export const earliestConsentAt = (...stamps: Array<{ consent_at?: string | null; consent_version?: string | null } | null | undefined>) => {
+    const times = stamps
+        .filter(s => s?.consent_at && s.consent_version === PRIVACY_VERSION && !Number.isNaN(Date.parse(s.consent_at)))
+        .map(s => s!.consent_at as string)
+        .sort((a, b) => Date.parse(a) - Date.parse(b));
+    return times[0] ?? null;
+};

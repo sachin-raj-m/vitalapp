@@ -52,6 +52,12 @@ const nextConfig = {
     ],
   },
   turbopack: {},
+  async redirects() {
+    return [
+      // The page was renamed from Achievements to Milestones; keep old links working.
+      { source: '/achievements', destination: '/milestones', permanent: true },
+    ];
+  },
   async headers() {
     return [
       { source: '/:path*', headers: securityHeaders },

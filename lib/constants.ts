@@ -2,6 +2,8 @@
 export const DONATION_RECOVERY_DAYS = 90; // Standard recovery period between donations
 
 // Achievement thresholds
+// `points` is a one-time bonus added when the milestone is reached, on top of
+// POINTS_PER_DONATION for each donation.
 export const ACHIEVEMENTS = {
     FIRST_DROP: {
         id: 'first_drop',
@@ -65,5 +67,7 @@ export const ACHIEVEMENTS = {
     }
 } as const;
 
-// Points system
+// Points system (private to the user, no exchange value).
+// Total = POINTS_PER_DONATION per completed donation + each reached milestone's
+// one-time bonus (ACHIEVEMENTS[*].points). See calculatePoints in lib/stats.ts.
 export const POINTS_PER_DONATION = 50;

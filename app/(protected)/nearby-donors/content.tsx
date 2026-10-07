@@ -17,16 +17,15 @@ const Map = dynamic(() => import('@/components/Map'), {
 
 interface Donor {
     id: string;
-    full_name: string;
+    display_name: string;
     blood_group: string;
-    location: {
-        latitude: number;
-        longitude: number;
-        address?: string;
-    };
-    present_zip?: string;
-    distanceKm?: number;
+    // ~1 km, rounded in SQL; null when the donor has no stored coordinates.
+    location: { latitude: number; longitude: number } | null;
+    // First 3 PIN digits (sorting district), never the full PIN code.
+    area_code: string | null;
 }
+
+type PlacedDonor = Donor & { location: { latitude: number; longitude: number }; distanceKm: number };
 
 function haversineDistanceKm(lat1: number, lon1: number, lat2: number, lon2: number) {
     const toRad = (v: number) => (v * Math.PI) / 180;
@@ -40,101 +39,38 @@ function haversineDistanceKm(lat1: number, lon1: number, lat2: number, lon2: num
     return R * c;
 }
 
-// nearby_donors() already returns "First L." names and ~1 km locations; rounding
-// again here also covers locations geocoded from a PIN code.
-const coarse = (n: number) => Math.round(n * 100) / 100;
-
 export default function NearbyDonorsPageContent() {
     const { user } = useAuth();
     const [center, setCenter] = useState<{ lat: number; lng: number }>({ lat: 20.5937, lng: 78.9629 });
     const [donors, setDonors] = useState<Donor[]>([]);
-    const [nearbyDonors, setNearbyDonors] = useState<Donor[]>([]);
+    const [nearbyDonors, setNearbyDonors] = useState<PlacedDonor[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [status, setStatus] = useState<string>('');
-
-    // Cache for zip code coordinates to avoid rate limiting
-    const [zipCache, setZipCache] = useState<Record<string, { lat: number, lng: number }>>({});
 
     // Fetch donors on mount
     useEffect(() => {
         const fetchDonors = async () => {
             try {
-                // nearby_donors() exposes only a display name, blood group, PIN code
-                // and a location already rounded to ~1 km.
+                // nearby_donors() returns a masked name ("First L."), blood group,
+                // a coarse area code and a location rounded to ~1 km. Donors with
+                // no stored coordinates can't be placed and are left off the map.
                 const { data, error } = await supabase.rpc('nearby_donors');
-
                 if (error) throw error;
 
-                let parsedDonors: Donor[] = (data || []).map((d: any) => ({
-                    id: d.id,
-                    full_name: d.display_name,
-                    blood_group: d.blood_group,
-                    present_zip: d.present_zip,
-                    location: d.approx_location || {},
+                setDonors((data || []).map((d: any): Donor => {
+                    const lat = Number(d.approx_location?.latitude);
+                    const lng = Number(d.approx_location?.longitude);
+                    return {
+                        id: d.id,
+                        display_name: d.display_name || 'Donor',
+                        blood_group: d.blood_group,
+                        area_code: d.area_code ?? null,
+                        location: d.approx_location && Number.isFinite(lat) && Number.isFinite(lng) && !(lat === 0 && lng === 0)
+                            ? { latitude: lat, longitude: lng }
+                            : null,
+                    };
                 }));
-
-                // Identify unique zips that need geocoding (where lat/lng is 0 or missing)
-                const zipsToGeocode = new Set<string>();
-                parsedDonors.forEach(d => {
-                    if ((!d.location?.latitude || d.location.latitude === 0) && d.present_zip) {
-                        zipsToGeocode.add(d.present_zip);
-                    }
-                });
-
-                // Geocode zips if they are not in cache
-                const newZipCache = { ...zipCache };
-                let cacheUpdated = false;
-
-                // We'll process zips sequentially to be nice to the free API
-                // Limit to 5 zips per batch to avoid lagging the UI too much on load
-                const zipsArray = Array.from(zipsToGeocode).slice(0, 5);
-
-                for (const zip of zipsArray) {
-                    if (newZipCache[zip]) continue;
-
-                    try {
-                        const response = await fetch(`/api/geocode?zip=${zip}`, {
-                            headers: {
-                                'Content-Type': 'application/json'
-                            }
-                        });
-                        const results = await response.json();
-                        if (results && results.length > 0) {
-                            newZipCache[zip] = {
-                                lat: parseFloat(results[0].lat),
-                                lng: parseFloat(results[0].lon)
-                            };
-                            cacheUpdated = true;
-                            // Small delay to respect rate limit
-                            await new Promise(r => setTimeout(r, 800));
-                        }
-                    } catch (e) {
-                        console.error(`Failed to geocode zip ${zip}`, e);
-                    }
-                }
-
-                if (cacheUpdated) {
-                    setZipCache(newZipCache);
-                }
-
-                // Assign coordinates from cache if original location is missing
-                const donosWithLocation = parsedDonors.map(d => {
-                    if ((!d.location?.latitude || d.location.latitude === 0) && d.present_zip && newZipCache[d.present_zip]) {
-                        return {
-                            ...d,
-                            location: {
-                                ...d.location,
-                                latitude: newZipCache[d.present_zip].lat,
-                                longitude: newZipCache[d.present_zip].lng,
-                                address: d.location?.address || `Zip: ${d.present_zip}`
-                            }
-                        };
-                    }
-                    return d;
-                });
-
-                setDonors(donosWithLocation as Donor[]);
             } catch (err: any) {
                 console.error("Error fetching donors", err);
                 setError(err.message);
@@ -205,23 +141,17 @@ export default function NearbyDonorsPageContent() {
 
     // Calculate distances when center or donors change
     useEffect(() => {
-        // Filter out donors with invalid location AND the current user
-        const validDonors = donors.filter(d =>
-            d.id !== user?.id && // Exclude current user
-            d.location &&
-            d.location.latitude !== undefined && d.location.latitude !== null &&
-            d.location.longitude !== undefined && d.location.longitude !== null
-        );
-
-        const withDistance = validDonors.map(d => {
-            const location = { ...d.location, latitude: coarse(d.location.latitude), longitude: coarse(d.location.longitude) };
-            const dist = haversineDistanceKm(center.lat, center.lng, location.latitude, location.longitude);
-            return { ...d, location, distanceKm: dist };
-        });
+        const placed: PlacedDonor[] = donors
+            .filter((d): d is Donor & { location: { latitude: number; longitude: number } } =>
+                d.id !== user?.id && d.location !== null)
+            .map(d => ({
+                ...d,
+                distanceKm: haversineDistanceKm(center.lat, center.lng, d.location.latitude, d.location.longitude),
+            }));
 
         // Sort by distance and take top 20
-        const sorted = withDistance.sort((a, b) => (a.distanceKm || 0) - (b.distanceKm || 0));
-        setNearbyDonors(sorted.slice(0, 20));
+        placed.sort((a, b) => a.distanceKm - b.distanceKm);
+        setNearbyDonors(placed.slice(0, 20));
 
     }, [center, donors, user]);
 
@@ -235,7 +165,7 @@ export default function NearbyDonorsPageContent() {
                 <div>
                     <h1 className="display text-4xl sm:text-[2.75rem]">Donors near you</h1>
                     <p className="mt-3 max-w-lg text-gray-600">
-                        The 20 registered donors closest to you. Locations are approximate, and contact details are never shown here.
+                        The 20 registered donors closest to you. Names are shortened, locations are rounded to about a kilometre, and only the first three digits of a PIN code are shown. Contact details are never shown here.
                     </p>
                 </div>
                 <Button
@@ -260,8 +190,8 @@ export default function NearbyDonorsPageContent() {
                             { position: center, title: 'You are here' },
                             ...nearbyDonors.map(d => ({
                                 position: { lat: d.location.latitude, lng: d.location.longitude },
-                                title: `${d.full_name} · ${formatBloodGroup(d.blood_group)}`,
-                                description: `About ${d.distanceKm?.toFixed(1)} km away`
+                                title: `${d.display_name} · ${formatBloodGroup(d.blood_group)}`,
+                                description: `About ${d.distanceKm.toFixed(1)} km away`
                             }))
                         ]}
                     />
@@ -289,10 +219,12 @@ export default function NearbyDonorsPageContent() {
                                         {formatBloodGroup(donor.blood_group)}
                                     </span>
                                     <span className="min-w-0 flex-1">
-                                        <span className="block truncate text-sm font-medium text-gray-900">{donor.full_name}</span>
-                                        <span className="block text-xs text-gray-500">{donor.present_zip || 'PIN code not set'}</span>
+                                        <span className="block truncate text-sm font-medium text-gray-900">{donor.display_name}</span>
+                                        {donor.area_code && (
+                                            <span className="block text-xs text-gray-500">PIN area {donor.area_code}xxx</span>
+                                        )}
                                     </span>
-                                    <span className="shrink-0 text-sm tabular-nums text-gray-600">{donor.distanceKm?.toFixed(1)} km</span>
+                                    <span className="shrink-0 text-sm tabular-nums text-gray-600">~{donor.distanceKm.toFixed(1)} km</span>
                                 </button>
                             </li>
                         ))}

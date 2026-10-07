@@ -14,7 +14,7 @@ import { DashboardSkeleton } from '@/components/skeletons/DashboardSkeleton';
 import { EmptyState } from '@/components/EmptyState';
 import { useRequests } from '@/context/RequestsContext';
 import { NotificationBanner } from '@/components/NotificationBanner';
-import { fetchUserStats, calculateEligibility, type UserStats } from '@/lib/stats';
+import { fetchUserStats, calculateEligibility, describePoints, type UserStats } from '@/lib/stats';
 
 const greeting = () => {
     const h = new Date().getHours();
@@ -93,7 +93,9 @@ export default function DashboardPage() {
                     <dt className="text-sm font-medium text-gray-600">Donations</dt>
                     <dd className="mt-1">
                         <CountUp value={stats?.total_donations ?? 0} className="font-serif text-5xl font-semibold leading-none text-red-600" />
-                        <p className="mt-1.5 text-sm text-gray-600">{stats?.total_points ?? 0} points</p>
+                        <p className="mt-1.5 text-sm text-gray-600">
+                            {stats ? describePoints(stats.points) : '0 points'}
+                        </p>
                     </dd>
                 </div>
 
@@ -101,9 +103,11 @@ export default function DashboardPage() {
                     <dt className="text-sm font-medium text-gray-600">Next milestone</dt>
                     <dd className="mt-2">
                         {nextBadge ? (
-                            <Link href="/achievements" className="group block">
+                            <Link href="/milestones" className="group block">
                                 <div className="flex items-baseline justify-between gap-2">
-                                    <span className="text-lg font-semibold text-gray-900 group-hover:text-red-700">{nextBadge.name}</span>
+                                    <span className="text-lg font-semibold text-gray-900 group-hover:text-red-700">
+                                        {nextBadge.name} <span className="text-sm font-normal text-gray-600">+{nextBadge.points} bonus</span>
+                                    </span>
                                     <span className="text-sm tabular-nums text-gray-600">{nextBadge.progress} of {nextBadge.threshold}</span>
                                 </div>
                                 <div className="mt-2.5 h-2 overflow-hidden rounded-full bg-red-50">
@@ -119,7 +123,7 @@ export default function DashboardPage() {
                                 </p>
                             </Link>
                         ) : (
-                            <Link href="/achievements" className="text-lg font-semibold text-gray-900 hover:text-red-700">
+                            <Link href="/milestones" className="text-lg font-semibold text-gray-900 hover:text-red-700">
                                 All milestones reached
                             </Link>
                         )}

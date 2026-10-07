@@ -28,7 +28,7 @@ const NAV = [
     { href: '/requests/my-requests', label: 'My requests', icon: FileText },
     { href: '/donations', label: 'My donations', icon: HeartPulse },
     { href: '/nearby-donors', label: 'Donors near you', icon: MapPin },
-    { href: '/achievements', label: 'Milestones', icon: Award },
+    { href: '/milestones', label: 'Milestones', icon: Award },
     { href: '/profile', label: 'Profile', icon: User },
 ];
 

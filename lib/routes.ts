@@ -1,5 +1,5 @@
 // Routes that render inside the app sidebar instead of the public header/footer.
-const APP_PREFIXES = ['/dashboard', '/admin', '/profile', '/nearby-donors', '/achievements', '/donations'];
+const APP_PREFIXES = ['/dashboard', '/admin', '/profile', '/nearby-donors', '/milestones', '/donations'];
 
 export const isAppRoute = (pathname: string | null) =>
     !!pathname && APP_PREFIXES.some(p => pathname.startsWith(p));
