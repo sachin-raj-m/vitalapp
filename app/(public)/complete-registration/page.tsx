@@ -6,6 +6,7 @@ import { Input, Select } from '@/components/ui/Input';
 import { Alert } from '@/components/ui/Alert';
 import { Button } from '@/components/ui/Button';
 import { supabase } from '@/lib/supabase';
+import { authedFetch } from '@/lib/api';
 import { BLOOD_GROUPS, formatBloodGroup } from '@/lib/blood-compatibility';
 import type { BloodGroup } from '@/types';
 import { useAuth } from '@/context/AuthContext';
@@ -207,6 +208,10 @@ export default function CompleteRegistration() {
                 );
 
             if (profileError) throw profileError;
+
+            // Place the donor on the map from their PIN code (server-side geocode).
+            // Fire-and-forget: if it fails, nearby search still ranks by PIN area.
+            authedFetch('/api/profile/location', { method: 'POST', keepalive: true }).catch(() => {});
 
             setProgress(90);
             setStatus('finalizing');

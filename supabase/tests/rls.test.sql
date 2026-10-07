@@ -548,4 +548,26 @@ SELECT tests.is(tests.val($q$SELECT has_function_privilege('anon', 'public.hook_
   OR has_function_privilege('service_role', 'public.hook_before_user_created(jsonb)', 'EXECUTE')$q$),
   'false', 'hook: not executable by anon / authenticated / service_role');
 
+-- ---------------------------------------------------------------------------
+-- 10. Donor coordinates (20261008000500_location_placeholders)
+-- ---------------------------------------------------------------------------
+SELECT tests.login('postgres');
+SELECT tests.is(public.location_in_india('{"latitude": 0, "longitude": 0}'), false,
+  'location: (0,0) placeholder is not a usable location');
+SELECT tests.is(public.location_in_india('{"latitude": 51.5, "longitude": -0.12}'), false,
+  'location: coordinates outside India are rejected');
+SELECT tests.is(public.location_in_india('{"latitude": 9.981, "longitude": 76.299}'), true,
+  'location: a point in India is accepted');
+SELECT tests.is(public.approx_location('{"latitude": 0, "longitude": 0}'), NULL::jsonb,
+  'location: approx_location hides the (0,0) placeholder');
+SELECT tests.is(public.approx_location('{"latitude": 9.981, "longitude": 76.299}'),
+  '{"latitude": 9.98, "longitude": 76.30}'::jsonb, 'location: approx_location rounds to ~1 km');
+
+SELECT tests.login('donor');
+SELECT tests.is(tests.affected($q$UPDATE public.profiles SET location = '{"latitude": 9.981, "longitude": 76.299, "source": "pin"}' WHERE id = auth.uid()$q$),
+  1, 'location: a donor can set their own location');
+SELECT tests.is(tests.affected(format($q$UPDATE public.profiles SET location = '{"latitude": 9.9, "longitude": 76.2}' WHERE id = %L$q$, tests.uid('requester'))),
+  0, 'location: a donor cannot set someone else''s location');
+SELECT tests.login('postgres');
+
 \o
