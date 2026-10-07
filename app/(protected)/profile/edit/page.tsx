@@ -87,7 +87,7 @@ export default function ProfileEditPage() {
                 is_public_profile: editForm.is_public_profile
                 // phone is not updated here directly if not changed
             });
-            setSuccess('Saved.');
+            setSuccess('Your changes have been saved.');
             setTimeout(() => router.push('/profile'), 1500);
         } catch (err: any) {
             console.error('Error updating profile:', err);
@@ -121,7 +121,7 @@ export default function ProfileEditPage() {
                 is_public_profile: editForm.is_public_profile
             });
 
-            setSuccess('Phone number verified successfully!');
+            setSuccess('Phone number verified.');
             setIsVerifying(false);
 
             // Redirect after brief delay to show success message
@@ -158,17 +158,18 @@ export default function ProfileEditPage() {
     return (
         <div className="mx-auto max-w-4xl">
             <Link href="/profile" className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-900">
-                <ArrowLeft className="h-3.5 w-3.5" /> Profile
+                <ArrowLeft className="h-3.5 w-3.5" /> Back to profile
             </Link>
             <header className="pb-8 pt-6">
-                <h1 className="display text-5xl leading-none">Edit profile</h1>
+                <h1 className="display text-4xl sm:text-[2.75rem]">Edit profile</h1>
+                <p className="mt-3 max-w-lg text-gray-600">Update your contact details, location and availability.</p>
             </header>
 
             {error && <Alert variant="error" className="mb-6">{error}</Alert>}
             {success && <Alert variant="success" className="mb-6">{success}</Alert>}
 
             <form onSubmit={handleSave}>
-                {section('You', 'Changing your phone number sends a code to the new number to confirm it.', <>
+                {section('Personal details', 'Changing your phone number sends a code to the new number to confirm it.', <>
                     <Input label="Full name" value={editForm.full_name} onChange={(e) => setEditForm({ ...editForm, full_name: e.target.value })} required autoComplete="name" />
                     <Input label="Phone" type="tel" value={editForm.phone} onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })} required autoComplete="tel" />
                 </>)}
@@ -178,7 +179,7 @@ export default function ProfileEditPage() {
                     <Input label="Permanent PIN code" inputMode="numeric" value={editForm.permanent_zip} onChange={(e) => setEditForm({ ...editForm, permanent_zip: e.target.value })} required />
                 </div>)}
 
-                {section('Availability', 'You can pause yourself any time, for travel, illness or anything else.', <div className="space-y-5">
+                {section('Availability', 'You can pause requests at any time, for example while travelling or unwell.', <div className="space-y-5">
                     {toggle(editForm.is_available, v => setEditForm({ ...editForm, is_available: v }), 'Available to donate', 'Turn off to stop getting requests for a while.')}
                     {toggle(editForm.is_public_profile, v => setEditForm({ ...editForm, is_public_profile: v }), 'Public donor card', 'Anyone with your link can see your first name, blood group and donation count.')}
                 </div>)}

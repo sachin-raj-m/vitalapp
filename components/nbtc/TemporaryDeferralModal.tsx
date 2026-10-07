@@ -12,7 +12,7 @@ interface TemporaryDeferralModalProps {
 }
 
 const CHECKS = [
-    { key: 'health', title: 'I’m feeling well today', detail: 'No cold, flu, sore throat or fever.' },
+    { key: 'health', title: 'I am feeling well today', detail: 'No cold, flu, sore throat or fever.' },
     { key: 'antibiotics', title: 'No antibiotics in the last 14 days', detail: 'Counted from your last dose.' },
     { key: 'procedures', title: 'No tattoo, piercing or surgery in the last 12 months' },
     { key: 'alcohol', title: 'No alcohol in the last 24 hours' },
@@ -39,9 +39,11 @@ export function TemporaryDeferralModal({ isOpen, onClose, onConfirm }: Temporary
     const allChecked = checked.size === CHECKS.length;
 
     return (
-        <Modal isOpen={isOpen} onClose={onClose} title="Before you offer">
+        <Modal isOpen={isOpen} onClose={onClose} title="Your self-check">
             <p className="leading-relaxed text-gray-600">
-                These keep the patient safe. If any of them aren’t true today, please sit this one out. There will be others.
+                Tick each item only if it is true for you today. This is your own declaration and Vital does not check it.
+                The hospital or blood bank makes its own checks and decides whether you can donate. If any item is not
+                true for you, please don’t offer on this request.
             </p>
 
             <ul className="mt-5 divide-y divide-gray-200 border-y border-gray-200">
@@ -73,10 +75,10 @@ export function TemporaryDeferralModal({ isOpen, onClose, onConfirm }: Temporary
             </ul>
 
             <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <span className="font-mono text-xs text-gray-400">{checked.size} / {CHECKS.length}</span>
+                <span className="text-sm tabular-nums text-gray-500">{checked.size} of {CHECKS.length} confirmed</span>
                 <div className="flex flex-col-reverse gap-2 sm:flex-row">
                     <Button variant="secondary" onClick={onClose}>Cancel</Button>
-                    <Button variant="ink" disabled={!allChecked} onClick={onConfirm}>All true, continue</Button>
+                    <Button variant="ink" disabled={!allChecked} onClick={onConfirm}>Continue</Button>
                 </div>
             </div>
         </Modal>

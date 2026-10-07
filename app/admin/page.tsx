@@ -456,7 +456,7 @@ export default function AdminDashboard() {
                                                     <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${user.verification_status === 'verified' ? 'bg-success-100 text-success-800' : 'bg-warning-100 text-warning-800'}`}>
                                                         {user.verification_status === 'verified' ? 'Verified Donor' : 'Pending Verified'}
                                                     </span>
-                                                ) : <span className="text-gray-400 text-xs">Recipient</span>}
+                                                ) : <span className="text-gray-500 text-xs">Recipient</span>}
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                                                 <Button
@@ -548,7 +548,7 @@ export default function AdminDashboard() {
                         {/* ... Modal content ... */}
                         <div className="p-6 border-b flex justify-between items-center sticky top-0 bg-white z-10">
                             <h3 className="text-xl font-bold">Edit User Details</h3>
-                            <button onClick={() => setSelectedUser(null)} className="text-gray-400 hover:text-gray-600">
+                            <button onClick={() => setSelectedUser(null)} className="text-gray-500 hover:text-gray-600">
                                 <X size={24} />
                             </button>
                         </div>

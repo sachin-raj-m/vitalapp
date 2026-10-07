@@ -139,13 +139,15 @@ export default function DonationsPage() {
     return (
         <div className="space-y-10">
             <header>
-                <p className="eyebrow">My donations</p>
-                <h1 className="display mt-3 text-5xl leading-none">Every offer you’ve made.</h1>
+                <h1 className="display text-4xl sm:text-[2.75rem]">My donations</h1>
+                <p className="mt-3 max-w-lg text-gray-600">
+                    Requests you have offered to donate for. Show your PIN at the hospital so they can confirm your donation.
+                </p>
             </header>
 
             {error && <Alert variant="error">{error}</Alert>}
 
-            <dl className="grid overflow-hidden rounded-lg border border-gray-200 bg-white sm:grid-cols-3 sm:divide-x sm:divide-gray-200">
+            <dl className="grid grid-cols-3 gap-4 border-y border-gray-200 py-6 sm:gap-8">
                 {[
                     { label: 'Verified donations', value: isLoading ? null : String(stats?.total_donations ?? counts.verified) },
                     { label: 'Points', value: isLoading ? null : String(stats?.total_points ?? 0) },
@@ -153,11 +155,11 @@ export default function DonationsPage() {
                         label: 'Next eligible',
                         value: isLoading ? null : eligibility.isEligible ? 'Now' : format(eligibility.nextEligibleDate, 'd MMM'),
                     },
-                ].map((item, i) => (
-                    <div key={item.label} className={cn('p-5 sm:p-6', i > 0 && 'border-t border-gray-200 sm:border-t-0')}>
-                        <dt className="eyebrow">{item.label}</dt>
-                        <dd className="mt-3 font-serif text-4xl leading-none tracking-tight text-gray-900">
-                            {item.value ?? <Skeleton className="h-9 w-16" />}
+                ].map(item => (
+                    <div key={item.label}>
+                        <dt className="text-sm text-gray-500">{item.label}</dt>
+                        <dd className="mt-1.5 text-xl font-medium tabular-nums text-gray-900 sm:text-2xl">
+                            {item.value ?? <Skeleton className="h-8 w-14" />}
                         </dd>
                     </div>
                 ))}
@@ -175,7 +177,7 @@ export default function DonationsPage() {
                                 filter === tab ? 'border-gray-900 bg-gray-900 text-gray-50' : 'border-gray-300 bg-white text-gray-700 hover:border-gray-400',
                             )}
                         >
-                            {tab === 'pending' ? 'Offered' : tab} <span className="ml-1 font-mono text-[11px] opacity-60">{counts[tab]}</span>
+                            {tab === 'pending' ? 'Offered' : tab} <span className="ml-1 tabular-nums opacity-60">{counts[tab]}</span>
                         </button>
                     ))}
                 </div>
@@ -185,8 +187,8 @@ export default function DonationsPage() {
                 ) : filtered.length === 0 ? (
                     <EmptyState
                         icon={HeartPulse}
-                        title={filter === 'all' ? 'No offers yet' : 'Nothing here'}
-                        description={filter === 'all' ? 'When you offer to donate for a request, it will show up here with the family’s contact and your PIN.' : 'Try a different filter.'}
+                        title={filter === 'all' ? 'No offers yet' : 'No donations in this view'}
+                        description={filter === 'all' ? 'When you offer to donate for a request, it will appear here with the contact details and your PIN.' : 'Try a different filter.'}
                         actionLabel={filter === 'all' ? 'See open requests' : undefined}
                         onAction={() => { window.location.href = '/requests'; }}
                     />
@@ -257,7 +259,7 @@ export default function DonationsPage() {
                 onClose={() => setDonationToWithdraw(null)}
                 onConfirm={performWithdraw}
                 title="Withdraw this offer?"
-                description="The family will no longer see you as an incoming donor. If you can still help, it’s kind to call and let them know either way."
+                description="The requester will no longer see you as an incoming donor. If you have already been in touch, please let them know."
                 confirmText="Withdraw offer"
                 variant="danger"
                 isLoading={isWithdrawing}

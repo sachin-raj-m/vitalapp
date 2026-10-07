@@ -40,7 +40,7 @@ function haversineDistanceKm(lat1: number, lon1: number, lat2: number, lon2: num
     return R * c;
 }
 
-// public_donors already returns "First L." names and ~1 km locations; rounding
+// nearby_donors() already returns "First L." names and ~1 km locations; rounding
 // again here also covers locations geocoded from a PIN code.
 const coarse = (n: number) => Math.round(n * 100) / 100;
 
@@ -60,15 +60,13 @@ export default function NearbyDonorsPageContent() {
     useEffect(() => {
         const fetchDonors = async () => {
             try {
-                // public_donors exposes only a display name, blood group, PIN code
+                // nearby_donors() exposes only a display name, blood group, PIN code
                 // and a location already rounded to ~1 km.
-                const { data, error } = await supabase
-                    .from('public_donors')
-                    .select('id, display_name, blood_group, approx_location, present_zip');
+                const { data, error } = await supabase.rpc('nearby_donors');
 
                 if (error) throw error;
 
-                let parsedDonors = (data || []).map((d: any) => ({
+                let parsedDonors: Donor[] = (data || []).map((d: any) => ({
                     id: d.id,
                     full_name: d.display_name,
                     blood_group: d.blood_group,
@@ -235,9 +233,8 @@ export default function NearbyDonorsPageContent() {
         <div className="space-y-6">
             <header className="flex flex-col justify-between gap-6 sm:flex-row sm:items-end">
                 <div>
-                    <p className="eyebrow">Donors nearby</p>
-                    <h1 className="display mt-3 text-5xl leading-none">Who’s around you.</h1>
-                    <p className="mt-3 max-w-lg text-sm text-gray-600">
+                    <h1 className="display text-4xl sm:text-[2.75rem]">Donors near you</h1>
+                    <p className="mt-3 max-w-lg text-gray-600">
                         The 20 registered donors closest to you. Locations are approximate, and contact details are never shown here.
                     </p>
                 </div>
@@ -272,13 +269,13 @@ export default function NearbyDonorsPageContent() {
 
                 <div className="flex min-h-0 flex-col">
                     <div className="flex items-center justify-between border-b border-gray-200 px-5 py-3">
-                        <span className="eyebrow">Closest first</span>
-                        <span className="font-mono text-xs text-gray-500">{nearbyDonors.length}</span>
+                        <span className="text-sm font-medium text-gray-900">Nearest donors</span>
+                        <span className="text-sm tabular-nums text-gray-500">{nearbyDonors.length} shown</span>
                     </div>
                     <ul className="max-h-[420px] flex-1 divide-y divide-gray-200 overflow-y-auto lg:max-h-none">
                         {nearbyDonors.length === 0 ? (
                             <li className="px-5 py-12 text-center">
-                                <MapPin className="mx-auto h-5 w-5 text-gray-400" strokeWidth={1.75} />
+                                <MapPin className="mx-auto h-5 w-5 text-gray-500" strokeWidth={1.75} />
                                 <p className="mt-3 text-sm font-medium text-gray-900">No donors found nearby</p>
                                 <p className="mt-1 text-sm text-gray-500">Try using your current location.</p>
                             </li>
@@ -293,9 +290,9 @@ export default function NearbyDonorsPageContent() {
                                     </span>
                                     <span className="min-w-0 flex-1">
                                         <span className="block truncate text-sm font-medium text-gray-900">{donor.full_name}</span>
-                                        <span className="block font-mono text-[11px] text-gray-500">{donor.present_zip || 'PIN code not set'}</span>
+                                        <span className="block text-xs text-gray-500">{donor.present_zip || 'PIN code not set'}</span>
                                     </span>
-                                    <span className="shrink-0 font-mono text-xs text-gray-600">{donor.distanceKm?.toFixed(1)} km</span>
+                                    <span className="shrink-0 text-sm tabular-nums text-gray-600">{donor.distanceKm?.toFixed(1)} km</span>
                                 </button>
                             </li>
                         ))}

@@ -17,10 +17,10 @@ interface BloodRequestCardProps {
   isOwnRequest?: boolean;
 }
 
-const URGENCY: Record<UrgencyLevel, { label: string; dot: string; text: string }> = {
-  High: { label: 'Urgent', dot: 'bg-red-600', text: 'text-red-700' },
-  Medium: { label: 'Soon', dot: 'bg-warning-500', text: 'text-warning-700' },
-  Low: { label: 'Planned', dot: 'bg-gray-400', text: 'text-gray-600' },
+const URGENCY: Record<UrgencyLevel, { label: string; className: string; dot: string }> = {
+  High: { label: 'Urgent', className: 'bg-red-600 text-white', dot: 'bg-white' },
+  Medium: { label: 'Needed soon', className: 'bg-warning-100 text-warning-800', dot: 'bg-warning-500' },
+  Low: { label: 'Planned', className: 'bg-gray-100 text-gray-700', dot: 'bg-gray-400' },
 };
 
 export const BloodRequestCard: React.FC<BloodRequestCardProps> = ({
@@ -40,14 +40,14 @@ export const BloodRequestCard: React.FC<BloodRequestCardProps> = ({
   return (
     <article
       className={cn(
-        'group relative flex gap-4 rounded-lg border bg-white p-4 transition-colors sm:gap-5 sm:p-5',
-        isUrgent ? 'border-red-200' : 'border-gray-200 hover:border-gray-300',
+        'lift group relative flex gap-4 overflow-hidden rounded-xl border bg-white p-4 sm:gap-5 sm:p-5',
+        isUrgent ? 'border-red-200 hover:border-red-300' : 'border-gray-200 hover:border-gray-300',
       )}
     >
       <div
         className={cn(
-          'flex h-16 w-16 shrink-0 items-center justify-center rounded-md font-serif text-[2rem] leading-none tracking-tight sm:h-[4.5rem] sm:w-[4.5rem] sm:text-[2.25rem]',
-          isUrgent ? 'bg-red-600 text-white' : 'bg-gray-100 text-gray-900',
+          'flex h-16 w-16 shrink-0 items-center justify-center rounded-lg font-serif text-[2rem] font-semibold leading-none tracking-tight transition-transform duration-200 group-hover:scale-[1.04] sm:h-[4.5rem] sm:w-[4.5rem] sm:text-[2.25rem]',
+          isUrgent ? 'bg-red-600 text-white shadow-md shadow-red-600/25' : 'bg-red-50 text-red-700',
         )}
         aria-label={`Blood group ${request.blood_group}`}
       >
@@ -56,48 +56,47 @@ export const BloodRequestCard: React.FC<BloodRequestCardProps> = ({
 
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-          <span className={cn('inline-flex items-center gap-1.5 font-mono text-[11px] uppercase tracking-[0.12em]', urgency.text)}>
-            <span className={cn('h-1.5 w-1.5 rounded-full', urgency.dot)} />
+          <span className={cn('inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-semibold', urgency.className)}>
+            <span className="relative flex h-1.5 w-1.5" aria-hidden>
+              {isUrgent && <span className={cn('absolute inline-flex h-full w-full rounded-full animate-beat', urgency.dot)} />}
+              <span className={cn('relative inline-flex h-1.5 w-1.5 rounded-full', urgency.dot)} />
+            </span>
             {urgency.label}
           </span>
-          <span className="font-mono text-[11px] uppercase tracking-[0.12em] text-gray-400">{timeAgo}</span>
+          <span className="text-xs text-gray-500">Posted {timeAgo}</span>
         </div>
 
-        <h3 className="mt-1.5 text-[17px] font-medium leading-snug tracking-tight text-gray-900">
+        <h3 className="mt-1.5 text-[17px] font-semibold leading-snug tracking-tight text-gray-900">
           <Link href={`/requests/${request.id}`} className="after:absolute after:inset-0 after:content-[''] focus-visible:outline-none">
             {units} at {request.hospital_name}
           </Link>
         </h3>
 
-        <p className="mt-1 text-sm text-gray-500">
-          {[request.city, request.date_needed && `needed by ${format(parseISO(request.date_needed), 'd MMM')}`, `for ${request.contact_name}`]
+        <p className="mt-1 text-sm text-gray-600">
+          {[request.city, request.date_needed && `Needed by ${format(parseISO(request.date_needed), 'd MMM')}`, `Contact: ${request.contact_name}`]
             .filter(Boolean)
             .join(' · ')}
         </p>
 
         {request.notes && (
-          <p className="mt-3 line-clamp-2 border-l-2 border-gray-200 pl-3 text-sm italic leading-relaxed text-gray-600">
+          <p className="mt-3 line-clamp-2 text-sm leading-relaxed text-gray-600">
             {request.notes}
           </p>
         )}
 
         {/* Actions sit above the stretched title link. */}
         <div className="relative z-10 mt-4 flex flex-wrap items-center justify-between gap-3">
-          <ShareButton
-            title={`${formatBloodGroup(request.blood_group)} blood needed: ${units} at ${request.hospital_name}`}
-            text={`${request.hospital_name}${request.city ? `, ${request.city}` : ''} needs ${units} of ${formatBloodGroup(request.blood_group)}.`}
-            path={`/requests/${request.id}`}
-          />
+          <ShareButton request={request} />
 
           {isOwnRequest ? (
-            <span className="font-mono text-[11px] uppercase tracking-[0.12em] text-gray-500">Your request</span>
+            <span className="text-sm text-gray-500">Your request</span>
           ) : onRespond && (
             hasOffered ? (
               <Button size="sm" variant="secondary" onClick={onPendingClick || onRespond} leftIcon={<Clock className="h-3.5 w-3.5" />}>
-                You offered · view PIN
+                Offer sent · View PIN
               </Button>
             ) : incompatible ? (
-              <span className="text-[13px] text-gray-400">
+              <span className="text-[13px] text-gray-500">
                 Not compatible with {formatBloodGroup(userBloodGroup)}
               </span>
             ) : (

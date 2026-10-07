@@ -1,27 +1,39 @@
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const supabaseHost = supabaseUrl ? new URL(supabaseUrl).host : '';
+const isDev = process.env.NODE_ENV === 'development';
 
-// Ships as Report-Only first: watch the browser console for violations, then
-// set CSP_ENFORCE=true to enforce it.
+// Enforced by default. Escape hatch: CSP_REPORT_ONLY=true sends the same policy
+// as Content-Security-Policy-Report-Only (violations are logged, nothing blocked).
+// Covers everything the app loads today: self-hosted next/font fonts, OSM map
+// tiles, Supabase REST/auth/realtime. Google OAuth is a top-level navigation and
+// OG images are same-origin. Adding a new third-party origin means adding it here.
 const csp = [
   "default-src 'self'",
   // Next.js injects inline bootstrap scripts; nonces would remove 'unsafe-inline'.
-  "script-src 'self' 'unsafe-inline'",
+  // React Refresh in `next dev` needs eval.
+  `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ''}`,
   // Leaflet marker HTML and React style props use inline styles.
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob: https://tile.openstreetmap.org",
   "font-src 'self'",
-  `connect-src 'self'${supabaseHost ? ` https://${supabaseHost} wss://${supabaseHost}` : ''}`,
+  `connect-src 'self'${supabaseHost ? ` https://${supabaseHost} wss://${supabaseHost}` : ''}${isDev ? ' ws: http://localhost:* http://127.0.0.1:*' : ''}`,
   "worker-src 'self'",
   "manifest-src 'self'",
+  "frame-src 'none'",
   "frame-ancestors 'none'",
   "form-action 'self'",
   "base-uri 'self'",
   "object-src 'none'",
 ].join('; ');
 
+// Without the Supabase host, connect-src would block every API call: never enforce that.
+if (!supabaseHost) console.warn('NEXT_PUBLIC_SUPABASE_URL is not set; CSP falls back to Report-Only.');
+const cspHeader = process.env.CSP_REPORT_ONLY === 'true' || !supabaseHost
+  ? 'Content-Security-Policy-Report-Only'
+  : 'Content-Security-Policy';
+
 const securityHeaders = [
-  { key: process.env.CSP_ENFORCE === 'true' ? 'Content-Security-Policy' : 'Content-Security-Policy-Report-Only', value: csp },
+  { key: cspHeader, value: csp },
   { key: 'X-Frame-Options', value: 'DENY' },
   { key: 'X-Content-Type-Options', value: 'nosniff' },
   { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },

@@ -10,14 +10,14 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const variantStyles = {
-  primary: 'bg-red-600 text-white hover:bg-red-700 active:bg-red-800',
-  ink: 'bg-gray-900 text-gray-50 hover:bg-gray-800 active:bg-gray-950',
-  secondary: 'bg-white text-gray-900 border border-gray-300 hover:border-gray-400 hover:bg-gray-100',
-  outline: 'bg-transparent text-gray-900 border border-gray-300 hover:border-gray-400 hover:bg-gray-100',
-  ghost: 'bg-transparent text-gray-700 hover:bg-gray-200/60 hover:text-gray-900',
-  accent: 'bg-gray-900 text-gray-50 hover:bg-gray-800',
+  primary: 'bg-red-600 text-white shadow-sm shadow-red-600/25 hover:bg-red-700 hover:shadow-md hover:shadow-red-600/25 active:bg-red-800',
+  ink: 'bg-gray-900 text-white hover:bg-gray-800 active:bg-gray-950',
+  secondary: 'bg-white text-gray-900 border border-gray-300 hover:border-gray-900 active:bg-gray-100',
+  outline: 'bg-transparent text-gray-900 border border-gray-300 hover:border-gray-900 hover:bg-white active:bg-gray-100',
+  ghost: 'bg-transparent text-gray-700 hover:bg-gray-100 hover:text-gray-900',
+  accent: 'bg-gray-900 text-white hover:bg-gray-800',
   success: 'bg-success-600 text-white hover:bg-success-700',
-  warning: 'bg-warning-500 text-white hover:bg-warning-600',
+  warning: 'bg-warning-500 text-gray-900 hover:bg-warning-400',
   error: 'bg-red-600 text-white hover:bg-red-700',
 };
 
@@ -42,7 +42,7 @@ export const Button: React.FC<ButtonProps> = ({
   return (
     <button
       className={cn(
-        'inline-flex items-center justify-center whitespace-nowrap rounded-md font-medium tracking-[-0.01em] transition-colors duration-150 select-none',
+        'inline-flex items-center justify-center whitespace-nowrap press rounded-md font-semibold tracking-[-0.01em] select-none',
         'disabled:pointer-events-none disabled:opacity-45',
         variantStyles[variant],
         sizeStyles[size],

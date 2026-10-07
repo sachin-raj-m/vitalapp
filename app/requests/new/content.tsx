@@ -1,5 +1,6 @@
 "use client";
 
+import { authedFetch } from '@/lib/api';
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -82,7 +83,7 @@ export default function CreateRequestPage() {
             return;
         }
         setCodeSent(true);
-        toast.success('Code sent', { description: `Check ${verifyEmail}. It can take a minute.` });
+        toast.success('Code sent', { description: `Check ${verifyEmail}. It may take a minute to arrive.` });
     };
 
     const confirmCode = async () => {
@@ -91,7 +92,7 @@ export default function CreateRequestPage() {
         const { data: otpData, error: otpError } = await supabase.auth.verifyOtp({ email: verifyEmail, token: code, type: 'email' });
         setVerifyBusy(false);
         if (otpError || !otpData.user) {
-            setError('That code didn’t work. Check it, or send a new one.');
+            setError('That code is incorrect or has expired. Check it or request a new one.');
             return;
         }
         setVerifiedUserId(otpData.user.id);
@@ -114,7 +115,7 @@ export default function CreateRequestPage() {
             return;
         }
         if (!hasLocation) {
-            setError('Drop a pin on the map (or use your location) so nearby donors can find the hospital.');
+            setError('Mark the hospital on the map, or use your location, so nearby donors can find it.');
             window.scrollTo({ top: 0, behavior: 'smooth' });
             return;
         }
@@ -178,9 +179,8 @@ export default function CreateRequestPage() {
 
             // Trigger Push Notifications (Fire and Forget)
             // The server loads the request itself and checks it belongs to us.
-            fetch('/api/notify/donors', {
+            authedFetch('/api/notify/donors', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ requestId })
             }).catch(e => console.error('Notification trigger failed', e));
 
@@ -198,7 +198,7 @@ export default function CreateRequestPage() {
             });
 
             toast.success('Request posted', {
-                description: `Compatible donors in ${formData.city} are being alerted. Share it on WhatsApp to reach more people.`
+                description: `Compatible donors in ${formData.city} are being notified. You can share the request to reach more people.`
             });
 
             router.push(requestId ? `/requests/${requestId}` : '/requests');
@@ -232,11 +232,11 @@ export default function CreateRequestPage() {
         }
     };
 
-    const section = (n: string, title: string, children: React.ReactNode) => (
+    const section = (title: string, hint: string, children: React.ReactNode) => (
         <section className="grid gap-6 border-t border-gray-200 py-8 md:grid-cols-3 md:gap-10">
             <div>
-                <p className="font-mono text-xs text-red-600">{n}</p>
-                <h2 className="mt-2 font-medium text-gray-900">{title}</h2>
+                <h2 className="font-medium text-gray-900">{title}</h2>
+                <p className="mt-1 text-sm leading-relaxed text-gray-500">{hint}</p>
             </div>
             <div className="space-y-4 md:col-span-2">{children}</div>
         </section>
@@ -245,18 +245,17 @@ export default function CreateRequestPage() {
     return (
         <div className="mx-auto max-w-4xl">
             <header className="pb-8">
-                <p className="eyebrow">New request</p>
-                <h1 className="display mt-3 text-5xl leading-none">Ask for blood.</h1>
-                <p className="mt-4 max-w-xl leading-relaxed text-gray-600">
-                    Once posted, registered donors in the same city with a compatible blood group are alerted by push and email.
-                    You’ll get a link to share as well.
+                <h1 className="display text-4xl sm:text-[2.75rem]">Request blood</h1>
+                <p className="mt-3 max-w-xl leading-relaxed text-gray-600">
+                    When you post a request, registered donors in the same city whose listed blood group is compatible
+                    are alerted by push notification and email. You will also get a link you can share.
                 </p>
             </header>
 
             {error && <Alert variant="error" className="mb-6" onClose={() => setError('')}>{error}</Alert>}
 
             <form onSubmit={handleSubmit}>
-                {section('01', 'What’s needed', <>
+                {section('Blood required', 'The blood group, number of units and when they are needed.', <>
                     <div>
                         <p className="mb-1.5 text-[13px] font-medium text-gray-800">Blood group</p>
                         <div className="grid grid-cols-4 gap-1.5" role="radiogroup" aria-label="Blood group">
@@ -296,7 +295,7 @@ export default function CreateRequestPage() {
                     <div>
                         <p className="mb-1.5 text-[13px] font-medium text-gray-800">Urgency</p>
                         <div className="grid grid-cols-3 gap-1.5" role="radiogroup" aria-label="Urgency">
-                            {([['High', 'Urgent', 'Today'], ['Medium', 'Soon', 'In a few days'], ['Low', 'Planned', 'Scheduled']] as const).map(([value, label, hint]) => (
+                            {([['High', 'Urgent', 'Today'], ['Medium', 'Needed soon', 'In a few days'], ['Low', 'Planned', 'Scheduled']] as const).map(([value, label, hint]) => (
                                 <button
                                     key={value}
                                     type="button"
@@ -313,11 +312,11 @@ export default function CreateRequestPage() {
                     </div>
                 </>)}
 
-                {section('02', 'Where', <>
+                {section('Hospital', 'Where the donation will take place.', <>
                     <Input label="Hospital" value={formData.hospitalName} onChange={(e) => setFormData({ ...formData, hospitalName: e.target.value })} required placeholder="e.g. General Hospital" />
                     <Input label="Address" value={formData.hospitalAddress} onChange={(e) => setFormData({ ...formData, hospitalAddress: e.target.value })} required />
                     <div className="grid gap-4 sm:grid-cols-2">
-                        <Input label="City" value={formData.city} onChange={(e) => setFormData({ ...formData, city: e.target.value })} required placeholder="e.g. Kochi" helperText="Donors in this city are alerted." />
+                        <Input label="City" value={formData.city} onChange={(e) => setFormData({ ...formData, city: e.target.value })} required placeholder="e.g. Kochi" helperText="Donors in this city are notified." />
                         <Input label="PIN code" inputMode="numeric" value={formData.zipcode} onChange={(e) => setFormData({ ...formData, zipcode: e.target.value })} required placeholder="e.g. 682011" />
                     </div>
                     <div>
@@ -337,15 +336,15 @@ export default function CreateRequestPage() {
                                 onLocationSelect={(loc) => setFormData(prev => ({ ...prev, location: { ...prev.location, latitude: loc.lat, longitude: loc.lng } }))}
                             />
                         </div>
-                        <p className="mt-1.5 font-mono text-[11px] text-gray-500">
+                        <p className="mt-1.5 text-xs tabular-nums text-gray-500">
                             {hasLocation
                                 ? `${formData.location.latitude.toFixed(4)}, ${formData.location.longitude.toFixed(4)}`
-                                : 'Tap the map to drop a pin'}
+                                : 'Tap the map to mark the hospital’s location.'}
                         </p>
                     </div>
                 </>)}
 
-                {section('03', 'Who to call', <>
+                {section('Contact details', 'The person donors should call. The phone number is shown only to donors who offer.', <>
                     <div className="grid gap-4 sm:grid-cols-2">
                         <Input label="Contact name" value={formData.contactName} onChange={(e) => setFormData({ ...formData, contactName: e.target.value })} required />
                         <Input label="Contact phone" type="tel" value={formData.contactPhone} onChange={(e) => setFormData({ ...formData, contactPhone: e.target.value })} required helperText="Only shown to donors who offer." />
@@ -354,19 +353,19 @@ export default function CreateRequestPage() {
                         label="Anything donors should know (optional)"
                         value={formData.notes}
                         onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                        placeholder="Ward number, patient’s condition, best time to call…"
+                        placeholder="For example, ward number or the best time to call"
                     />
                 </>)}
 
-                {!user && section('04', 'Verify it’s you', <>
+                {!user && section('Verify your email', 'Required to post without an account.', <>
                     {verifiedUserId ? (
                         <p className="flex items-center gap-2 text-sm text-success-700">
-                            <span className="h-2 w-2 rounded-full bg-success-500" /> Verified as {verifyEmail}. You can post now.
+                            <span className="h-2 w-2 rounded-full bg-success-500" /> Email confirmed as {verifyEmail}. You can now post your request.
                         </p>
                     ) : (
                         <>
                             <p className="text-sm leading-relaxed text-gray-600">
-                                No account needed. We’ll email you a one-time code; that also lets you manage this request later.
+                                You don’t need an account. We will email you a one-time code, which also lets you manage this request later.
                                 Already registered? <Link href="/login?redirect=/requests/new" className="text-gray-900 underline decoration-gray-300 underline-offset-4">Sign in</Link>.
                             </p>
                             <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
@@ -398,7 +397,15 @@ export default function CreateRequestPage() {
                     )}
                 </>)}
 
-                <div className="flex flex-col-reverse gap-2 border-t border-gray-200 pt-6 sm:flex-row sm:justify-end">
+                <p className="border-t border-gray-200 pt-6 text-[13px] leading-relaxed text-gray-500">
+                    Posting makes your request visible to donors on Vital. Vital does not arrange, verify or guarantee a
+                    donor, and is not involved in any payment. You are responsible for the accuracy of your request, and
+                    any contact with a donor is directly between you, at your own discretion. In an emergency, also contact
+                    the hospital or a blood bank directly. See the{' '}
+                    <Link href="/terms" className="text-gray-900 underline decoration-gray-300 underline-offset-4">Terms</Link>.
+                </p>
+
+                <div className="mt-4 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
                     <Button type="button" variant="ghost" onClick={() => router.push('/requests')}>Cancel</Button>
                     <Button
                         type="submit"

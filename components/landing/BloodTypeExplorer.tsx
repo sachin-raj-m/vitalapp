@@ -15,10 +15,10 @@ function describe(group: BloodGroup) {
     const takeFrom = getCompatibleDonors(group);
     const g = formatBloodGroup(group);
 
-    if (giveTo.length === BLOOD_GROUPS.length) return `${g} can give to every group. It's the one hospitals reach for first.`;
-    if (takeFrom.length === BLOOD_GROUPS.length) return `${g} can only give to ${g}, but can receive from all eight.`;
-    if (giveTo.length === 1) return `${g} can only give to ${g}, so every ${g} donor counts.`;
-    return `${g} can give to ${giveTo.length} of 8 groups, and receive from ${takeFrom.length}.`;
+    if (giveTo.length === BLOOD_GROUPS.length) return `${g} red cells can be given to patients of every blood group.`;
+    if (takeFrom.length === BLOOD_GROUPS.length) return `${g} donors can give only to ${g} patients, and can receive blood from all eight groups.`;
+    if (giveTo.length === 1) return `${g} donors can give only to ${g} patients.`;
+    return `${g} donors can give to ${giveTo.length} of the 8 groups, and can receive from ${takeFrom.length}.`;
 }
 
 export function BloodTypeExplorer() {
@@ -51,7 +51,7 @@ export function BloodTypeExplorer() {
 
     return (
         <div>
-            <div className="grid grid-cols-4 gap-px overflow-hidden rounded-lg border border-gray-800 bg-gray-800" role="radiogroup" aria-label="Blood group">
+            <div className="grid grid-cols-4 gap-1.5 sm:gap-2" role="radiogroup" aria-label="Blood group">
                 {BLOOD_GROUPS.map((group, index) => {
                     const isSelected = group === selected;
                     const canReceive = !isSelected && recipients.includes(group);
@@ -66,24 +66,24 @@ export function BloodTypeExplorer() {
                             onKeyDown={e => onKeyDown(e, index)}
                             onClick={() => { setTouched(true); setSelected(group); }}
                             className={cn(
-                                'group relative flex aspect-[4/3] flex-col justify-between p-3 text-left transition-colors duration-300 sm:aspect-[5/4] sm:p-4',
-                                isSelected && 'bg-red-600',
-                                canReceive && 'bg-gray-900',
-                                !isSelected && !canReceive && 'bg-gray-950',
+                                'group relative flex aspect-[4/3] flex-col justify-between rounded-lg p-3 text-left transition-[background-color,transform,box-shadow] duration-300 active:scale-[0.97] sm:aspect-[5/4] sm:p-4',
+                                isSelected && 'z-10 scale-[1.03] bg-red-600 shadow-lg shadow-red-600/40',
+                                canReceive && 'bg-white',
+                                !isSelected && !canReceive && 'bg-gray-800 hover:bg-gray-700',
                             )}
                         >
                             <span
                                 className={cn(
-                                    'font-mono text-[10px] uppercase tracking-[0.14em] transition-colors duration-300',
-                                    isSelected ? 'text-red-100' : canReceive ? 'text-red-400' : 'text-gray-700',
+                                    'text-[11px] font-semibold uppercase tracking-[0.06em] leading-none transition-colors duration-300 sm:text-xs',
+                                    isSelected ? 'text-white' : canReceive ? 'text-red-700' : 'text-transparent',
                                 )}
                             >
-                                {isSelected ? 'You' : canReceive ? 'Receives' : '—'}
+                                {isSelected ? 'Donor' : canReceive ? 'Receives' : '\u00a0'}
                             </span>
                             <span
                                 className={cn(
-                                    'font-serif text-4xl leading-none tracking-tight transition-colors duration-300 sm:text-6xl',
-                                    isSelected ? 'text-white' : canReceive ? 'text-gray-50' : 'text-gray-700 group-hover:text-gray-500',
+                                    'font-serif text-4xl font-semibold leading-none transition-colors duration-300 sm:text-6xl',
+                                    isSelected ? 'text-white' : canReceive ? 'text-gray-900' : 'text-gray-400 group-hover:text-gray-200',
                                 )}
                             >
                                 {formatBloodGroup(group)}
@@ -93,7 +93,7 @@ export function BloodTypeExplorer() {
                 })}
             </div>
 
-            <p className="mt-6 min-h-[3.5rem] max-w-xl text-lg leading-snug text-gray-300 sm:text-xl" aria-live={touched ? 'polite' : 'off'}>
+            <p className="mt-6 min-h-[3.5rem] max-w-xl leading-relaxed text-gray-300 sm:text-lg" aria-live={touched ? 'polite' : 'off'}>
                 {describe(selected)}
             </p>
         </div>

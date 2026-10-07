@@ -10,11 +10,14 @@
 
   body {
     @apply bg-paper text-ink antialiased;
-    font-feature-settings: "ss01", "cv11";
+    /* Manrope reads best at its default spacing with standard kerning and ligatures. */
+    font-kerning: normal;
+    font-optical-sizing: auto;
+    font-variant-ligatures: common-ligatures;
   }
 
   ::selection {
-    @apply bg-red-600 text-white;
+    @apply bg-red-200 text-ink;
   }
 
   :focus-visible {
@@ -27,18 +30,51 @@
 }
 
 @layer components {
-  /* Small uppercase label used for section kickers and field captions. */
+  /* Quiet label used for section kickers and field captions. */
   .eyebrow {
-    @apply font-mono text-[11px] font-medium uppercase tracking-[0.14em] text-gray-500;
+    @apply font-sans text-[12px] font-semibold uppercase leading-snug tracking-[0.08em] text-gray-500;
   }
 
-  /* Large serif display type. */
+  /* Large serif display type (Cormorant Garamond). Its small x-height needs
+     medium weight and only light negative tracking to hold up at size. */
   .display {
-    @apply font-serif font-normal tracking-tight text-ink;
+    @apply font-serif font-medium tracking-[-0.015em] text-ink;
+    line-height: 1.05;
+    font-kerning: normal;
+    text-wrap: balance;
+  }
+
+  /* Cormorant numerals (stats, blood groups) should sit on the baseline. */
+  .display,
+  .font-serif {
+    font-variant-numeric: lining-nums proportional-nums;
   }
 
   .hairline {
     @apply border-gray-200;
+  }
+
+  /* Tactile press feedback for buttons and button-like links. */
+  .press {
+    @apply transition-[transform,background-color,border-color,color,box-shadow] duration-150 ease-out active:scale-[0.97];
+  }
+
+  /* Cards that respond to the pointer: a small lift and a crisper edge. */
+  .lift {
+    @apply transition-[transform,box-shadow,border-color] duration-200 ease-out hover:-translate-y-0.5 hover:shadow-[0_10px_30px_-12px_rgba(22,24,29,0.18)];
+  }
+
+  /* Edge fade for horizontally scrolling strips (the live request ticker). */
+  .fade-x {
+    -webkit-mask-image: linear-gradient(to right, transparent, #000 6%, #000 94%, transparent);
+    mask-image: linear-gradient(to right, transparent, #000 6%, #000 94%, transparent);
+  }
+
+  .no-scrollbar {
+    scrollbar-width: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
   }
 }
 
@@ -51,12 +87,17 @@
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+
+  .press:active,
+  .lift:hover {
+    transform: none !important;
+  }
 }
 
 @layer components {
-  /* Muted map tiles to match the paper palette. */
+  /* Lightly softened map tiles: real colour, a touch calmer so markers stand out. */
   .vital-tiles {
-    filter: grayscale(1) sepia(0.12) contrast(0.92) brightness(1.04);
+    filter: saturate(0.7) contrast(1.02) brightness(1.03);
   }
 
   .legal-body ul {

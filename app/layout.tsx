@@ -1,18 +1,24 @@
-import { Geist, Geist_Mono, Instrument_Serif } from "next/font/google";
+import { Cormorant_Garamond, Manrope } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/context/AuthContext";
 import { PWAInstallPrompt } from "@/components/PWAInstallPrompt";
 import { Toaster } from 'sonner';
 import { SITE_URL } from '@/lib/site';
 
-const sans = Geist({ subsets: ["latin"], variable: "--font-sans" });
-const mono = Geist_Mono({ subsets: ["latin"], variable: "--font-mono" });
-const serif = Instrument_Serif({
+// Body and UI text.
+const sans = Manrope({ subsets: ["latin"], variable: "--font-sans", display: "swap" });
+
+// Display headings and the wordmark.
+const serif = Cormorant_Garamond({
     subsets: ["latin"],
-    weight: "400",
+    weight: ["500", "600", "700"],
     style: ["normal", "italic"],
     variable: "--font-serif",
+    display: "swap",
 });
+
+// No web mono font: `font-mono` falls back to the system monospace stack
+// (see tailwind.config.js) and is reserved for PINs and codes.
 
 const DESCRIPTION = "A free, non-commercial network that alerts nearby, eligible blood donors the moment a request goes up.";
 
@@ -65,7 +71,7 @@ export default function RootLayout({
     children: React.ReactNode;
 }) {
     return (
-        <html lang="en" className={`${sans.variable} ${mono.variable} ${serif.variable}`} suppressHydrationWarning>
+        <html lang="en" className={`${sans.variable} ${serif.variable}`} suppressHydrationWarning>
             <body className="font-sans">
                 <AuthProvider>
                     <div className="min-h-screen flex flex-col">
@@ -75,8 +81,8 @@ export default function RootLayout({
                             position="top-center"
                             toastOptions={{
                                 classNames: {
-                                    toast: '!bg-gray-900 !text-gray-50 !border-gray-800 !rounded-md !font-sans',
-                                    description: '!text-gray-400',
+                                    toast: '!bg-gray-900 !text-white !border-gray-800 !rounded-lg !shadow-lg !font-sans',
+                                    description: '!text-gray-300',
                                 },
                             }}
                         />

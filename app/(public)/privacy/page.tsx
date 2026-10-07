@@ -11,12 +11,11 @@ export const metadata = {
 export default function PrivacyPage() {
     return (
         <LegalPage
-            eyebrow="Privacy notice"
-            title={<>Your data, <em>plainly.</em></>}
+            title="Privacy notice"
             updated={LEGAL_UPDATED}
             intro={
                 <p>
-                    Vital connects voluntary blood donors with people who need blood. To do that we hold some personal and
+                    Vital is a free platform where people can post blood requests and voluntary donors can respond to them. To run it we hold some personal and
                     health-related information about you. This notice explains what, why, who can see it, and how to have it
                     removed. It is written to meet India’s Digital Personal Data Protection Act, 2023.
                 </p>
@@ -45,11 +44,11 @@ export default function PrivacyPage() {
                     heading: 'Why we use it',
                     body: (
                         <ul>
-                            <li>To alert you when someone in your city needs a blood group you can give to.</li>
-                            <li>To connect a donor and a family once the donor offers to help.</li>
-                            <li>To work out when you can safely donate again (90 days for men, 120 for women).</li>
-                            <li>To confirm that a donation happened, using your PIN.</li>
-                            <li>To keep the service safe and investigate misuse.</li>
+                            <li>To alert you to requests in your city that match the blood group you entered.</li>
+                            <li>To show a donor and a requester each other’s contact details once the donor offers on that request.</li>
+                            <li>To show a reminder of when you may be able to donate again (90 days for men, 120 for women), based on dates you enter.</li>
+                            <li>To mark a donation as completed in Vital when the requester enters your PIN.</li>
+                            <li>To run the service and look into misuse.</li>
                         </ul>
                     ),
                 },
@@ -60,10 +59,10 @@ export default function PrivacyPage() {
                             <ul>
                                 <li><strong>Anyone:</strong> open requests (blood group, units, hospital, city, date, contact name and note). Never the contact’s phone number.</li>
                                 <li><strong>Signed-in users, on “Donors nearby”:</strong> your first name and last initial, blood group, PIN code, and a location rounded to about 1 km. Never your phone, email or exact address.</li>
-                                <li><strong>A family whose request you offer on:</strong> your name and phone number, so they can reach you. Nobody else.</li>
-                                <li><strong>You, when you offer on a request:</strong> that family’s contact name and phone number.</li>
+                                <li><strong>A requester whose request you offer on:</strong> your name and phone number, so they can reach you. Nobody else.</li>
+                                <li><strong>You, when you offer on a request:</strong> that request’s contact name and phone number.</li>
                                 <li><strong>Your public donor card:</strong> off by default. If you turn it on, anyone with the link sees your name, blood group, donor number and donation count.</li>
-                                <li><strong>Your donor PIN:</strong> only you. The family types it in and our server checks it; they never see it.</li>
+                                <li><strong>Your donor PIN:</strong> only you. The requester types it in and our server checks it; they never see it.</li>
                                 <li><strong>Vital administrators:</strong> account and request details, to run and protect the service.</li>
                             </ul>
                             <p>We never sell your data or share it for advertising.</p>

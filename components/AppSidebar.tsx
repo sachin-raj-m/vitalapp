@@ -27,7 +27,7 @@ const NAV = [
     { href: '/requests', label: 'Open requests', icon: Inbox },
     { href: '/requests/my-requests', label: 'My requests', icon: FileText },
     { href: '/donations', label: 'My donations', icon: HeartPulse },
-    { href: '/nearby-donors', label: 'Donors nearby', icon: MapPin },
+    { href: '/nearby-donors', label: 'Donors near you', icon: MapPin },
     { href: '/achievements', label: 'Milestones', icon: Award },
     { href: '/profile', label: 'Profile', icon: User },
 ];
@@ -53,9 +53,9 @@ export function AppSidebar() {
     const isActive = (path: string) => pathname === path;
 
     const sidebarContent = (
-        <div className="flex h-full flex-col bg-paper">
+        <div className="flex h-full flex-col bg-white">
             <div className="flex h-16 items-center px-6">
-                <Link href="/" aria-label="Vital home" className="-mb-1">
+                <Link href="/" aria-label="Vital home" className="group -mb-1">
                     <Logo />
                 </Link>
             </div>
@@ -63,7 +63,7 @@ export function AppSidebar() {
             <div className="px-4 pb-2 pt-2">
                 <Link
                     href="/requests/new"
-                    className="flex h-9 items-center justify-center gap-1.5 rounded-md bg-red-600 text-sm font-medium text-white transition-colors hover:bg-red-700"
+                    className="press flex h-10 items-center justify-center gap-1.5 rounded-md bg-red-600 text-sm font-semibold text-white shadow-sm shadow-red-600/25 hover:bg-red-700"
                 >
                     <Plus className="h-4 w-4" /> Request blood
                 </Link>
@@ -79,14 +79,13 @@ export function AppSidebar() {
                                     href={href}
                                     aria-current={active ? 'page' : undefined}
                                     className={cn(
-                                        'relative flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors',
+                                        'relative flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
                                         active
-                                            ? 'bg-white font-medium text-gray-900 ring-1 ring-gray-200'
-                                            : 'text-gray-600 hover:bg-gray-200/50 hover:text-gray-900',
+                                            ? 'bg-red-50 text-red-700 before:absolute before:inset-y-2 before:-left-3 before:w-[3px] before:rounded-r-full before:bg-red-600'
+                                            : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900',
                                     )}
                                 >
-                                    {active && <span className="absolute left-0 top-2 bottom-2 w-[2px] rounded-full bg-red-600" />}
-                                    <Icon className={cn('h-4 w-4', active ? 'text-gray-900' : 'text-gray-400')} strokeWidth={1.75} />
+                                    <Icon className={cn('h-4 w-4', active ? 'text-red-600' : 'text-gray-400')} strokeWidth={active ? 2 : 1.75} />
                                     {label}
                                 </Link>
                             </li>
@@ -97,7 +96,7 @@ export function AppSidebar() {
 
             <div className="border-t border-gray-200 p-3">
                 <div className="flex items-center gap-3 px-2 py-2">
-                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gray-900 font-mono text-xs text-gray-50">
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-red-600 text-xs font-semibold text-white">
                         {user?.blood_group || user?.full_name?.[0] || '·'}
                     </div>
                     <div className="min-w-0 flex-1">
@@ -106,7 +105,7 @@ export function AppSidebar() {
                     </div>
                     <button
                         onClick={() => signOut()}
-                        className="rounded-md p-1.5 text-gray-400 transition-colors hover:bg-gray-200/60 hover:text-gray-900"
+                        className="rounded-md p-1.5 text-gray-500 transition-colors hover:bg-red-50 hover:text-red-700"
                         aria-label="Sign out"
                         title="Sign out"
                     >
@@ -123,8 +122,8 @@ export function AppSidebar() {
                 {sidebarContent}
             </aside>
 
-            <div className="sticky top-0 z-40 flex h-14 items-center justify-between border-b border-gray-200 bg-paper/90 px-4 backdrop-blur-md md:hidden">
-                <Link href="/dashboard" aria-label="Vital dashboard" className="-mb-1">
+            <div className="sticky top-0 z-40 flex h-14 items-center justify-between border-b border-gray-200 bg-white/90 px-4 backdrop-blur-md md:hidden">
+                <Link href="/dashboard" aria-label="Vital dashboard" className="group -mb-1">
                     <Logo className="text-[22px]" />
                 </Link>
                 <button

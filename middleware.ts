@@ -1,12 +1,25 @@
-import { createServerClient, type CookieOptions } from '@supabase/ssr'
+import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
+/**
+ * Refreshes a cookie-based Supabase session if one exists.
+ *
+ * Route protection is deliberately NOT done here: the browser client
+ * (lib/supabase.ts, supabase-js createClient) keeps the session in
+ * localStorage, so the server never sees a session cookie and a cookie gate
+ * would bounce every signed-in user to /login. Private pages are guarded
+ * client-side by ProtectedRoute, and every private read/write is enforced by
+ * RLS and by getVerifiedUser() in API routes, which is where security lives.
+ * To gate pages here, first move the browser client to @supabase/ssr's
+ * createBrowserClient (cookie storage).
+ */
 export async function middleware(request: NextRequest) {
-    let response = NextResponse.next({
-        request: {
-            headers: request.headers,
-        },
-    })
+    // Nothing to refresh without a Supabase auth cookie; skip the auth call.
+    if (!request.cookies.getAll().some(c => c.name.startsWith('sb-') && c.name.includes('-auth-token'))) {
+        return NextResponse.next({ request })
+    }
+
+    let response = NextResponse.next({ request })
 
     const supabase = createServerClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -17,47 +30,23 @@ export async function middleware(request: NextRequest) {
                     return request.cookies.getAll()
                 },
                 setAll(cookiesToSet) {
-                    cookiesToSet.forEach(({ name, value, options }) => {
-                        request.cookies.set(name, value)
-                        response.cookies.set(name, value, options)
-                    })
+                    cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
+                    response = NextResponse.next({ request })
+                    cookiesToSet.forEach(({ name, value, options }) => response.cookies.set(name, value, options))
                 },
             },
         }
     )
 
+    // getUser() validates the JWT with Supabase and refreshes it when needed.
     const { data: { user } } = await supabase.auth.getUser()
 
-    // Protected Routes Pattern
-    // Protected Routes Pattern
-    // We are relaxing server-side protection for user routes to avoid race conditions 
-    // where client has session but server cookie is stale. 
-    // We rely on client-side ProtectedRoute for these.
-    const protectedPaths: string[] = [
-        // '/dashboard',
-        // '/profile',
-        // '/nearby-donors',
-        // '/donations',
-        // '/requests/new',
-        // '/requests/my-requests'
-        // '/admin' // Keep admin protected strictly
-    ]
-
-    const isProtected = protectedPaths.some(path => request.nextUrl.pathname.startsWith(path))
-
-    if (isProtected && !user) {
-        const redirectUrl = request.nextUrl.clone()
-        redirectUrl.pathname = '/login'
-        redirectUrl.searchParams.set('redirect', request.nextUrl.pathname)
-        return NextResponse.redirect(redirectUrl)
-    }
-
-    // Auth Routes Pattern (Redirect to dashboard if already logged in)
+    // Signed in (cookie session): skip the auth pages.
     const authPaths = ['/login', '/register', '/forgot-password']
-    const isAuthPage = authPaths.some(path => request.nextUrl.pathname.startsWith(path))
-
-    if (isAuthPage && user) {
-        return NextResponse.redirect(new URL('/dashboard', request.url))
+    if (user && authPaths.some(path => request.nextUrl.pathname.startsWith(path))) {
+        const redirect = NextResponse.redirect(new URL('/dashboard', request.url))
+        response.cookies.getAll().forEach(cookie => redirect.cookies.set(cookie))
+        return redirect
     }
 
     return response
@@ -65,13 +54,7 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
     matcher: [
-        /*
-         * Match all request paths except for the ones starting with:
-         * - _next/static (static files)
-         * - _next/image (image optimization files)
-         * - favicon.ico (favicon file)
-         * Feel free to modify this pattern to include more paths.
-         */
-        '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+        // Everything except static assets, the service worker and the manifest.
+        '/((?!_next/static|_next/image|favicon.ico|sw.js|custom-sw.js|manifest.json|icons/|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|woff2?)$).*)',
     ],
 }

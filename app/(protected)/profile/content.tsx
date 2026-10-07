@@ -1,5 +1,6 @@
 "use client";
 
+import { authedFetch } from '@/lib/api';
 import React, { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -11,9 +12,11 @@ import { fetchUserStats, calculateEligibility, type UserStats } from '@/lib/stat
 import { Copy, Download, ExternalLink, Pencil, Send } from 'lucide-react';
 import { format } from 'date-fns';
 import { donorProfilePath } from '@/lib/donor-slug';
+import { buildDonorShareMessage, whatsappShareUrl } from '@/lib/share';
 import { formatBloodGroup } from '@/lib/blood-compatibility';
 import { Skeleton } from '@/components/ui/Skeleton';
 import html2canvas from 'html2canvas';
+import { motion } from 'framer-motion';
 
 import { PushNotificationManager } from '@/components/PushNotificationManager';
 import DonorCard from '@/components/DonorCard';
@@ -36,9 +39,14 @@ export default function ProfilePage() {
 
     const handleLinkShare = () => {
         if (!user?.id) return;
-        const url = `${window.location.origin}${publicPath}`;
-        const text = `I’m a registered blood donor on Vital. If you’ve ever thought about it, it takes two minutes: ${url}`;
-        window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+        // Link the public card only when it is visible; otherwise share an invite.
+        const text = buildDonorShareMessage({
+            origin: window.location.origin,
+            path: donorProfilePath(user),
+            isPublic: !!user.is_public_profile,
+            bloodGroup: user.blood_group,
+        });
+        window.open(whatsappShareUrl(text), '_blank', 'noopener,noreferrer');
     };
 
     const togglePublicProfile = async (newValue: boolean) => {
@@ -52,7 +60,7 @@ export default function ProfilePage() {
 
     const handleDeleteAccount = async () => {
         try {
-            const res = await fetch('/api/auth/delete', { method: 'POST' });
+            const res = await authedFetch('/api/auth/delete', { method: 'POST' });
             if (!res.ok) throw new Error('Deletion failed');
             await signOut();
             router.push('/login');
@@ -167,7 +175,7 @@ export default function ProfilePage() {
     const row = (label: string, value: React.ReactNode) => (
         <div className="grid grid-cols-3 gap-4 py-3.5">
             <dt className="text-sm text-gray-500">{label}</dt>
-            <dd className="col-span-2 truncate text-gray-900">{value || <span className="text-gray-400">Not set</span>}</dd>
+            <dd className="col-span-2 truncate text-gray-900">{value || <span className="text-gray-500">Not set</span>}</dd>
         </div>
     );
 
@@ -177,8 +185,7 @@ export default function ProfilePage() {
 
             <header className="flex flex-col justify-between gap-6 sm:flex-row sm:items-end">
                 <div>
-                    <p className="eyebrow">Profile</p>
-                    <h1 className="display mt-3 text-5xl leading-none">{user?.full_name || 'Your profile'}</h1>
+                    <h1 className="display text-4xl sm:text-[2.75rem]">{user?.full_name || 'Your profile'}</h1>
                     <p className="mt-3 flex items-center gap-2 text-sm text-gray-600">
                         <span className={`h-2 w-2 rounded-full ${eligibility.isEligible ? 'bg-success-500' : 'bg-warning-500'}`} />
                         {eligibility.isEligible
@@ -194,21 +201,31 @@ export default function ProfilePage() {
                 </Link>
             </header>
 
-            <section className="grid gap-10 lg:grid-cols-[minmax(0,24rem)_1fr] lg:gap-14">
+            <section className="grid gap-10 lg:grid-cols-[minmax(0,28rem)_1fr] lg:gap-14">
                 <div>
-                    {isLoading ? (
-                        <Skeleton className="h-[22rem] w-full max-w-sm rounded-xl" />
-                    ) : (
-                        <DonorCard
-                            ref={cardRef}
-                            user={user}
-                            totalDonations={stats?.total_donations || 0}
-                            donorNumber={user?.donor_number}
-                            badges={unlocked}
-                        />
-                    )}
+                    <div className="flex justify-center rounded-2xl border border-gray-200 bg-gray-100 px-5 py-8 sm:px-8 sm:py-10">
+                        {isLoading ? (
+                            <Skeleton className="h-[22rem] w-full max-w-sm rounded-3xl" />
+                        ) : (
+                            <motion.div
+                                initial={{ opacity: 0, rotateY: 90 }}
+                                animate={{ opacity: 1, rotateY: 0 }}
+                                transition={{ delay: 0.2, type: 'spring' }}
+                                className="flex w-full justify-center [perspective:1000px]"
+                            >
+                                <DonorCard
+                                    ref={cardRef}
+                                    user={user}
+                                    showAchievements={unlocked.length > 0}
+                                    achievementCount={unlocked.length}
+                                    totalDonations={stats?.total_donations || 0}
+                                    donorNumber={user?.donor_number}
+                                />
+                            </motion.div>
+                        )}
+                    </div>
                     {user?.is_donor && (
-                        <div className="mt-4 flex max-w-sm flex-wrap gap-2">
+                        <div className="mt-4 flex flex-wrap justify-center gap-2">
                             <Button size="sm" variant="secondary" onClick={handleDownload} leftIcon={<Download className="h-3.5 w-3.5" />}>
                                 Save image
                             </Button>
