@@ -110,6 +110,11 @@ export default function LoginPage() {
             {error && <Alert variant="error" className="mb-6">{error}</Alert>}
 
             <GoogleButton onClick={handleGoogleSignIn} isLoading={isGoogleLoading} />
+            <p className="mt-3 text-[13px] leading-relaxed text-gray-500">
+                New to Vital? Continuing with Google creates an account, and means you accept the{' '}
+                <Link href="/terms" className={authLinkClass}>Terms</Link> and{' '}
+                <Link href="/privacy" className={authLinkClass}>Privacy notice</Link>. You will confirm this on the next screen.
+            </p>
             <OrDivider />
 
             <form onSubmit={handleSubmit} className="space-y-4">

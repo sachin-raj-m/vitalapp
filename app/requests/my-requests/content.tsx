@@ -126,10 +126,17 @@ export function MyRequestsContent() {
             });
 
             if (verifyErr) {
+                setVerifyError(verifyErr.message);
+                return;
+            }
+
+            // A wrong PIN is returned (not raised) so the server can count attempts.
+            if (result?.error === 'pin_mismatch') {
+                const left = Number(result.attempts_left ?? 0);
                 setVerifyError(
-                    verifyErr.message.includes('PIN does not match')
-                        ? 'That PIN doesn’t match. Ask the donor to check it.'
-                        : verifyErr.message
+                    left > 0
+                        ? `That PIN doesn’t match. Ask the donor to check it. ${left} ${left === 1 ? 'attempt' : 'attempts'} left.`
+                        : 'That PIN doesn’t match, and this offer is now locked. Ask the donor to withdraw and offer again.'
                 );
                 return;
             }
@@ -219,9 +226,12 @@ export function MyRequestsContent() {
                     {filteredRequests.map((request) => {
                         const collected = request.donations
                             .filter(d => d.status === 'completed')
-                            .reduce((sum, d) => sum + (d.units_donated || 1), 0);
+                            .reduce((sum, d) => sum + (d.units_donated ?? 0), 0);
                         const isActive = request.status === 'active';
-                        const progress = Math.min(100, (collected / Math.max(1, request.units_needed)) * 100);
+                        // Same semantics as verify_donation(): NULL units count as 0.
+                        const remaining = Math.max(0, request.units_needed - collected);
+                        const overCollected = collected > request.units_needed;
+                        const progress = Math.min(100, Math.max(0, (collected / Math.max(1, request.units_needed)) * 100));
                         const offers = request.donations.filter(d => d.status !== 'cancelled');
 
                         return (
@@ -251,7 +261,11 @@ export function MyRequestsContent() {
                                         <div className="mt-4 max-w-xs">
                                             <div className="flex justify-between text-[13px]">
                                                 <span className="text-gray-500">Collected</span>
-                                                <span className="tabular-nums text-gray-900">{collected} of {request.units_needed} units</span>
+                                                <span className="tabular-nums text-gray-900">
+                                                    {overCollected
+                                                        ? `${collected} units recorded (${request.units_needed} requested)`
+                                                        : `${collected} of ${request.units_needed} units`}
+                                                </span>
                                             </div>
                                             <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-gray-200">
                                                 <div className="h-full rounded-full bg-success-500" style={{ width: `${progress}%` }} />
@@ -286,7 +300,7 @@ export function MyRequestsContent() {
                                                             )}
                                                         </div>
                                                     </div>
-                                                    {donation.status === 'pending' && isActive ? (
+                                                    {donation.status === 'pending' && isActive && remaining > 0 ? (
                                                         <Button
                                                             size="sm"
                                                             variant="ink"
@@ -297,7 +311,7 @@ export function MyRequestsContent() {
                                                                     donationId: donation.id,
                                                                     requestId: request.id,
                                                                     donorName: donation.profiles?.full_name ?? "",
-                                                                    maxUnits: Math.max(1, request.units_needed - collected),
+                                                                    maxUnits: Math.max(1, remaining),
                                                                 });
                                                             }}
                                                         >

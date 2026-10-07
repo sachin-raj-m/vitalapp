@@ -13,7 +13,7 @@ import { isRegistrationComplete } from '@/lib/auth-helpers';
 import { addDays } from 'date-fns';
 import { toast } from 'sonner';
 import Link from 'next/link';
-import { PRIVACY_VERSION } from '@/lib/legal';
+import { PRIVACY_VERSION, earliestConsentAt } from '@/lib/legal';
 
 interface PendingRegistration {
     userId: string;
@@ -153,6 +153,22 @@ export default function CompleteRegistration() {
                 return;
             }
 
+            // Keep the first time this person agreed to the current Privacy notice
+            // (on the register page, a guest request, or an earlier save) rather
+            // than overwriting it with now. Ticking the box here is itself consent.
+            const { data: existingConsent } = await supabase
+                .from('profiles')
+                .select('consent_at, consent_version')
+                .eq('id', session.user.id)
+                .maybeSingle();
+            let pendingConsent: { consent_at?: string; consent_version?: string } | null = null;
+            try { pendingConsent = JSON.parse(localStorage.getItem('pendingConsent') || 'null'); } catch { /* ignore */ }
+            // Only trust the locally remembered (Google) consent if it was given just before this account was created.
+            if (pendingConsent?.consent_at && Date.parse(pendingConsent.consent_at) < Date.parse(session.user.created_at) - 30 * 60 * 1000) {
+                pendingConsent = null;
+            }
+            const consentAt = earliestConsentAt(existingConsent, session.user.user_metadata, pendingConsent) ?? new Date().toISOString();
+
             // Create/Update Profile
             const { error: profileError } = await supabase
                 .from('profiles')
@@ -173,7 +189,7 @@ export default function CompleteRegistration() {
                         availability: formData.availability,
                         has_medical_conditions: formData.hasConditions,
                         consent_agreed: true,
-                        consent_at: new Date().toISOString(),
+                        consent_at: consentAt,
                         consent_version: PRIVACY_VERSION,
                         next_eligible_date: (() => {
                             if (!nbtcEligible) return null; // Permanent deferral
@@ -199,7 +215,10 @@ export default function CompleteRegistration() {
                 data: {
                     registration_completed: true,
                     phone: formData.phone,
-                    full_name: formData.fullName
+                    full_name: formData.fullName,
+                    consent_agreed: true,
+                    consent_at: consentAt,
+                    consent_version: PRIVACY_VERSION
                 }
             });
 
@@ -208,6 +227,7 @@ export default function CompleteRegistration() {
             setProgress(100);
             setStatus('completed');
             localStorage.removeItem('pendingRegistration');
+            localStorage.removeItem('pendingConsent');
             toast.success('You’re on the network', {
                 description: 'We’ll alert you when someone nearby needs your blood group.'
             });

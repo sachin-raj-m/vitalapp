@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/Button';
 import { Alert } from '@/components/ui/Alert';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
+import { PLATFORM_DISCLAIMER, consentStamp } from '@/lib/legal';
 
 export default function RegisterPage() {
     const router = useRouter();
@@ -23,11 +24,21 @@ export default function RegisterPage() {
     const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
     const [isLoading, setIsLoading] = useState(false);
     const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+    const [agreed, setAgreed] = useState(false);
+    const consentError = 'Tick the box to agree to the Terms and Privacy notice before continuing.';
 
     const handleGoogleSignUp = async () => {
-        setIsGoogleLoading(true);
         setError('');
+        if (!agreed) {
+            setFieldErrors({ consent: consentError });
+            return;
+        }
+        setFieldErrors({});
+        setIsGoogleLoading(true);
         try {
+            // OAuth can't carry user metadata, so remember the consent locally;
+            // complete-registration records it against the account.
+            try { localStorage.setItem('pendingConsent', JSON.stringify(consentStamp())); } catch { /* storage unavailable */ }
             const { error } = await supabase.auth.signInWithOAuth({
                 provider: 'google',
                 options: { redirectTo: `${window.location.origin}/auth/callback` },
@@ -57,6 +68,8 @@ export default function RegisterPage() {
             errors.password = 'Use at least 8 characters.';
         }
 
+        if (!agreed) errors.consent = consentError;
+
         setFieldErrors(errors);
         return Object.keys(errors).length === 0;
     };
@@ -73,12 +86,15 @@ export default function RegisterPage() {
         setIsLoading(true);
 
         try {
+            const consent = consentStamp();
             const { data: authData, error: authError } = await supabase.auth.signUp({
                 email: formData.email,
                 password: formData.password,
                 options: {
                     data: {
-                        registration_completed: false
+                        registration_completed: false,
+                        // Recorded server-side in auth.users at the moment of signup.
+                        ...consent,
                     },
                     emailRedirectTo: `${window.location.origin}/complete-registration`
                 }
@@ -88,6 +104,12 @@ export default function RegisterPage() {
 
             if (!authData.user) {
                 throw new Error('Failed to create account');
+            }
+
+            // A database trigger creates the profile row on signup; stamp the
+            // consent on it too when we already have a session (no email confirmation).
+            if (authData.session) {
+                await supabase.from('profiles').update(consent).eq('id', authData.user.id); // best effort; metadata above is the record
             }
 
             // Store basic registration data
@@ -120,6 +142,24 @@ export default function RegisterPage() {
         >
             {error && <Alert variant="error" className="mb-6">{error}</Alert>}
 
+            <div className="mb-6">
+                <label className="flex cursor-pointer items-start gap-3">
+                    <input
+                        type="checkbox"
+                        checked={agreed}
+                        onChange={(e) => { setAgreed(e.target.checked); if (e.target.checked) setFieldErrors(({ consent: _c, ...rest }) => rest); }}
+                        aria-invalid={!!fieldErrors.consent}
+                        aria-describedby={fieldErrors.consent ? 'consent-error' : undefined}
+                        className="mt-1 h-4 w-4 shrink-0 rounded-[4px] border-gray-400 accent-gray-900"
+                    />
+                    <span className="text-sm leading-relaxed text-gray-600">
+                        I agree to the <Link href="/terms" target="_blank" className={authLinkClass}>Terms</Link> and have read the
+                        {' '}<Link href="/privacy" target="_blank" className={authLinkClass}>Privacy notice</Link>.
+                    </span>
+                </label>
+                {fieldErrors.consent && <p id="consent-error" className="ml-7 mt-1.5 text-[13px] text-red-700">{fieldErrors.consent}</p>}
+            </div>
+
             <GoogleButton onClick={handleGoogleSignUp} isLoading={isGoogleLoading} />
             <OrDivider />
 
@@ -151,10 +191,7 @@ export default function RegisterPage() {
             </form>
 
             <p className="mt-6 text-[13px] leading-relaxed text-gray-500">
-                By creating an account you agree to the <Link href="/terms" className={authLinkClass}>Terms</Link> and
-                {' '}<Link href="/privacy" className={authLinkClass}>Privacy notice</Link>. Vital only connects people. It does not
-                arrange, verify or guarantee donations, and is not involved in any payment. Any arrangement is between
-                you and the other person, at your own discretion.
+                {PLATFORM_DISCLAIMER} Any arrangement is between you and the other person, at your own discretion.
             </p>
         </AuthFrame>
     );
