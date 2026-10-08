@@ -1,12 +1,13 @@
 import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
 import { PLATFORM_DISCLAIMER_LONG } from '@/lib/legal';
+import { pageMetadata } from '@/lib/seo';
 
-export const metadata = {
-    alternates: { canonical: '/how-it-works' },
+export const metadata = pageMetadata({
+    path: '/how-it-works',
     title: 'How it works',
     description: 'How the Vital app works, from a blood request being posted to a donor responding. Vital only connects people.',
-};
+});
 
 const STEPS = [
     {
@@ -41,11 +42,11 @@ const STEPS = [
             'Those donors receive a push notification and an email. Each donor decides for themselves whether to respond.',
         ],
         figure: (
-            <div className="grid grid-cols-4 gap-px overflow-hidden rounded-md bg-gray-200 font-serif text-3xl font-medium">
+            <div role="img" aria-label="For a B+ patient: O−, O+, B− and B+ donors match; A−, A+, AB− and AB+ do not." className="grid grid-cols-4 gap-px overflow-hidden rounded-md bg-gray-200 font-serif text-3xl font-medium">
                 {['O−', 'O+', 'A−', 'A+', 'B−', 'B+', 'AB−', 'AB+'].map(g => {
                     const match = ['O−', 'O+', 'B−', 'B+'].includes(g);
                     return (
-                        <div key={g} className={`flex aspect-square items-center justify-center ${match ? 'bg-gray-900 text-white' : 'bg-white text-gray-300'}`}>
+                        <div key={g} className={`flex aspect-square items-center justify-center ${match ? 'bg-gray-900 text-white' : 'bg-white text-gray-500'}`}>
                             {g}
                         </div>
                     );
@@ -137,7 +138,7 @@ export default function HowItWorksPage() {
                     <h2 className="max-w-2xl font-serif text-4xl font-medium leading-[1.05] sm:text-5xl">
                         Register as a donor
                     </h2>
-                    <p className="mt-5 max-w-xl text-lg leading-relaxed text-gray-500">
+                    <p className="mt-5 max-w-xl text-lg leading-relaxed text-gray-400">
                         If you are between 18 and 65 and in good health, you can register. You will be alerted
                         to requests in your city that match your blood group, and you decide whether to respond.
                     </p>

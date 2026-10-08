@@ -10,6 +10,7 @@ import { formatBloodGroup, getCompatibleDonors, isBloodCompatible } from '@/lib/
 import { URGENCY_LABEL, buildRequestShare, placeLabel, requestDescription, requestPath, type ShareableRequest } from '@/lib/share';
 import { SITE_URL } from '@/lib/site';
 import type { BloodRequest } from '@/types';
+import { REQUEST_PUBLIC_COLUMNS, isRequestOpen } from '@/lib/requests';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,18 +18,23 @@ interface Props {
     params: Promise<{ id: string }>;
 }
 
+// Public columns only (see lib/requests.ts). RLS hides requests that are closed
+// or past their needed-by date, so those 404 here.
 // Cached per render so generateMetadata and the page share one query.
 const getRequest = cache(async (id: string) => {
     const supabase = await createClient();
-    const { data } = await supabase.from('blood_requests').select('*').eq('id', id).maybeSingle();
-    return { supabase, request: data as BloodRequest | null };
+    const { data } = await supabase.from('blood_requests').select(REQUEST_PUBLIC_COLUMNS).eq('id', id).maybeSingle();
+    return { supabase, request: data as unknown as BloodRequest | null };
 });
+
+
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
     const { id } = await params;
     const { request } = await getRequest(id);
 
-    if (!request) {
+    // Closed or past its needed-by date: the preview must not ask for blood.
+    if (!request || !isRequestOpen(request)) {
         return {
             title: 'Request not available',
             description: 'This blood request has been closed or is no longer available. See open requests on Vital.',
@@ -49,7 +55,6 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
         title,
         description,
         alternates: { canonical: path },
-        robots: request.status === 'active' ? undefined : { index: false },
         openGraph: { title, description, url: `${SITE_URL}${path}`, type: 'website', siteName: 'Vital', locale: 'en_IN' },
         twitter: { card: 'summary_large_image', title, description },
     };
@@ -74,8 +79,9 @@ export default async function RequestDetailsPage({ params }: Props) {
         userBloodGroup = profile?.blood_group ?? null;
     }
 
-    const isOwn = request.user_id === user?.id;
-    const isOpen = request.status === 'active';
+    // Owners manage their requests from My requests; the public page never knows the poster.
+    const isOwn = false;
+    const isOpen = isRequestOpen(request);
     const isUrgent = request.urgency_level === 'High';
     const group = formatBloodGroup(request.blood_group);
     const donors = getCompatibleDonors(request.blood_group).map(formatBloodGroup);

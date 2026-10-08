@@ -24,6 +24,11 @@
     @apply outline-none ring-2 ring-red-600 ring-offset-2 ring-offset-paper;
   }
 
+  /* The skip link focuses <main>; no ring around the whole page. */
+  main:focus-visible {
+    @apply ring-0 ring-offset-0;
+  }
+
   summary::-webkit-details-marker {
     display: none;
   }

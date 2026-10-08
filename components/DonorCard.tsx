@@ -66,7 +66,7 @@ const DonorCard = forwardRef<HTMLDivElement, DonorCardProps>(({ user, className 
                     </motion.div>
                     <div>
                         <div className="text-[10px] text-[#64748b] uppercase tracking-[0.2em] font-bold mb-0.5">Vital Member</div>
-                        <h3 className="text-[#0f172a] font-black text-base tracking-tight leading-none">Official Donor Card</h3>
+                        <p className="text-[#0f172a] font-black text-base tracking-tight leading-none">Official Donor Card</p>
                     </div>
                 </div>
                 {/* Achievement Badge Counter (simplified) */}
@@ -115,7 +115,7 @@ const DonorCard = forwardRef<HTMLDivElement, DonorCardProps>(({ user, className 
                 <div className="relative z-10 w-full mt-2 mb-1 bg-[#f8fafc]/80 rounded-2xl p-4 border border-[#f1f5f9]">
                     <div className="flex items-center gap-2 mb-3">
                         <Award className="w-4 h-4 text-[#94a3b8]" />
-                        <div className="text-[10px] text-[#94a3b8] uppercase font-bold tracking-wider">Achievements</div>
+                        <div className="text-[10px] text-[#64748b] uppercase font-bold tracking-wider">Achievements</div>
                     </div>
                     <div className="flex flex-col gap-3">
                         {badges.map((badge) => (
@@ -136,14 +136,14 @@ const DonorCard = forwardRef<HTMLDivElement, DonorCardProps>(({ user, className 
             {/* Card Footer */}
             <div className="relative border-t border-[#f1f5f9]/80 pt-4 mt-1 z-10 w-full flex justify-between items-end">
                 <div className="flex flex-col items-start gap-1">
-                    <div className="text-[9px] text-[#94a3b8] uppercase font-bold tracking-wider">Holder Name</div>
+                    <div className="text-[9px] text-[#64748b] uppercase font-bold tracking-wider">Holder Name</div>
                     <div className="text-[#0f172a] font-black text-lg uppercase truncate max-w-[180px] tracking-tight">
                         {user?.full_name || "Unknown"}
                     </div>
                 </div>
 
                 <div className="flex flex-col items-end gap-1">
-                    <div className="text-[9px] text-[#94a3b8] uppercase font-bold tracking-wider">Donor ID</div>
+                    <div className="text-[9px] text-[#64748b] uppercase font-bold tracking-wider">Donor ID</div>
                     <div className="font-mono text-[#475569] text-xs bg-[#f8fafc] px-2 py-1 rounded border border-[#e2e8f0] font-semibold">
                         {donorNumber ? `#${donorNumber}` : (user?.id?.slice(0, 8).toUpperCase() || "--------")}
                     </div>

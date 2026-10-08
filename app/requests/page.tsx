@@ -1,11 +1,11 @@
-import { Metadata } from 'next';
 import RequestsPageContent from './content';
+import { pageMetadata } from '@/lib/seo';
 
-export const metadata: Metadata = {
-    alternates: { canonical: '/requests' },
+export const metadata = pageMetadata({
+    path: '/requests',
     title: 'Open requests',
-    description: 'View active blood donation requests and help those in need.',
-};
+    description: 'Open blood requests near you. Anyone able to donate can respond; Vital only connects people.',
+});
 
 export default function RequestsPage() {
     return <RequestsPageContent />;

@@ -73,6 +73,12 @@ export default function RootLayout({
     return (
         <html lang="en" className={`${sans.variable} ${serif.variable}`} suppressHydrationWarning>
             <body className="font-sans">
+                <a
+                    href="#main"
+                    className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100] focus:rounded-md focus:bg-gray-900 focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-white"
+                >
+                    Skip to content
+                </a>
                 <AuthProvider>
                     <div className="min-h-screen flex flex-col">
                         {children}

@@ -19,6 +19,7 @@ import { toast } from 'sonner';
 import { ConfirmationModal } from '@/components/ui/ConfirmationModal';
 import { EmptyState } from '@/components/EmptyState';
 import { logActivity } from '@/lib/logger';
+import { isRequestOpen } from '@/lib/requests';
 
 interface RequestWithDonations extends BloodRequest {
     donations: (Donation & { profiles: { full_name: string; phone: string | null } | null, units_donated: number | null })[];
@@ -96,9 +97,10 @@ export function MyRequestsContent() {
     const [requestToDelete, setRequestToDelete] = useState<string | null>(null);
 
     const filteredRequests = requests.filter(req => {
-        if (activeTab === 'active') return req.status === 'active';
+        // Past its needed-by date counts as no longer open, even if not closed.
+        if (activeTab === 'active') return isRequestOpen(req);
         // Same rule as the tab count: anything that is no longer open.
-        return req.status !== 'active';
+        return !isRequestOpen(req);
     });
 
     // Verification State
@@ -234,8 +236,8 @@ export function MyRequestsContent() {
     };
 
     const counts = {
-        active: requests.filter(r => r.status === 'active').length,
-        past: requests.filter(r => r.status !== 'active').length,
+        active: requests.filter(r => isRequestOpen(r)).length,
+        past: requests.filter(r => !isRequestOpen(r)).length,
     };
 
     return (
@@ -294,7 +296,11 @@ export function MyRequestsContent() {
                         const collected = donations
                             .filter(d => d.status === 'completed')
                             .reduce((sum, d) => sum + (Number(d.units_donated) || 0), 0);
+                        // Not fulfilled or closed. Offers made before the needed-by date can
+                        // still be confirmed after it, so this gates the PIN step, not isOpen.
                         const isActive = request.status === 'active';
+                        const isOpen = isRequestOpen(request);
+                        const isExpired = isActive && !isOpen;
                         // Same semantics as verify_donation(): NULL units count as 0.
                         const remaining = Math.max(0, request.units_needed - collected);
                         const overCollected = collected > request.units_needed;
@@ -310,7 +316,7 @@ export function MyRequestsContent() {
                                 <div className="flex items-start gap-4 p-5">
                                     <div className={cn(
                                         'flex h-14 w-14 shrink-0 items-center justify-center rounded-md font-serif text-3xl tracking-tight',
-                                        isActive ? 'bg-gray-900 text-gray-50' : 'bg-gray-100 text-gray-500',
+                                        isOpen ? 'bg-gray-900 text-gray-50' : 'bg-gray-100 text-gray-500',
                                     )}>
                                         {formatBloodGroup(request.blood_group)}
                                     </div>
@@ -319,8 +325,8 @@ export function MyRequestsContent() {
                                             <Link href={`/requests/${request.id}`} className="font-medium text-gray-900 hover:underline hover:underline-offset-4">
                                                 {request.hospital_name}
                                             </Link>
-                                            <Badge variant={isActive ? 'warning' : request.status === 'fulfilled' ? 'success' : 'neutral'} size="sm">
-                                                {isActive ? 'Open' : request.status === 'fulfilled' ? 'Fulfilled' : 'Closed'}
+                                            <Badge variant={isOpen ? 'warning' : request.status === 'fulfilled' ? 'success' : 'neutral'} size="sm">
+                                                {isOpen ? 'Open' : isExpired ? 'Expired' : request.status === 'fulfilled' ? 'Fulfilled' : 'Closed'}
                                             </Badge>
                                         </div>
                                         <p className="mt-0.5 text-sm text-gray-500">

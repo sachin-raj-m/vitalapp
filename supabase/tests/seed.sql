@@ -76,7 +76,11 @@ INSERT INTO public.blood_requests
    'fulfilled', 'Testville', current_date - 3),
   ('aaaaaaaa-0000-4000-8000-000000000003', '33333333-3333-4333-8333-333333333333', 'B+', 1,
    'Testville Clinic', '3 Example Road', 'Low', 'Eve', '{"latitude": 9.97, "longitude": 76.29}',
-   'active', 'Testville', current_date + 5);
+   'active', 'Testville', current_date + 5),
+  -- Still 'active' but its needed-by date has passed: treated as expired.
+  ('aaaaaaaa-0000-4000-8000-000000000004', '11111111-1111-4111-8111-111111111111', 'B+', 1,
+   'Testville Old Hospital', '4 Example Road', 'High', 'Riya', '{"latitude": 9.98, "longitude": 76.28}',
+   'active', 'Testville', current_date - 2);
 
 INSERT INTO public.request_contacts (request_id, contact_phone) VALUES
   ('aaaaaaaa-0000-4000-8000-000000000001', '0000000101'),

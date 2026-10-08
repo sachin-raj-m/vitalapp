@@ -1,11 +1,12 @@
 import { LegalPage } from '@/components/legal/LegalPage';
 import { GRIEVANCE_EMAIL, LEGAL_UPDATED, PLATFORM_DISCLAIMER_LONG } from '@/lib/legal';
+import { pageMetadata } from '@/lib/seo';
 
-export const metadata = {
+export const metadata = pageMetadata({
+    path: '/safety-guidelines',
     title: 'Safety guidelines',
     description: 'General information on who can donate and how to prepare. Not medical advice; the hospital or blood bank decides.',
-    alternates: { canonical: '/safety-guidelines' },
-};
+});
 
 export default function SafetyPage() {
     return (

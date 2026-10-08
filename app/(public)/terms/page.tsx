@@ -1,12 +1,13 @@
 import Link from 'next/link';
 import { LegalPage } from '@/components/legal/LegalPage';
 import { GRIEVANCE_EMAIL, LEGAL_UPDATED, PLATFORM_DISCLAIMER_LONG } from '@/lib/legal';
+import { pageMetadata } from '@/lib/seo';
 
-export const metadata = {
+export const metadata = pageMetadata({
+    path: '/terms',
     title: 'Terms',
     description: 'The terms for using Vital, a free platform that only lets people post blood requests and lets voluntary donors respond.',
-    alternates: { canonical: '/terms' },
-};
+});
 
 export default function TermsPage() {
     return (

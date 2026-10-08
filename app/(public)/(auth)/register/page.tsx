@@ -1,11 +1,11 @@
-import { Metadata } from 'next';
 import RegisterPageContent from './content';
+import { pageMetadata } from '@/lib/seo';
 
-export const metadata: Metadata = {
-    alternates: { canonical: '/register' },
+export const metadata = pageMetadata({
+    path: '/register',
     title: 'Become a donor',
-    description: 'Create a new account to become a blood donor or request blood.',
-};
+    description: 'Register as a voluntary blood donor on Vital. Free, and your details stay private.',
+});
 
 export default function RegisterPage() {
     return (
