@@ -12,6 +12,7 @@ import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { isRegistrationComplete } from '@/lib/auth-helpers';
 import { safeInternalPath } from '@/lib/site';
+import { ConfirmEmailCode } from '@/components/auth/ConfirmEmailCode';
 
 export default function LoginPage() {
     const router = useRouter();
@@ -21,6 +22,8 @@ export default function LoginPage() {
     const [error, setError] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+    // Registered with a password but never entered the emailed code.
+    const [unconfirmedEmail, setUnconfirmedEmail] = useState<string | null>(null);
 
     useEffect(() => {
         if (!user) return;
@@ -63,7 +66,11 @@ export default function LoginPage() {
             await signIn(email, password);
             // The navigation will be handled by the useEffect above
         } catch (err: any) {
-            setError(friendlyAuthError(err?.message));
+            if (String(err?.message).includes('Email not confirmed')) {
+                setUnconfirmedEmail(email);
+            } else {
+                setError(friendlyAuthError(err?.message));
+            }
             setIsLoading(false);
         }
     };
@@ -91,6 +98,18 @@ export default function LoginPage() {
             setIsGoogleLoading(false);
         }
     };
+
+    if (unconfirmedEmail) {
+        return (
+            <AuthFrame
+                title="Confirm your email"
+                subtitle="This account’s email hasn’t been confirmed yet. Send yourself a code, enter it, and you’ll be signed in."
+            >
+                {/* verifyOtp signs the person in; the effect above then routes them. */}
+                <ConfirmEmailCode email={unconfirmedEmail} sentOnMount={false} onVerified={() => {}} onBack={() => setUnconfirmedEmail(null)} />
+            </AuthFrame>
+        );
+    }
 
     return (
         <AuthFrame
