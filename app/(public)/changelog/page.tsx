@@ -1,14 +1,14 @@
 import React from 'react';
-import { Metadata } from 'next';
 import { ChangelogClient, ChangelogEntry } from './components/ChangelogClient';
 import { promises as fs } from 'fs';
 import path from 'path';
+import { pageMetadata } from '@/lib/seo';
 
-export const metadata: Metadata = {
-    alternates: { canonical: '/changelog' },
+export const metadata = pageMetadata({
+    path: '/changelog',
     title: 'Changelog',
-    description: 'See the latest updates, features, and improvements to the VitalApp platform.',
-};
+    description: 'What’s new in Vital.',
+});
 
 async function getChangelogData(): Promise<ChangelogEntry[]> {
     const filePath = path.join(process.cwd(), 'content', 'changelog.json');

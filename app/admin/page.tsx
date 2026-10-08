@@ -409,12 +409,13 @@ export default function AdminDashboard() {
 
                 <div className={activeTab === 'users' ? 'block' : 'hidden'}>
                     <div className="space-y-4">
-                        <div className="flex items-center space-x-2 bg-white border border-slate-300 rounded-md px-3 py-2 w-full max-w-sm">
+                        <div className="flex items-center space-x-2 bg-white border border-slate-300 rounded-md px-3 py-2 w-full max-w-sm focus-within:ring-2 focus-within:ring-red-500">
                             <Search className="h-4 w-4 text-slate-400" />
                             <input
                                 type="text"
                                 placeholder="Search users by name or email..."
-                                className="outline-none text-sm w-full"
+                                aria-label="Search users"
+                                className="text-sm w-full focus:outline-none"
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
                             />

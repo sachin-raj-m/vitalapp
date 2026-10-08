@@ -1,12 +1,13 @@
 import Link from 'next/link';
 import { LegalPage } from '@/components/legal/LegalPage';
 import { GRIEVANCE_EMAIL, LEGAL_UPDATED } from '@/lib/legal';
+import { pageMetadata } from '@/lib/seo';
 
-export const metadata = {
+export const metadata = pageMetadata({
+    path: '/privacy',
     title: 'Privacy notice',
     description: 'What Vital collects, who can see it, and how to get it deleted.',
-    alternates: { canonical: '/privacy' },
-};
+});
 
 export default function PrivacyPage() {
     return (

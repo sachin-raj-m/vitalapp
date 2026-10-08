@@ -3,6 +3,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { SITE_URL } from '@/lib/site';
 import { compatibleDonorGroups, formatNeededBy, unitsLabel, URGENCY_LABEL } from '@/lib/share';
+import { isRequestOpen } from '@/lib/requests';
 
 export const OG_SIZE = { width: 1200, height: 630 };
 export const POSTER_SIZE = { width: 1080, height: 1350 };
@@ -140,7 +141,8 @@ export async function fetchOpenRequest(id: string): Promise<OgRequest | null> {
             .eq('id', id)
             .maybeSingle();
         const r = data as OgRequest | null;
-        return r && r.status === 'active' ? r : null;
+        // RLS already hides expired requests; checked here too so previews never ask for blood after the date.
+        return r && isRequestOpen(r) ? r : null;
     } catch {
         return null;
     }

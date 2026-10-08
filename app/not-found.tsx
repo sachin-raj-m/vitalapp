@@ -7,7 +7,7 @@ export default function NotFound() {
             <header className="mx-auto flex h-16 w-full max-w-6xl items-center px-5 sm:px-8">
                 <Link href="/" aria-label="Vital home" className="-mb-1"><Logo /></Link>
             </header>
-            <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col justify-center px-5 pb-24 sm:px-8">
+            <main id="main" tabIndex={-1} className="mx-auto flex w-full max-w-6xl flex-1 flex-col justify-center px-5 pb-24 sm:px-8">
                 <h1 className="display max-w-3xl text-5xl sm:text-7xl">Page not found</h1>
                 <p className="mt-6 max-w-md text-lg leading-relaxed text-gray-600">
                     The link may be out of date, or the request it pointed to may have been closed or removed.

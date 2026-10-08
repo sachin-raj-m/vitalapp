@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import type { BloodRequest } from '@/types';
+import { REQUEST_PUBLIC_COLUMNS } from '@/lib/requests';
 import { useAuth } from './AuthContext';
 
 interface RequestsContextType {
@@ -30,10 +31,13 @@ export function RequestsProvider({ children }: { children: React.ReactNode }) {
             if (!hasLoaded.current) setLoading(true);
             setError(null);
 
+            // Visitors can't read user_id; signed-in users need it to spot their own requests.
+            const columns: string = user ? `${REQUEST_PUBLIC_COLUMNS}, user_id` : REQUEST_PUBLIC_COLUMNS;
+
             // Centralized fetch: Only Active requests, newest first
             const { data, error: supabaseError } = await supabase
                 .from('blood_requests')
-                .select('*')
+                .select(columns)
                 .eq('status', 'active')
                 // Hide requests whose needed-by date has passed; they're stale, not open.
                 .or(`date_needed.is.null,date_needed.gte.${new Date().toISOString().slice(0, 10)}`)
@@ -41,7 +45,7 @@ export function RequestsProvider({ children }: { children: React.ReactNode }) {
 
             if (supabaseError) throw supabaseError;
 
-            setRequests(data as BloodRequest[] || []);
+            setRequests((data as unknown as BloodRequest[]) || []);
 
             // Also fetch user's donations if logged in
             if (user) {

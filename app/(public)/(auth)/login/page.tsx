@@ -1,11 +1,11 @@
-import { Metadata } from 'next';
 import LoginPageContent from './content';
+import { pageMetadata } from '@/lib/seo';
 
-export const metadata: Metadata = {
-    alternates: { canonical: '/login' },
+export const metadata = pageMetadata({
+    path: '/login',
     title: 'Sign in',
-    description: 'Sign in to your Vital Blood Donation account to manage requests and donations.',
-};
+    description: 'Sign in to Vital to manage your blood requests and donor card.',
+});
 
 export default function LoginPage() {
     return (

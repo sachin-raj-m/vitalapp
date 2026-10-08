@@ -116,7 +116,7 @@ export const RequestShareActions: React.FC<{ request: ShareableRequest; posterFi
                 href={whatsappShareUrl(share.message)}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex h-10 items-center gap-2 rounded-md bg-[#1F8F4E] px-4 text-sm font-medium text-white transition-colors hover:bg-[#187A42]"
+                className="inline-flex h-10 items-center gap-2 rounded-md bg-[#15803D] px-4 text-sm font-medium text-white transition-colors hover:bg-[#166534]"
             >
                 <MessageCircle className="h-4 w-4" /> Share on WhatsApp
             </a>

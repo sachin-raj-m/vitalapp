@@ -1,12 +1,13 @@
 
+import { cache } from 'react';
+import type { Metadata } from 'next';
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
-import { notFound } from 'next/navigation';
 import DonorCard from '@/components/DonorCard';
 import Link from 'next/link';
 import { calculateAchievements } from '@/lib/stats';
 import PublicProfileHeader from '../components/PublicProfileHeader';
-import { parseDonorSlug } from '@/lib/donor-slug';
+import { donorProfilePath, parseDonorSlug } from '@/lib/donor-slug';
 
 // Set revalidation time to 0 for instant updates
 export const revalidate = 0;
@@ -17,33 +18,73 @@ interface Props {
     }>;
 }
 
-export async function generateMetadata({ params }: Props) {
-    const { id } = await params;
-    const decodedId = decodeURIComponent(id);
-    const displayName = decodedId.split('@')[0];
+type DonorCardRow = { id: string; donor_number: number; display_name: string | null; blood_group: string | null; is_public_profile: boolean };
 
-    const title = `${displayName} is a blood donor`;
+// One lookup per request, shared by generateMetadata and the page.
+// public_donor_card returns nothing for private cards (unless the viewer owns
+// it) and for unknown ids, so the two cases can't be told apart from outside.
+const getDonor = cache(async (slug: string) => {
+    const cookieStore = await cookies();
+    const supabase = createServerClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+        {
+            cookies: {
+                get(name: string) {
+                    return cookieStore.get(name)?.value;
+                },
+            },
+        }
+    );
+
+    const parsed = parseDonorSlug(slug);
+    if (!parsed) return { supabase, donor: null };
+
+    const { data, error } = await supabase
+        .rpc('public_donor_card', parsed.isUuid ? { p_id: parsed.lookupId } : { p_donor_number: parseInt(parsed.lookupId) })
+        .maybeSingle<DonorCardRow>();
+    return { supabase, donor: error ? null : data };
+});
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+    const { id } = await params;
+    const { donor } = await getDonor(decodeURIComponent(id));
+
+    // Titles come from the database, never from the URL, so a link can't be
+    // crafted to show someone else's name in its preview.
+    if (!donor?.is_public_profile) {
+        return {
+            title: 'Donor card',
+            description: 'A donor card on Vital, the free and voluntary blood donor network.',
+            robots: { index: false, follow: false },
+        };
+    }
+
+    const firstName = donor.display_name?.split(' ')[0] || 'A Vital donor';
+    const path = donorProfilePath({ full_name: donor.display_name, donor_number: donor.donor_number, id: donor.id });
+    const title = `${firstName} is a blood donor`;
     const description = 'A donor card from Vital, the free and voluntary blood donor network.';
     return {
         title,
         description,
-        alternates: { canonical: `/donor/${id}` },
-        openGraph: { title, description, url: `/donor/${id}` },
+        alternates: { canonical: path },
+        openGraph: { title, description, url: path },
         twitter: { card: 'summary_large_image', title, description },
     };
 }
 
-// Private Profile Component
-function PrivateProfilePage({ displayName }: { displayName: string }) {
+// Shown for private cards and for links that don't match a donor; the two are
+// deliberately indistinguishable so registrations can't be enumerated.
+function UnavailableProfilePage() {
     return (
         <div className="flex min-h-screen flex-col">
             <PublicProfileHeader />
-            <main className="mx-auto flex w-full max-w-xl flex-1 flex-col justify-center px-5 pb-24">
+            <main id="main" tabIndex={-1} className="mx-auto flex w-full max-w-xl flex-1 flex-col justify-center px-5 pb-24">
                 <h1 className="display text-4xl sm:text-5xl">
-                    This donor card is private
+                    This donor card isn&rsquo;t available
                 </h1>
                 <p className="mt-5 text-lg leading-relaxed text-gray-600">
-                    If you are able to give blood, you can register as a donor on Vital. It is free and voluntary.
+                    It may be private, or the link may be incomplete. If you are able to give blood, you can register as a donor on Vital. It is free and voluntary.
                 </p>
                 <div className="mt-8 flex flex-wrap gap-3">
                     <Link href="/register" className="inline-flex h-11 items-center rounded-md bg-red-600 px-5 text-sm font-medium text-white hover:bg-red-700">
@@ -60,53 +101,12 @@ function PrivateProfilePage({ displayName }: { displayName: string }) {
 
 export default async function PublicDonorPage({ params }: Props) {
     const { id } = await params;
-    const decodedId = decodeURIComponent(id);
-    const displayName = decodedId.split('@')[0] || 'This user';
+    const { supabase, donor } = await getDonor(decodeURIComponent(id));
+    if (!donor) return <UnavailableProfilePage />;
 
-    // Parse the vanity slug
-    const parsed = parseDonorSlug(decodedId);
-    if (!parsed) {
-        return notFound();
-    }
-    const { lookupId, isUuid, isDonorNumber } = parsed;
-
-    // Create Supabase client
-    const cookieStore = await cookies();
-    const supabase = createServerClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-        {
-            cookies: {
-                get(name: string) {
-                    return cookieStore.get(name)?.value;
-                },
-            },
-        }
-    );
-
-    // Get current user (if logged in)
     const { data: { user: currentUser } } = await supabase.auth.getUser();
-
-    // Build and execute query
-    // public_donor_card only answers for donors, and only reveals name and blood
-    // group when the card is public (or the viewer is the owner).
-    const { data: donor, error } = await supabase
-        .rpc('public_donor_card', isUuid ? { p_id: lookupId } : { p_donor_number: parseInt(lookupId) })
-        .maybeSingle<{ id: string; donor_number: number; display_name: string | null; blood_group: string | null; is_public_profile: boolean }>();
-
-    // Profile not found - return 404
-    if (error || !donor) {
-        return notFound();
-    }
-
-    // Check visibility: Is the profile public OR is the viewer the owner?
     const isOwner = currentUser?.id === donor.id;
-    const isPublic = donor.is_public_profile === true;
-
-    if (!isPublic && !isOwner) {
-        // Profile is private and viewer is not the owner
-        return <PrivateProfilePage displayName={displayName} />;
-    }
+    if (!donor.is_public_profile && !isOwner) return <UnavailableProfilePage />;
 
     // A private card previewed by its owner shows their full name.
     let fullName: string | null = donor.display_name;
@@ -133,7 +133,7 @@ export default async function PublicDonorPage({ params }: Props) {
     return (
         <div className="flex min-h-screen flex-col">
             <PublicProfileHeader />
-            <main className="mx-auto grid w-full max-w-6xl flex-1 content-center items-center gap-12 px-5 pb-20 pt-6 sm:px-8 lg:grid-cols-2 lg:gap-20">
+            <main id="main" tabIndex={-1} className="mx-auto grid w-full max-w-6xl flex-1 content-center items-center gap-12 px-5 pb-20 pt-6 sm:px-8 lg:grid-cols-2 lg:gap-20">
                 <div className="animate-fade-up">
                     <h1 className="display text-5xl sm:text-6xl">
                         {firstName} is a registered blood donor

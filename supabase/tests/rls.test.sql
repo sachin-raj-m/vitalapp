@@ -41,26 +41,24 @@ SELECT tests.denied($q$DELETE FROM public.blood_requests$q$, 'anon: cannot delet
 SELECT tests.denied($q$UPDATE public.profiles SET role = 'admin'$q$, 'anon: cannot update profiles');
 SELECT tests.denied($q$TRUNCATE public.blood_requests$q$, 'anon: cannot truncate blood_requests');
 
--- public_donors view: read-only and minimal for anon
-SELECT tests.denied($q$UPDATE public.public_donors SET is_public_profile = true WHERE id = '22222222-2222-4222-8222-222222222222'$q$,
-  'anon: cannot UPDATE public_donors');
-SELECT tests.denied($q$DELETE FROM public.public_donors$q$, 'anon: cannot DELETE public_donors');
-SELECT tests.denied($q$INSERT INTO public.public_donors (id) VALUES (gen_random_uuid())$q$, 'anon: cannot INSERT public_donors');
-SELECT tests.denied($q$SELECT present_zip FROM public.public_donors$q$, 'anon: public_donors.present_zip hidden');
-SELECT tests.denied($q$SELECT approx_location FROM public.public_donors$q$, 'anon: public_donors.approx_location hidden');
-SELECT tests.denied($q$SELECT city FROM public.public_donors$q$, 'anon: public_donors.city hidden');
-SELECT tests.throws($q$SELECT phone FROM public.public_donors$q$, '42703', 'anon: public_donors has no phone column');
-SELECT tests.is(tests.val($q$SELECT coalesce(display_name, '<null>') || '|' || coalesce(blood_group, '<null>')
-  FROM public.public_donors WHERE donor_number = 9002$q$), '<null>|<null>',
-  'anon: private donor card in list hides name and blood group');
-SELECT tests.is(tests.val($q$SELECT display_name || '|' || blood_group FROM public.public_donors WHERE donor_number = 9003$q$),
-  'Eve U.|B+', 'anon: public donor in list shows masked name and group');
-SELECT tests.is(tests.rows($q$SELECT 1 FROM public.public_donors WHERE id = '55555555-5555-4555-8555-555555555555'$q$), 0::bigint,
-  'anon: fresh email-code account (no blood group) is not listed as a donor');
+-- The old public_donors view is gone; cards come from public_donor_card().
+SELECT tests.is(to_regclass('public.public_donors') IS NULL, true, 'public_donors view has been dropped');
+SELECT tests.is(tests.rows($q$SELECT 1 FROM public.public_donor_card(NULL, 9002)$q$), 0::bigint,
+  'anon: private donor card returns nothing (no enumeration of private donors)');
+SELECT tests.is(tests.val($q$SELECT display_name || '|' || blood_group FROM public.public_donor_card(NULL, 9003)$q$),
+  'Eve Unrelated|B+', 'anon: public donor card shows name and blood group');
+SELECT tests.is(tests.rows($q$SELECT 1 FROM public.public_donor_card('55555555-5555-4555-8555-555555555555', NULL)$q$), 0::bigint,
+  'anon: fresh email-code account (no blood group) has no donor card');
 
-SELECT tests.is(tests.val($q$SELECT coalesce(display_name, '<null>') || '|' || coalesce(blood_group, '<null>') || '|' || is_public_profile
-  FROM public.public_donor_card(p_donor_number => 9002)$q$), '<null>|<null>|false',
-  'anon: public_donor_card(private) hides name and group');
+-- Requests: anon never sees the poster's account id or expired requests.
+SELECT tests.denied($q$SELECT user_id FROM public.blood_requests$q$, 'anon: blood_requests.user_id hidden');
+SELECT tests.ok(tests.rows($q$SELECT id, blood_group, hospital_name, contact_name FROM public.blood_requests$q$) > 0,
+  'anon: public request columns readable');
+SELECT tests.is(tests.rows($q$SELECT 1 FROM public.blood_requests WHERE id = 'aaaaaaaa-0000-4000-8000-000000000004'$q$), 0::bigint,
+  'anon: expired request (active, needed-by date passed) is hidden');
+
+SELECT tests.is(tests.rows($q$SELECT 1 FROM public.public_donor_card(p_donor_number => 9002)$q$), 0::bigint,
+  'anon: public_donor_card(private) returns no row at all');
 SELECT tests.is(tests.val($q$SELECT display_name || '|' || blood_group FROM public.public_donor_card(p_id => '33333333-3333-4333-8333-333333333333')$q$),
   'Eve Unrelated|B+', 'anon: public_donor_card(public) shows name and group');
 SELECT tests.is(tests.rows($q$SELECT * FROM public.public_donor_card('22222222-2222-4222-8222-222222222222', 9003)$q$), 0::bigint,
@@ -110,10 +108,6 @@ SELECT tests.is(tests.val($q$SELECT contact_phone FROM public.get_request_contac
   '0000000103', 'contact: visible to the request owner');
 
 -- Masking for signed-in users
-SELECT tests.is(tests.val($q$SELECT display_name || '|' || blood_group FROM public.public_donors WHERE donor_number = 9002$q$),
-  'Dev D.|O-', 'user: private donor shown as "First L." in public_donors');
-SELECT tests.is(tests.val($q$SELECT present_zip FROM public.public_donors WHERE donor_number = 9002$q$),
-  '999', 'user: public_donors.present_zip coarsened to area code');
 SELECT tests.is(tests.val($q$SELECT display_name FROM public.nearby_donors() WHERE id = '22222222-2222-4222-8222-222222222222'$q$),
   'Dev D.', 'user: nearby_donors() masks private donor name');
 SELECT tests.is(tests.val($q$SELECT string_agg(display_name, ',' ORDER BY display_name) FROM public.nearby_donors()$q$),
@@ -124,8 +118,8 @@ SELECT tests.is(tests.rows($q$SELECT 1 FROM public.nearby_donors() n WHERE to_js
   0::bigint, 'user: nearby_donors() leaks no full PIN code or phone');
 SELECT tests.is(tests.val($q$SELECT approx_location::text FROM public.nearby_donors() WHERE id = '22222222-2222-4222-8222-222222222222'$q$)::jsonb,
   '{"latitude": 9.98, "longitude": 76.28}'::jsonb, 'user: nearby_donors() rounds location to ~1 km');
-SELECT tests.is(tests.val($q$SELECT coalesce(display_name, '<null>') FROM public.public_donor_card(p_donor_number => 9002)$q$),
-  '<null>', 'user: another user''s private card hides name');
+SELECT tests.is(tests.rows($q$SELECT 1 FROM public.public_donor_card(p_donor_number => 9002)$q$), 0::bigint,
+  'user: another user''s private card returns nothing');
 
 -- Privilege escalation
 SELECT tests.is(tests.val($q$SELECT public.is_admin()::text$q$), 'false', 'user: is_admin() is false');
@@ -177,9 +171,6 @@ SELECT tests.throws($q$SELECT public.create_notification('22222222-2222-4222-822
 SELECT tests.throws($q$SELECT public.rate_limit_hit('x', 60, 1)$q$, '42501', 'user: rate_limit_hit() not executable');
 SELECT tests.throws($q$SELECT public.protect_profile_privileged_columns()$q$, '42501', 'user: trigger function not callable');
 SELECT tests.denied($q$TRUNCATE public.blood_requests$q$, 'user: cannot truncate blood_requests');
-SELECT tests.denied($q$UPDATE public.public_donors SET is_public_profile = true WHERE id = '22222222-2222-4222-8222-222222222222'$q$,
-  'user: cannot UPDATE public_donors');
-SELECT tests.denied($q$DELETE FROM public.public_donors$q$, 'user: cannot DELETE public_donors');
 
 -- Storage: proofs bucket, one folder per user
 SELECT tests.is(tests.val($q$SELECT string_agg(name, ',') FROM storage.objects WHERE bucket_id = 'proofs'$q$),
@@ -446,8 +437,8 @@ SELECT tests.is(tests.val($q$SELECT string_agg(tablename || '.' || policyname, '
   'catalog: no public-schema write policy applies to anon/public');
 SELECT tests.is(tests.val($q$SELECT string_agg(tablename || '.' || policyname, ', ') FROM pg_policies
   WHERE schemaname = 'public' AND cmd = 'SELECT' AND (roles && ARRAY['anon', 'public']::name[])
-    AND NOT (tablename = 'blood_requests' AND policyname = 'Anyone reads active requests')$q$), NULL,
-  'catalog: only "Anyone reads active requests" is readable by anon');
+    AND NOT (tablename = 'blood_requests' AND policyname = 'Anyone reads open requests')$q$), NULL,
+  'catalog: only "Anyone reads open requests" is readable by anon');
 SELECT tests.is(tests.val($q$SELECT string_agg(policyname, ', ') FROM pg_policies
   WHERE schemaname = 'storage' AND tablename = 'objects' AND (roles && ARRAY['anon', 'public']::name[])$q$), NULL,
   'catalog: no storage.objects policy applies to anon/public');
@@ -568,6 +559,19 @@ SELECT tests.is(tests.affected($q$UPDATE public.profiles SET location = '{"latit
   1, 'location: a donor can set their own location');
 SELECT tests.is(tests.affected(format($q$UPDATE public.profiles SET location = '{"latitude": 9.9, "longitude": 76.2}' WHERE id = %L$q$, tests.uid('requester'))),
   0, 'location: a donor cannot set someone else''s location');
+SELECT tests.login('postgres');
+
+-- ---------------------------------------------------------------------------
+-- 11. Expired requests (20261008000600)
+-- ---------------------------------------------------------------------------
+SELECT tests.login('requester');
+SELECT tests.is(tests.rows($q$SELECT 1 FROM public.blood_requests WHERE id = 'aaaaaaaa-0000-4000-8000-000000000004'$q$), 1::bigint,
+  'expired: the owner still sees their expired request');
+SELECT tests.login('unrelated');
+SELECT tests.is(tests.rows($q$SELECT 1 FROM public.blood_requests WHERE id = 'aaaaaaaa-0000-4000-8000-000000000004'$q$), 0::bigint,
+  'expired: other signed-in users do not see it');
+SELECT tests.denied($q$INSERT INTO public.donations (request_id, donor_id, status) VALUES ('aaaaaaaa-0000-4000-8000-000000000004', auth.uid(), 'pending')$q$,
+  'expired: cannot offer on an expired request');
 SELECT tests.login('postgres');
 
 \o

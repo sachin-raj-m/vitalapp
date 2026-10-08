@@ -11,7 +11,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     return (
         <div className="flex min-h-screen flex-col md:flex-row">
             <AppSidebar />
-            <main className="flex-1 md:ml-60">
+            <main id="main" tabIndex={-1} className="flex-1 md:ml-60">
                 <div className="mx-auto max-w-5xl space-y-6 px-4 py-6 sm:px-6 md:px-10 md:py-10">
                     <VerificationBanner />
                     {children}
@@ -30,7 +30,7 @@ export function SidebarWrapper({ children }: { children: React.ReactNode }) {
         return (
             <>
                 <Header />
-                <main className="flex-grow">
+                <main id="main" tabIndex={-1} className="flex-grow">
                     <div className="mx-auto max-w-5xl px-5 py-10 sm:px-8">{children}</div>
                 </main>
                 <Footer />

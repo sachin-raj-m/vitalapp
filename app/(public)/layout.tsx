@@ -9,7 +9,7 @@ export default function PublicLayout({
     return (
         <>
             <Header />
-            <main className="flex-grow">
+            <main id="main" tabIndex={-1} className="flex-grow">
                 {children}
             </main>
             <Footer />
