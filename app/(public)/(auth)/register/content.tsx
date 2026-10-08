@@ -9,13 +9,13 @@ import { GoogleButton, OrDivider, friendlyAuthError } from '@/components/auth/Go
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { Alert } from '@/components/ui/Alert';
-import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { PLATFORM_DISCLAIMER, consentStamp } from '@/lib/legal';
+import { ConfirmEmailCode } from '@/components/auth/ConfirmEmailCode';
+import type { User } from '@supabase/supabase-js';
 
 export default function RegisterPage() {
     const router = useRouter();
-    const { signUp } = useAuth();
     const [formData, setFormData] = useState({
         email: '',
         password: '',
@@ -25,6 +25,8 @@ export default function RegisterPage() {
     const [isLoading, setIsLoading] = useState(false);
     const [isGoogleLoading, setIsGoogleLoading] = useState(false);
     const [agreed, setAgreed] = useState(false);
+    // Set once the account exists but the email still has to be confirmed with a code.
+    const [pendingEmail, setPendingEmail] = useState<string | null>(null);
     const consentError = 'Tick the box to agree to the Terms and Privacy notice before continuing.';
 
     const handleGoogleSignUp = async () => {
@@ -48,6 +50,19 @@ export default function RegisterPage() {
             setError(friendlyAuthError(err?.message));
             setIsGoogleLoading(false);
         }
+    };
+
+    // Runs once the person has a session (email confirmed).
+    const finishSignUp = async (user: User) => {
+        // A database trigger creates the profile row on signup; stamp the consent
+        // on it too (best effort; the sign-up metadata is the record).
+        await supabase.from('profiles').update(consentStamp()).eq('id', user.id);
+        try {
+            localStorage.setItem('pendingRegistration', JSON.stringify({ userId: user.id, email: user.email }));
+        } catch { /* storage blocked */ }
+        // Welcome email goes to the signed-in user's own address (server-side).
+        authedFetch('/api/notify/welcome', { method: 'POST' }).catch(() => {});
+        router.push('/complete-registration');
     };
 
     const validateForm = () => {
@@ -106,25 +121,15 @@ export default function RegisterPage() {
                 throw new Error('Failed to create account');
             }
 
-            // A database trigger creates the profile row on signup; stamp the
-            // consent on it too when we already have a session (no email confirmation).
-            if (authData.session) {
-                await supabase.from('profiles').update(consent).eq('id', authData.user.id); // best effort; metadata above is the record
+            // Email confirmation is on, so there is no session yet: the account
+            // only works once the emailed code is entered. (For an address that
+            // is already registered Supabase also returns no session, so this
+            // screen doesn't reveal whether an account exists.)
+            if (!authData.session) {
+                setPendingEmail(formData.email);
+                return;
             }
-
-            // Store basic registration data
-            localStorage.setItem('pendingRegistration', JSON.stringify({
-                userId: authData.user.id,
-                email: formData.email
-            }));
-
-            // Trigger Welcome Email in background
-            // Welcome email goes to the signed-in user's own address (server-side).
-            authedFetch('/api/notify/welcome', { method: 'POST' }).catch(() => {});
-
-            // Direct onboarding: auto-login logic (handled by supabase client usually if confirm is off)
-            // Redirect to completion page immediately
-            router.push('/complete-registration');
+            await finishSignUp(authData.user);
 
         } catch (err: any) {
             console.error('Registration error');
@@ -133,6 +138,18 @@ export default function RegisterPage() {
             setIsLoading(false);
         }
     };
+
+    if (pendingEmail) {
+        return (
+            <AuthFrame
+                title="Confirm your email"
+                subtitle="Enter the code we emailed you. This makes sure the account belongs to you."
+                footer={<>Already registered? <Link href="/login" className={authLinkClass}>Sign in</Link></>}
+            >
+                <ConfirmEmailCode email={pendingEmail} onVerified={finishSignUp} onBack={() => setPendingEmail(null)} />
+            </AuthFrame>
+        );
+    }
 
     return (
         <AuthFrame
