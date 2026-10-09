@@ -695,4 +695,24 @@ SELECT tests.is(public.verify_donation_for(tests.uid('requester'), current_setti
   '1', 'wa: right PIN completes the donation');
 SELECT tests.login('postgres');
 
+
+-- ---------------------------------------------------------------------------
+-- 14. Phone verification (20261009000300)
+-- ---------------------------------------------------------------------------
+SELECT tests.login('postgres');
+UPDATE public.profiles SET phone_verified_at = now() WHERE id = tests.uid('fresh');
+SELECT tests.login('fresh');
+SELECT tests.denied($q$SELECT * FROM public.phone_change_codes$q$, 'phone: users cannot read pending codes');
+UPDATE public.profiles SET phone_verified_at = now() - interval '1 day', full_name = 'Finn F' WHERE id = auth.uid();
+SELECT tests.ok(tests.val($q$SELECT phone_verified_at > now() - interval '1 hour' FROM public.profiles WHERE id = auth.uid()$q$) = 'true',
+  'phone: users cannot set phone_verified_at');
+UPDATE public.profiles SET phone = '9123456780' WHERE id = auth.uid();
+SELECT tests.is(tests.val($q$SELECT coalesce(phone_verified_at::text, 'null') FROM public.profiles WHERE id = auth.uid()$q$), 'null',
+  'phone: changing the number clears verification');
+SELECT tests.login('service');
+UPDATE public.profiles SET phone = '9123456781', phone_verified_at = now() WHERE id = tests.uid('fresh');
+SELECT tests.ok(tests.val(format($q$SELECT phone_verified_at IS NOT NULL FROM public.profiles WHERE id = %L$q$, tests.uid('fresh'))) = 'true',
+  'phone: the server can mark a number verified');
+SELECT tests.login('postgres');
+
 \o

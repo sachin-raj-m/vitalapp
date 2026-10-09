@@ -23,10 +23,11 @@ export const TEMPLATES = {
     donationFollowup: 'vital_donation_followup',
     donorThanks: 'vital_donor_thanks',
     requestCovered: 'vital_request_covered',
+    verifyCode: 'vital_verify_code',
 } as const;
 
 export type MessageKind =
-    | 'alert' | 'offer_received' | 'followup' | 'thanks' | 'covered' | 'reply';
+    | 'alert' | 'offer_received' | 'followup' | 'thanks' | 'covered' | 'reply' | 'verify';
 
 export const whatsappEnabled = () =>
     process.env.WHATSAPP_ENABLED === 'true' && !!process.env.WHATSAPP_TOKEN && !!process.env.WHATSAPP_PHONE_NUMBER_ID;
