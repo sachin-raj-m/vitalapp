@@ -16,7 +16,7 @@ export const Modal = ({ isOpen, onClose, title, children }: ModalProps) => {
     const panelRef = useRef<HTMLDivElement>(null);
     // Keep the latest onClose without re-running the effect on every render.
     const onCloseRef = useRef(onClose);
-    onCloseRef.current = onClose;
+    useEffect(() => { onCloseRef.current = onClose; }, [onClose]);
     // Portal target only exists in the browser; render nothing until mounted.
     const [mounted, setMounted] = useState(false);
     useEffect(() => setMounted(true), []);

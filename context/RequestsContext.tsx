@@ -74,24 +74,21 @@ export function RequestsProvider({ children }: { children: React.ReactNode }) {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [user?.id]);
 
-    // Fetch on mount or when user changes (e.g. login/logout could change RLS visibility)
+    // Fetch on mount or when user changes (e.g. login/logout could change RLS visibility).
+    // Then refresh quietly every minute while the tab is visible, and when it
+    // regains focus. (Realtime isn't used: blood_requests isn't in the realtime
+    // publication, and polling keeps the anon column restrictions simple.)
     useEffect(() => {
         fetchRequests();
 
-        // Optional: Real-time subscription could go here
-        const channel = supabase
-            .channel('public_requests')
-            .on('postgres_changes',
-                { event: '*', schema: 'public', table: 'blood_requests' },
-                () => {
-
-                    fetchRequests();
-                }
-            )
-            .subscribe();
-
+        const refreshIfVisible = () => {
+            if (document.visibilityState === 'visible') fetchRequests();
+        };
+        const interval = window.setInterval(refreshIfVisible, 60_000);
+        document.addEventListener('visibilitychange', refreshIfVisible);
         return () => {
-            supabase.removeChannel(channel);
+            window.clearInterval(interval);
+            document.removeEventListener('visibilitychange', refreshIfVisible);
         };
     }, [fetchRequests]);
 
