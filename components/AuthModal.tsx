@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -9,6 +9,7 @@ import { Modal } from '@/components/ui/Modal';
 import { GoogleButton, OrDivider, friendlyAuthError } from '@/components/auth/GoogleButton';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
+import { TurnstileField, type TurnstileHandle } from '@/components/TurnstileField';
 
 interface AuthModalProps {
     isOpen: boolean;
@@ -24,6 +25,7 @@ export function AuthModal({ isOpen, onClose, onSuccess, message = "Sign in to co
     const [error, setError] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+    const captcha = useRef<TurnstileHandle>(null);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -31,10 +33,11 @@ export function AuthModal({ isOpen, onClose, onSuccess, message = "Sign in to co
         setIsLoading(true);
 
         try {
-            await signIn(email, password);
+            await signIn(email, password, await captcha.current?.getToken());
             onSuccess();
         } catch (err: any) {
             setError(friendlyAuthError(err?.message));
+            captcha.current?.reset(); // tokens work once
         } finally {
             setIsLoading(false);
         }
@@ -62,6 +65,7 @@ export function AuthModal({ isOpen, onClose, onSuccess, message = "Sign in to co
             <form onSubmit={handleSubmit} className="space-y-4">
                 <Input label="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="email" />
                 <Input label="Password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required autoComplete="current-password" />
+                <TurnstileField ref={captcha} />
                 <Button type="submit" variant="ink" size="lg" className="w-full" isLoading={isLoading}>
                     Sign in
                 </Button>

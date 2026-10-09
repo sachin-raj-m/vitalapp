@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { AuthFrame, authLinkClass } from '@/components/auth/AuthFrame';
@@ -13,6 +13,7 @@ import { supabase } from '@/lib/supabase';
 import { isRegistrationComplete } from '@/lib/auth-helpers';
 import { safeInternalPath } from '@/lib/site';
 import { ConfirmEmailCode } from '@/components/auth/ConfirmEmailCode';
+import { TurnstileField, type TurnstileHandle } from '@/components/TurnstileField';
 
 export default function LoginPage() {
     const router = useRouter();
@@ -22,6 +23,7 @@ export default function LoginPage() {
     const [error, setError] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+    const captcha = useRef<TurnstileHandle>(null);
     // Registered with a password but never entered the emailed code.
     const [unconfirmedEmail, setUnconfirmedEmail] = useState<string | null>(null);
 
@@ -63,7 +65,7 @@ export default function LoginPage() {
         setIsLoading(true);
 
         try {
-            await signIn(email, password);
+            await signIn(email, password, await captcha.current?.getToken());
             // The navigation will be handled by the useEffect above
         } catch (err: any) {
             if (String(err?.message).includes('Email not confirmed')) {
@@ -72,6 +74,7 @@ export default function LoginPage() {
                 setError(friendlyAuthError(err?.message));
             }
             setIsLoading(false);
+            captcha.current?.reset(); // tokens work once
         }
     };
 
@@ -139,6 +142,7 @@ export default function LoginPage() {
             <form onSubmit={handleSubmit} className="space-y-4">
                 <Input label="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="email" />
                 <Input label="Password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required autoComplete="current-password" />
+                <TurnstileField ref={captcha} />
                 <Button type="submit" variant="ink" size="lg" className="w-full !mt-6" isLoading={isLoading}>
                     Sign in
                 </Button>

@@ -1,7 +1,7 @@
 "use client";
 
 import { authedFetch } from '@/lib/api';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { AuthFrame, authLinkClass } from '@/components/auth/AuthFrame';
@@ -14,6 +14,7 @@ import { PLATFORM_DISCLAIMER, consentStamp } from '@/lib/legal';
 import { ConfirmEmailCode } from '@/components/auth/ConfirmEmailCode';
 import type { User } from '@supabase/supabase-js';
 import { rememberReferral } from '@/lib/referrals';
+import { TurnstileField, type TurnstileHandle } from '@/components/TurnstileField';
 
 export default function RegisterPage() {
     const router = useRouter();
@@ -28,6 +29,7 @@ export default function RegisterPage() {
     const [agreed, setAgreed] = useState(false);
     // Set once the account exists but the email still has to be confirmed with a code.
     const [pendingEmail, setPendingEmail] = useState<string | null>(null);
+    const captcha = useRef<TurnstileHandle>(null);
     // Arrived from a referral link (/r/CODE): keep the code until registration completes.
     useEffect(() => {
         rememberReferral(new URLSearchParams(window.location.search).get('ref'));
@@ -112,6 +114,7 @@ export default function RegisterPage() {
                 email: formData.email,
                 password: formData.password,
                 options: {
+                    captchaToken: await captcha.current?.getToken(),
                     data: {
                         registration_completed: false,
                         // Recorded server-side in auth.users at the moment of signup.
@@ -140,6 +143,7 @@ export default function RegisterPage() {
         } catch (err: any) {
             console.error('Registration error');
             setError(friendlyAuthError(err?.message));
+            captcha.current?.reset(); // tokens work once
         } finally {
             setIsLoading(false);
         }
@@ -213,6 +217,7 @@ export default function RegisterPage() {
                     helperText="At least 8 characters."
                     error={fieldErrors.password}
                 />
+                <TurnstileField ref={captcha} />
                 <Button
                     type="submit"
                     variant="primary"

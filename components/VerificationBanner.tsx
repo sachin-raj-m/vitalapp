@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { Alert } from '@/components/ui/Alert';
 import { Button } from '@/components/ui/Button';
@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabase';
 import { Mail, Phone, X } from 'lucide-react';
 import { WHATSAPP_LIVE } from '@/lib/features';
 import { waNumber } from '@/lib/phone';
+import { TurnstileField, type TurnstileHandle } from '@/components/TurnstileField';
 
 export const VerificationBanner = () => {
     const { session, user } = useAuth();
@@ -13,6 +14,7 @@ export const VerificationBanner = () => {
     const [loading, setLoading] = useState<'email' | 'phone' | null>(null);
     const [sent, setSent] = useState<'email' | 'phone' | null>(null);
     const [error, setError] = useState<string>('');
+    const captcha = useRef<TurnstileHandle>(null);
 
     if (!session?.user || !isVisible) return null;
 
@@ -31,7 +33,8 @@ export const VerificationBanner = () => {
                 type: 'signup',
                 email: session.user.email!,
                 options: {
-                    emailRedirectTo: `${window.location.origin}/dashboard`
+                    emailRedirectTo: `${window.location.origin}/dashboard`,
+                    captchaToken: await captcha.current?.getToken(),
                 }
             });
             if (error) throw error;
@@ -41,6 +44,7 @@ export const VerificationBanner = () => {
             setError(err.message || 'Couldn’t send the verification email. Please try again.');
         } finally {
             setLoading(null);
+            captcha.current?.reset(); // tokens work once
         }
     };
 
@@ -63,6 +67,7 @@ export const VerificationBanner = () => {
                 {sent === 'email' && <p className="mt-1 text-[13px] text-success-700">Verification email sent. Check your inbox.</p>}
             </div>
             <div className="flex flex-wrap items-center gap-2">
+                {!emailVerified && sent !== 'email' && <TurnstileField ref={captcha} />}
                 {!emailVerified && sent !== 'email' && (
                     <Button size="sm" variant="secondary" onClick={handleVerifyEmail} isLoading={loading === 'email'} leftIcon={<Mail className="h-3.5 w-3.5" />}>
                         Send verification email

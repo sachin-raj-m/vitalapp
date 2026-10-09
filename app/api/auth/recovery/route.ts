@@ -4,6 +4,7 @@ import { getResetPasswordEmailHtml } from '@/lib/email-templates';
 import { sendEmail } from '@/lib/email';
 import { serviceClient } from '@/lib/supabase-route';
 import { clientIp, hashKey, rateLimitAll, tooManyRequests } from '@/lib/rate-limit';
+import { verifyTurnstile } from '@/lib/turnstile';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -28,6 +29,12 @@ export async function POST(request: Request) {
         [`recovery:email:${hashKey(email)}`, 60 * 60, 3],
     ]);
     if (!allowed) return tooManyRequests(15 * 60);
+
+    // Bot check (Cloudflare Turnstile). This route bypasses Supabase Auth's own
+    // captcha check, so it verifies the token itself.
+    if (!(await verifyTurnstile(body?.captchaToken, clientIp(request)))) {
+        return NextResponse.json({ error: 'The security check failed. Please reload the page and try again.' }, { status: 400 });
+    }
 
     if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
         console.error('Recovery: SUPABASE_SERVICE_ROLE_KEY is not set');
