@@ -19,7 +19,8 @@ export function InviteDonors({ bloodGroup }: { bloodGroup?: string | null }) {
         let cancelled = false;
         Promise.all([supabase.rpc('get_my_referral_code'), supabase.rpc('get_my_referral_count')]).then(([c, n]) => {
             if (cancelled) return;
-            setCode(c.error ? null : (c.data as string | null));
+            // A code is a non-empty string; anything else means there's nothing to share.
+            setCode(!c.error && typeof c.data === 'string' && c.data ? c.data : null);
             setCount(n.error ? null : Number(n.data ?? 0));
         });
         return () => { cancelled = true; };

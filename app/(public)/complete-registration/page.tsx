@@ -16,6 +16,7 @@ import { toast } from 'sonner';
 import Link from 'next/link';
 import { PRIVACY_VERSION, earliestConsentAt } from '@/lib/legal';
 import { takeReferral } from '@/lib/referrals';
+import { waNumber } from '@/lib/phone';
 
 interface PendingRegistration {
     userId: string;
@@ -39,6 +40,7 @@ interface CompleteRegistrationForm {
     availability: string[];
     hasConditions: boolean;
     consent: boolean;
+    whatsappAlerts: boolean;
 }
 
 export default function CompleteRegistration() {
@@ -63,7 +65,8 @@ export default function CompleteRegistration() {
         willingTovelKm: 10,
         availability: ['Weekends'],
         hasConditions: false,
-        consent: false
+        consent: false,
+        whatsappAlerts: true,
     });
     const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
     const [nbtcEligible, setNbtcEligible] = useState<boolean>(true);
@@ -119,6 +122,7 @@ export default function CompleteRegistration() {
 
         if (!formData.fullName.trim()) errors.fullName = 'Full name is required';
         if (!formData.phone.trim()) errors.phone = 'Phone number is required';
+        else if (formData.whatsappAlerts && !waNumber(formData.phone)) errors.phone = 'Enter a 10-digit Indian mobile number for WhatsApp alerts, or untick WhatsApp alerts below.';
         if (!formData.dob) errors.dob = 'Date of birth is required';
         if (!formData.gender) errors.gender = 'Gender is required';
         if (!formData.bloodGroup) errors.bloodGroup = 'Blood Group is required';
@@ -203,7 +207,8 @@ export default function CompleteRegistration() {
                         })(),
                         // If NBTC ineligible, force is_donor to false (Volunteer Only)
                         is_donor: nbtcEligible,
-                        is_available: nbtcEligible
+                        is_available: nbtcEligible,
+                        whatsapp_alerts: formData.whatsappAlerts && !!waNumber(formData.phone),
                     },
                     { onConflict: 'id' }
                 );
@@ -336,6 +341,12 @@ export default function CompleteRegistration() {
                         />
                     </div>
                     <Input label="Mobile number" type="tel" value={formData.phone} onChange={e => set('phone', e.target.value)} required autoComplete="tel" placeholder="+91 98765 43210" error={fieldErrors.phone} />
+                    {checkbox(
+                        formData.whatsappAlerts,
+                        v => set('whatsappAlerts', v),
+                        'Send me alerts on WhatsApp',
+                        'We’ll message this number when someone nearby needs your blood group. Phone numbers are never shared in WhatsApp. You can turn this off any time in Settings, or by replying STOP.',
+                    )}
                 </>)}
 
                 {section('Blood group', 'If you are not sure, check a recent blood test report or ask a blood bank.', <>

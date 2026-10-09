@@ -7,6 +7,11 @@ import { getVerifiedUser, serviceClient } from '@/lib/supabase-route'
 import { rateLimit, tooManyRequests } from '@/lib/rate-limit'
 import { SITE_URL } from '@/lib/site'
 import type { BloodGroup } from '@/types'
+import { TEMPLATES, sendTemplate, waNumber, whatsappEnabled } from '@/lib/whatsapp'
+import { formatNeededBy, placeLabel } from '@/lib/share'
+
+// A donor gets at most this many WhatsApp alerts in 24 hours.
+const WHATSAPP_ALERTS_PER_DAY = 3
 
 /**
  * Exact, case-insensitive match pattern for ilike: escapes LIKE wildcards
@@ -40,7 +45,7 @@ export async function POST(request: Request) {
     // Read as the caller so RLS confirms ownership.
     const { data: bloodRequest } = await supabase
         .from('blood_requests')
-        .select('id, user_id, blood_group, hospital_name, city, urgency_level, status, created_at')
+        .select('id, user_id, blood_group, hospital_name, city, urgency_level, status, created_at, date_needed')
         .eq('id', requestId)
         .maybeSingle()
 
@@ -68,7 +73,7 @@ export async function POST(request: Request) {
     try {
         const { data: donors, error: donorError } = await admin
             .from('profiles')
-            .select('id, full_name, email')
+            .select('id, full_name, email, phone, whatsapp_alerts')
             .in('blood_group', groups)
             .eq('is_donor', true)
             .eq('is_available', true)
@@ -80,9 +85,36 @@ export async function POST(request: Request) {
         }
 
         const requestLink = `${SITE_URL}/requests/${bloodRequest.id}`
+
+        // WhatsApp for donors who opted in (with a daily cap); email for everyone else.
+        const viaWhatsApp = new Set<string>()
+        let whatsappSent = 0
+        if (whatsappEnabled()) {
+            const candidates = donors.filter(d => d.whatsapp_alerts && waNumber(d.phone))
+            const { data: recent } = candidates.length
+                ? await admin.from('whatsapp_messages').select('user_id')
+                    .eq('kind', 'alert').neq('status', 'failed')
+                    .in('user_id', candidates.map(d => d.id))
+                    .gt('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
+                : { data: [] as { user_id: string | null }[] }
+            const counts = new Map<string, number>()
+            for (const r of recent ?? []) if (r.user_id) counts.set(r.user_id, (counts.get(r.user_id) ?? 0) + 1)
+
+            const place = placeLabel(bloodRequest.hospital_name, bloodRequest.city) || 'a hospital near you'
+            const neededBy = formatNeededBy(bloodRequest.date_needed)
+            await Promise.allSettled(candidates.filter(d => (counts.get(d.id) ?? 0) < WHATSAPP_ALERTS_PER_DAY).map(donor => {
+                viaWhatsApp.add(donor.id)
+                return sendTemplate(waNumber(donor.phone)!, TEMPLATES.donorAlert, {
+                    body: [group, place, neededBy ? `Needed by ${neededBy}.` : 'Needed as soon as possible.'],
+                    quickReplies: [`offer:${bloodRequest.id}`, `decline:${bloodRequest.id}`],
+                    urlSuffix: { index: 2, value: bloodRequest.id },
+                }, { kind: 'alert', userId: donor.id, requestId: bloodRequest.id }).then(id => { if (id) whatsappSent++ })
+            }))
+        }
+
         let emailsSent = 0
         if (process.env.SMTP_USER) {
-            await Promise.allSettled(donors.filter(d => d.email).map(donor =>
+            await Promise.allSettled(donors.filter(d => d.email && !viaWhatsApp.has(d.id)).map(donor =>
                 sendEmail({
                     to: donor.email!,
                     subject: `${group} blood needed${bloodRequest.city ? ` in ${bloodRequest.city}` : ''}`,
@@ -129,7 +161,7 @@ export async function POST(request: Request) {
             ))
         }
 
-        return NextResponse.json({ matchedDonors: donors.length, notificationsSent: pushSent, emailsSent })
+        return NextResponse.json({ matchedDonors: donors.length, notificationsSent: pushSent, emailsSent, whatsappSent })
     } catch (error: any) {
         console.error('Error in notify/donors:', error)
         return NextResponse.json({ error: 'Could not notify donors' }, { status: 500 })

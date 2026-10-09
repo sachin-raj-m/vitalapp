@@ -16,6 +16,7 @@ import dynamic from 'next/dynamic';
 import { logActivity } from '@/lib/logger';
 import { toast } from 'sonner';
 import { consentStamp, earliestConsentAt, hasRecordedConsent, type ConsentFields } from '@/lib/legal';
+import { waNumber } from '@/lib/phone';
 
 const Map = dynamic(() => import('@/components/Map'), {
     ssr: false,
@@ -40,6 +41,7 @@ export default function CreateRequestPage() {
         notes: '',
         contactName: '',
         contactPhone: '',
+        whatsappUpdates: true,
         location: {
             latitude: 0,
             longitude: 0,
@@ -213,7 +215,11 @@ export default function CreateRequestPage() {
             // donors who offer can read it.
             const { error: contactError } = await supabase
                 .from('request_contacts')
-                .insert({ request_id: requestId, contact_phone: formData.contactPhone });
+                .insert({
+                    request_id: requestId,
+                    contact_phone: formData.contactPhone,
+                    whatsapp_updates: formData.whatsappUpdates && !!waNumber(formData.contactPhone),
+                });
             if (contactError) {
                 await supabase.from('blood_requests').delete().eq('id', requestId);
                 throw contactError;
@@ -395,6 +401,21 @@ export default function CreateRequestPage() {
                         <Input label="Contact name" value={formData.contactName} onChange={(e) => setFormData({ ...formData, contactName: e.target.value })} required />
                         <Input label="Contact phone" type="tel" value={formData.contactPhone} onChange={(e) => setFormData({ ...formData, contactPhone: e.target.value })} required helperText="Only shown to donors who offer." />
                     </div>
+                    <label className="flex cursor-pointer items-start gap-3">
+                        <input
+                            type="checkbox"
+                            checked={formData.whatsappUpdates}
+                            onChange={(e) => setFormData({ ...formData, whatsappUpdates: e.target.checked })}
+                            className="mt-1 h-4 w-4 shrink-0 rounded-[4px] border-gray-400 accent-gray-900"
+                        />
+                        <span className="text-sm leading-relaxed text-gray-600">
+                            <span className="block text-gray-900">Send updates on WhatsApp to this number</span>
+                            When a donor offers, and to confirm the donation with their PIN afterwards. Numbers are never shared in WhatsApp; you’ll get a private link instead.
+                            {formData.whatsappUpdates && formData.contactPhone.trim() !== '' && !waNumber(formData.contactPhone) && (
+                                <span className="mt-1 block text-warning-800">WhatsApp updates need a 10-digit Indian mobile number.</span>
+                            )}
+                        </span>
+                    </label>
                     <Textarea
                         label="Anything donors should know (optional)"
                         value={formData.notes}

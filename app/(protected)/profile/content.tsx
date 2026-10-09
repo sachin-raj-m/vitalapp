@@ -9,7 +9,7 @@ import { Alert } from '@/components/ui/Alert';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { fetchUserStats, calculateEligibility, type UserStats } from '@/lib/stats';
-import { Copy, Download, ExternalLink, Pencil, Send } from 'lucide-react';
+import { Copy, Download, ExternalLink, Send, Settings } from 'lucide-react';
 import { format } from 'date-fns';
 import { donorProfilePath } from '@/lib/donor-slug';
 import { buildDonorShareMessage, whatsappShareUrl } from '@/lib/share';
@@ -18,7 +18,6 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import html2canvas from 'html2canvas';
 import { motion } from 'framer-motion';
 
-import { PushNotificationManager } from '@/components/PushNotificationManager';
 import DonorCard from '@/components/DonorCard';
 import { InviteDonors } from '@/components/InviteDonors';
 import { toast } from 'sonner';
@@ -26,7 +25,7 @@ import { TypeToConfirmModal } from '@/components/ui/TypeToConfirmModal';
 
 export default function ProfilePage() {
     const router = useRouter();
-    const { user, signOut, session, updateProfile } = useAuth();
+    const { user, signOut } = useAuth();
     const [stats, setStats] = useState<UserStats | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState('');
@@ -51,15 +50,6 @@ export default function ProfilePage() {
             bloodGroup: user.blood_group,
         });
         window.open(whatsappShareUrl(text), '_blank', 'noopener,noreferrer');
-    };
-
-    const togglePublicProfile = async (newValue: boolean) => {
-        try {
-            await updateProfile({ is_public_profile: newValue });
-        } catch (err) {
-            console.error('Failed to toggle visibility', err);
-            toast.error('Failed to update visibility settings');
-        }
     };
 
     // Throws on failure so the dialog stays open and shows the server's message.
@@ -216,7 +206,7 @@ export default function ProfilePage() {
                     href="/profile/edit"
                     className="inline-flex h-9 items-center gap-1.5 self-start rounded-md border border-gray-300 bg-white px-3.5 text-sm font-medium text-gray-900 hover:border-gray-400 sm:self-auto"
                 >
-                    <Pencil className="h-3.5 w-3.5" /> Edit profile
+                    <Settings className="h-3.5 w-3.5" /> Settings
                 </Link>
             </header>
 
@@ -267,25 +257,13 @@ export default function ProfilePage() {
                         </dl>
                     </div>
 
-                    <div>
-                        <div className="flex items-start justify-between gap-6">
-                            <div>
-                                <h2 className="text-lg font-medium tracking-tight text-gray-900">Public donor card</h2>
-                                <p className="mt-1 max-w-md text-sm leading-relaxed text-gray-600">
-                                    When on, anyone with your link can see your card: first name, blood group and donation count. Never your contact details.
-                                </p>
-                            </div>
-                            <label className="relative mt-1 inline-flex shrink-0 cursor-pointer items-center">
-                                <input
-                                    type="checkbox"
-                                    checked={user?.is_public_profile || false}
-                                    onChange={(e) => togglePublicProfile(e.target.checked)}
-                                    className="peer sr-only"
-                                    aria-label="Make donor card public"
-                                />
-                                <span className="h-6 w-11 rounded-full bg-gray-300 transition-colors after:absolute after:left-[3px] after:top-[3px] after:h-[18px] after:w-[18px] after:rounded-full after:bg-white after:transition-transform after:content-[''] peer-checked:bg-gray-900 peer-checked:after:translate-x-5 peer-focus-visible:ring-2 peer-focus-visible:ring-red-600 peer-focus-visible:ring-offset-2" />
-                            </label>
-                        </div>
+                    {user?.is_donor && <div>
+                        <h2 className="text-lg font-medium tracking-tight text-gray-900">Your public card</h2>
+                        <p className="mt-1 max-w-md text-sm leading-relaxed text-gray-600">
+                            {user?.is_public_profile
+                                ? 'Anyone with this link can see your first name, blood group and donation count. Never your contact details.'
+                                : <>Your card is private. You can make it public in <Link href="/profile/edit" className="text-gray-900 underline underline-offset-4">Settings</Link>.</>}
+                        </p>
                         {user?.is_public_profile && (
                             <div className="mt-4 flex items-center gap-2">
                                 <code className="min-w-0 flex-1 truncate rounded-md border border-gray-200 bg-white px-3 py-2 font-mono text-[13px] text-gray-700">
@@ -297,19 +275,9 @@ export default function ProfilePage() {
                                 </a>
                             </div>
                         )}
-                    </div>
+                    </div>}
 
                     {user?.is_donor && <InviteDonors bloodGroup={user.blood_group} />}
-
-                    <div className="flex items-start justify-between gap-6 border-t border-gray-200 pt-8">
-                        <div>
-                            <h2 className="text-lg font-medium tracking-tight text-gray-900">Alerts on this device</h2>
-                            <p className="mt-1 max-w-md text-sm leading-relaxed text-gray-600">
-                                Get a push notification when someone in your city needs a blood group you can give to.
-                            </p>
-                        </div>
-                        <div className="shrink-0 pt-1"><PushNotificationManager /></div>
-                    </div>
                 </div>
             </section>
 

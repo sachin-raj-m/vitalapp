@@ -122,7 +122,7 @@ export function AppSidebar() {
                 {sidebarContent}
             </aside>
 
-            <div className="sticky top-0 z-40 flex h-14 items-center justify-between border-b border-gray-200 bg-white/90 px-4 backdrop-blur-md md:hidden">
+            <header className="sticky top-0 z-40 flex h-14 items-center justify-between border-b border-gray-200 bg-white/90 px-4 backdrop-blur-md md:hidden">
                 <Link href="/dashboard" aria-label="Vital dashboard" className="group -mb-1">
                     <Logo className="text-[22px]" />
                 </Link>
@@ -135,7 +135,7 @@ export function AppSidebar() {
                 >
                     <Menu className="h-5 w-5" />
                 </button>
-            </div>
+            </header>
 
             <AnimatePresence>
                 {isMobileOpen && (
