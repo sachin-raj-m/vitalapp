@@ -6,6 +6,7 @@ import {
     BarChart, Bar, PieChart, Pie, Cell, Legend
 } from 'recharts';
 import { Card, CardBody, CardHeader } from '@/components/ui/Card';
+import { isRequestOpen } from '@/lib/requests';
 
 interface AnalyticsChartsProps {
     users: any[];
@@ -16,6 +17,7 @@ interface AnalyticsChartsProps {
 const COLORS = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#3b82f6', '#a855f7'];
 const STATUS_COLORS = {
     active: '#eab308', // yellow
+    expired: '#f97316', // orange
     fulfilled: '#22c55e', // green
     withdrawn: '#6b7280', // gray
     cancelled: '#ef4444' // red
@@ -41,15 +43,18 @@ export function AnalyticsCharts({ users, requests, donations }: AnalyticsChartsP
 
     // 2. Request Status Distribution
     const getRequestStatusData = () => {
-        const stats = { active: 0, fulfilled: 0, withdrawn: 0, cancelled: 0 };
+        const stats = { active: 0, expired: 0, fulfilled: 0, withdrawn: 0, cancelled: 0 };
         requests.forEach(r => {
-            if (stats[r.status as keyof typeof stats] !== undefined) {
-                stats[r.status as keyof typeof stats]++;
+            // Active but past its needed-by date counts as expired, as on the public site.
+            const key = r.status === 'active' && !isRequestOpen(r) ? 'expired' : r.status;
+            if (stats[key as keyof typeof stats] !== undefined) {
+                stats[key as keyof typeof stats]++;
             }
         });
 
         return [
-            { name: 'Active', value: stats.active, color: STATUS_COLORS.active },
+            { name: 'Open', value: stats.active, color: STATUS_COLORS.active },
+            { name: 'Expired', value: stats.expired, color: STATUS_COLORS.expired },
             { name: 'Fulfilled', value: stats.fulfilled, color: STATUS_COLORS.fulfilled },
             { name: 'Cancelled/Withdrawn', value: stats.withdrawn + stats.cancelled, color: STATUS_COLORS.withdrawn },
         ].filter(d => d.value > 0);
