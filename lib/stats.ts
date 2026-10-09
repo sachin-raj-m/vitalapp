@@ -1,5 +1,6 @@
 import { supabase } from './supabase';
 import { ACHIEVEMENTS, DONATION_RECOVERY_DAYS, POINTS_PER_DONATION } from './constants';
+import { REFERRAL_POINTS } from './referrals';
 
 export interface Achievement {
     id: string;
@@ -20,7 +21,8 @@ export interface Achievement {
  * exchange value):
  *   - POINTS_PER_DONATION (50) for every completed donation, regardless of
  *     units given (cancelled and pending offers score nothing), plus
- *   - a one-time bonus for every milestone reached (ACHIEVEMENTS[*].points).
+ *   - a one-time bonus for every milestone reached (ACHIEVEMENTS[*].points), plus
+ *   - REFERRAL_POINTS (25) for every donor who registered with the user's link.
  * So one completed donation = 50 + 50 (First Drop bonus) = 100 points.
  */
 export interface PointsBreakdown {
@@ -28,12 +30,15 @@ export interface PointsBreakdown {
     donation_points: number; // donations * POINTS_PER_DONATION
     bonus_points: number;   // sum of unlocked milestone bonuses
     milestones: number;     // milestones reached
-    total: number;          // donation_points + bonus_points
+    referrals: number;      // donors who registered with the user's link
+    referral_points: number; // referrals * REFERRAL_POINTS
+    total: number;          // donation_points + bonus_points + referral_points
 }
 
 export interface UserStats {
     total_donations: number;
     total_requests: number;
+    total_referrals: number;
     /** Always equals points.total. */
     total_points: number;
     points: PointsBreakdown;
@@ -59,15 +64,20 @@ export async function fetchUserStats(userId: string): Promise<UserStats> {
 
     if (requestsError) throw requestsError;
 
+    // Donors who joined with this user's link (0 if the lookup fails).
+    const { data: referralCount } = await supabase.rpc('get_my_referral_count');
+    const referrals = Number(referralCount ?? 0) || 0;
+
     const completedDonations = (donations || []).filter(d => d.status === 'completed');
     const achievements = calculateAchievements(donations || []);
-    const points = calculatePoints(completedDonations.length, achievements);
+    const points = calculatePoints(completedDonations.length, achievements, referrals);
 
     const lastDonation = completedDonations[0];
 
     return {
         total_donations: completedDonations.length,
         total_requests: requests?.length || 0,
+        total_referrals: referrals,
         total_points: points.total,
         points,
         last_donation_date: lastDonation?.created_at || null,
@@ -76,16 +86,19 @@ export async function fetchUserStats(userId: string): Promise<UserStats> {
 }
 
 /** Pure scoring: see PointsBreakdown for the rule. */
-export function calculatePoints(completedDonations: number, achievements: Pick<Achievement, 'unlocked' | 'points'>[]): PointsBreakdown {
+export function calculatePoints(completedDonations: number, achievements: Pick<Achievement, 'unlocked' | 'points'>[], referrals = 0): PointsBreakdown {
     const reached = achievements.filter(a => a.unlocked);
     const donation_points = completedDonations * POINTS_PER_DONATION;
     const bonus_points = reached.reduce((sum, a) => sum + a.points, 0);
+    const referral_points = referrals * REFERRAL_POINTS;
     return {
         donations: completedDonations,
         donation_points,
         bonus_points,
         milestones: reached.length,
-        total: donation_points + bonus_points,
+        referrals,
+        referral_points,
+        total: donation_points + bonus_points + referral_points,
     };
 }
 
@@ -94,6 +107,7 @@ export function describePoints(p: PointsBreakdown): string {
     if (p.total === 0) return '0 points';
     const parts = [`${p.donation_points} for ${p.donations} ${p.donations === 1 ? 'donation' : 'donations'}`];
     if (p.bonus_points > 0) parts.push(`${p.bonus_points} milestone bonus`);
+    if (p.referral_points > 0) parts.push(`${p.referral_points} for ${p.referrals} ${p.referrals === 1 ? 'donor' : 'donors'} invited`);
     return `${parts.join(' + ')} = ${p.total} points`;
 }
 

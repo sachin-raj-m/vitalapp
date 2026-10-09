@@ -574,4 +574,61 @@ SELECT tests.denied($q$INSERT INTO public.donations (request_id, donor_id, statu
   'expired: cannot offer on an expired request');
 SELECT tests.login('postgres');
 
+
+-- ---------------------------------------------------------------------------
+-- 12. Referrals (20261009000100)
+-- Fixtures still standing here: Dev (consented donor, private card), Finn
+-- (consented, not a donor), Lee (legacy donor, no consent).
+-- ---------------------------------------------------------------------------
+SELECT tests.login('anon');
+SELECT tests.throws($q$SELECT public.get_my_referral_code()$q$, '42501', 'referral: anon cannot get a code');
+SELECT tests.denied($q$SELECT * FROM public.referrals$q$, 'referral: anon cannot read referrals');
+
+SELECT tests.login('requester');
+SELECT tests.is(tests.val($q$SELECT coalesce(public.get_my_referral_code(), 'none')$q$), 'none',
+  'referral: a non-donor gets no code');
+
+SELECT tests.login('donor');
+SELECT tests.ok(tests.val($q$SELECT public.get_my_referral_code()$q$) ~ '^DEV[0-9]{3}$', 'referral: donor code is name + 3 digits');
+SELECT tests.is(tests.val($q$SELECT public.get_my_referral_code()$q$), tests.val($q$SELECT referral_code FROM public.profiles WHERE id = auth.uid()$q$),
+  'referral: the code is stable');
+SELECT tests.is(tests.val($q$SELECT public.claim_referral(public.get_my_referral_code())$q$), 'self', 'referral: cannot refer yourself');
+UPDATE public.profiles SET referral_code = 'HACK999', referred_by = '77777777-7777-4777-8777-777777777777' WHERE id = auth.uid();
+SELECT tests.ok(tests.val($q$SELECT referral_code FROM public.profiles WHERE id = auth.uid()$q$) ~ '^DEV[0-9]{3}$'
+  AND tests.val($q$SELECT coalesce(referred_by::text, 'null') FROM public.profiles WHERE id = auth.uid()$q$) = 'null',
+  'referral: code and referred_by cannot be set directly');
+SELECT tests.denied($q$SELECT * FROM public.referrals$q$, 'referral: users cannot read the referrals table');
+SELECT tests.throws(format($q$SELECT public.ensure_referral_code(%L)$q$, tests.uid('fresh')), '42501',
+  'referral: users cannot create codes for other people');
+
+SELECT tests.login('postgres');
+SELECT referral_code AS dev_code FROM public.profiles WHERE id = tests.uid('donor') \gset
+SELECT tests.login('fresh');
+SELECT tests.is(tests.val(format($q$SELECT public.claim_referral(%L)$q$, :'dev_code')),
+  'not_donor', 'referral: a non-donor cannot claim');
+UPDATE public.profiles SET is_donor = true, blood_group = 'A+' WHERE id = auth.uid();
+SELECT tests.is(tests.val($q$SELECT public.claim_referral('NOPE000')$q$), 'invalid', 'referral: unknown code');
+SELECT tests.is(tests.val(format($q$SELECT public.claim_referral(%L)$q$, lower(:'dev_code'))),
+  'credited', 'referral: a new donor can claim (code is case-insensitive)');
+SELECT tests.is(tests.val(format($q$SELECT public.claim_referral(%L)$q$, :'dev_code')),
+  'already', 'referral: can only be claimed once');
+SELECT tests.is(tests.val($q$SELECT public.get_my_referral_count()::text$q$), '0', 'referral: referee has no referrals of their own');
+
+-- Lee: a donor whose account is older than 14 days.
+SELECT tests.login('postgres');
+UPDATE public.profiles SET consent_agreed = true, consent_at = now(), consent_version = '2026-10-06' WHERE id = tests.uid('legacy');
+UPDATE auth.users SET created_at = now() - interval '30 days' WHERE id = tests.uid('legacy');
+SELECT tests.login('legacy');
+SELECT tests.is(tests.val(format($q$SELECT public.claim_referral(%L)$q$, :'dev_code')),
+  'too_old', 'referral: an older account cannot claim');
+
+SELECT tests.login('donor');
+SELECT tests.is(tests.val($q$SELECT public.get_my_referral_count()::text$q$), '1', 'referral: referrer sees their count');
+SELECT tests.is(tests.rows($q$SELECT 1 FROM public.referral_leaderboard()$q$), 0::bigint,
+  'referral: private-card donors are left off the leaderboard');
+UPDATE public.profiles SET is_public_profile = true WHERE id = auth.uid();
+SELECT tests.is(tests.val($q$SELECT display_name || '|' || referrals || '|' || is_me FROM public.referral_leaderboard()$q$), 'Dev D.|1|true',
+  'referral: leaderboard shows public donors by short name');
+SELECT tests.login('postgres');
+
 \o

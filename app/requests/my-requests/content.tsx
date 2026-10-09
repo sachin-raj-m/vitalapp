@@ -20,6 +20,7 @@ import { ConfirmationModal } from '@/components/ui/ConfirmationModal';
 import { EmptyState } from '@/components/EmptyState';
 import { logActivity } from '@/lib/logger';
 import { isRequestOpen } from '@/lib/requests';
+import { authedFetch } from '@/lib/api';
 
 interface RequestWithDonations extends BloodRequest {
     donations: (Donation & { profiles: { full_name: string; phone: string | null } | null, units_donated: number | null })[];
@@ -217,6 +218,14 @@ export function MyRequestsContent() {
                     metadata: { requestId: verifyModal.requestId, unitsDonated: unitsDonatedInput },
                 });
             }
+
+            // Personal thank-you email to the donor (server checks ownership; sent once).
+            authedFetch('/api/notify/thank-donor', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ donationId: verifyModal.donationId }),
+                keepalive: true,
+            }).catch(() => {});
 
             await loadRequests();
             setVerifyModal({ isOpen: false, donationId: '', requestId: '', donorName: '', maxUnits: 0 });
