@@ -8,16 +8,16 @@ import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { Alert } from '@/components/ui/Alert';
 import { useAuth } from '@/context/AuthContext';
-import { supabase } from '@/lib/supabase';
 import { authedFetch } from '@/lib/api';
 import { ArrowLeft } from 'lucide-react';
 import { SecuritySettings } from '@/app/(protected)/profile/SecuritySettings';
 import { PushNotificationManager } from '@/components/PushNotificationManager';
 import { formatWaNumber, waNumber } from '@/lib/phone';
+import { WHATSAPP_LIVE } from '@/lib/features';
 
 export default function ProfileEditPage() {
     const router = useRouter();
-    const { user, updateProfile } = useAuth();
+    const { user, updateProfile, refreshProfile } = useAuth();
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
     const [isLoading, setIsLoading] = useState(false);
@@ -58,56 +58,68 @@ export default function ProfileEditPage() {
         authedFetch('/api/profile/location', { method: 'POST', keepalive: true }).catch(() => {});
     };
 
+    // Everything except the phone number, which has its own flow below.
+    const saveOtherFields = async () => {
+        await updateProfile({
+            full_name: editForm.full_name,
+            is_available: editForm.is_available,
+            permanent_zip: editForm.permanent_zip,
+            present_zip: editForm.present_zip,
+            is_public_profile: editForm.is_public_profile,
+            whatsapp_alerts: editForm.whatsapp_alerts,
+        });
+    };
+
+    const finish = (message: string) => {
+        setSuccess(message);
+        setTimeout(() => router.push('/profile'), 1500);
+    };
+
+    // Starts a phone change (or re-verifies the current number). With WhatsApp
+    // live, a code is sent there; otherwise the number is saved straight away.
+    const startPhoneVerification = async (phone: string) => {
+        const res = await authedFetch('/api/profile/phone', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'start', phone }),
+        });
+        const body = await res.json().catch(() => null);
+        if (!res.ok) throw new Error(body?.error || 'Could not update your number.');
+        if (body?.sent) {
+            setPendingPhone(body.to);
+            setOtp('');
+            setIsVerifying(true);
+        }
+        return body as { sent?: boolean; saved?: boolean };
+    };
+
     const handleSave = async (e: React.FormEvent) => {
         e.preventDefault();
         e.stopPropagation();
         setError('');
         setSuccess('');
-        setIsLoading(true);
         const previousZip = user?.present_zip;
 
         if (editForm.whatsapp_alerts && !waNumber(editForm.phone)) {
             setError('WhatsApp alerts need a 10-digit Indian mobile number. Update your phone number or turn WhatsApp alerts off.');
-            setIsLoading(false);
             return;
         }
 
+        setIsLoading(true);
         try {
-            // Check if phone number changed
-            if (editForm.phone !== user?.phone) {
-
-
-                // Initiate Phone Verification
-                const { error: authError } = await supabase.auth.updateUser({
-                    phone: editForm.phone
-                });
-
-                if (authError) {
-                    console.error('OTP send error:', authError);
-                    throw authError;
-                }
-
-
-                setPendingPhone(editForm.phone);
-                setIsVerifying(true);
-                setIsLoading(false);
-                setSuccess(`Verification code sent to ${editForm.phone}`);
-                return;
-            }
-
-            // Normal update without phone change
-            await updateProfile({
-                full_name: editForm.full_name,
-                is_available: editForm.is_available,
-                permanent_zip: editForm.permanent_zip,
-                present_zip: editForm.present_zip,
-                is_public_profile: editForm.is_public_profile,
-                whatsapp_alerts: editForm.whatsapp_alerts,
-                // phone is not updated here directly if not changed
-            });
+            await saveOtherFields();
             refreshLocationIfPinChanged(previousZip);
-            setSuccess('Your changes have been saved.');
-            setTimeout(() => router.push('/profile'), 1500);
+
+            if (editForm.phone.trim() !== (user?.phone || '').trim()) {
+                const result = await startPhoneVerification(editForm.phone);
+                if (result.sent) {
+                    // The rest is saved; the number is saved once the code is confirmed.
+                    setIsLoading(false);
+                    return;
+                }
+                await refreshProfile();
+            }
+            finish('Your changes have been saved.');
         } catch (err: any) {
             console.error('Error updating profile:', err);
             setError(err.message || 'Failed to update profile');
@@ -120,39 +132,35 @@ export default function ProfileEditPage() {
         e.stopPropagation();
         setError('');
         setIsLoading(true);
-        const previousZip = user?.present_zip;
-
         try {
-            const { data, error: verifyError } = await supabase.auth.verifyOtp({
-                phone: pendingPhone,
-                token: otp,
-                type: 'phone_change'
+            const res = await authedFetch('/api/profile/phone', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'confirm', code: otp }),
             });
-
-            if (verifyError) throw verifyError;
-
-            // Update remaining profile details
-            await updateProfile({
-                full_name: editForm.full_name,
-                phone: pendingPhone,
-                is_available: editForm.is_available,
-                permanent_zip: editForm.permanent_zip,
-                present_zip: editForm.present_zip,
-                is_public_profile: editForm.is_public_profile,
-                whatsapp_alerts: editForm.whatsapp_alerts,
-            });
-            refreshLocationIfPinChanged(previousZip);
-
-            setSuccess('Phone number verified.');
+            const body = await res.json().catch(() => null);
+            if (!res.ok) throw new Error(body?.error || 'That code isn’t right.');
+            await refreshProfile();
             setIsVerifying(false);
-
-            // Redirect after brief delay to show success message
-            setTimeout(() => router.push('/profile'), 1500);
+            finish('Your number is confirmed and saved.');
         } catch (err: any) {
             setError(err.message || 'Invalid verification code');
             setIsLoading(false);
         }
     };
+
+    const resendCode = async () => {
+        setError('');
+        try {
+            await startPhoneVerification(editForm.phone);
+            setSuccess('New code sent on WhatsApp.');
+        } catch (err: any) {
+            setError(err.message);
+        }
+    };
+
+    const phoneChanged = editForm.phone.trim() !== (user?.phone || '').trim();
+    const needsVerify = WHATSAPP_LIVE && !phoneChanged && !!user?.phone && !user?.phone_verified_at && !!waNumber(user.phone);
 
     const section = (title: string, hint: string, children: React.ReactNode) => (
         <section className="grid gap-6 border-t border-gray-200 py-8 md:grid-cols-3 md:gap-10">
@@ -191,9 +199,19 @@ export default function ProfileEditPage() {
             {success && <Alert variant="success" className="mb-6">{success}</Alert>}
 
             <form onSubmit={handleSave}>
-                {section('Personal details', 'Changing your phone number sends a code to the new number to confirm it.', <>
+                {section('Personal details', WHATSAPP_LIVE ? 'A new phone number is confirmed with a code sent to it on WhatsApp.' : 'Use a mobile number you have WhatsApp on.', <>
                     <Input label="Full name" value={editForm.full_name} onChange={(e) => setEditForm({ ...editForm, full_name: e.target.value })} required autoComplete="name" />
-                    <Input label="Phone" type="tel" value={editForm.phone} onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })} required autoComplete="tel" />
+                    <div>
+                        <Input label="Phone" type="tel" value={editForm.phone} onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })} required autoComplete="tel" />
+                        {needsVerify && (
+                            <p className="mt-1.5 text-sm text-gray-600">
+                                Not confirmed yet.{' '}
+                                <button type="button" onClick={() => startPhoneVerification(user!.phone).catch(err => setError(err.message))} className="text-gray-900 underline underline-offset-4">
+                                    Confirm on WhatsApp
+                                </button>
+                            </p>
+                        )}
+                    </div>
                 </>)}
 
                 {section('Location', 'Used to show you donors and requests nearby.', <div className="grid gap-4 sm:grid-cols-2">
@@ -243,11 +261,12 @@ export default function ProfileEditPage() {
             <Modal
                 isOpen={isVerifying}
                 onClose={() => { setIsVerifying(false); setIsLoading(false); setOtp(''); }}
-                title="Confirm your new number"
+                title="Confirm your number"
             >
                 <form onSubmit={handleVerifyOtp} className="space-y-5">
                     <p className="leading-relaxed text-gray-600">
-                        We sent a 6-digit code to <span className="text-gray-900">{pendingPhone}</span>.
+                        We sent a 6-digit code on WhatsApp to <span className="text-gray-900">{pendingPhone}</span>. It works for 10 minutes.
+                        {' '}<button type="button" onClick={resendCode} className="text-gray-900 underline underline-offset-4">Send a new code</button>
                     </p>
                     <Input
                         label="Code"

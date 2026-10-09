@@ -4,6 +4,8 @@ import { Alert } from '@/components/ui/Alert';
 import { Button } from '@/components/ui/Button';
 import { supabase } from '@/lib/supabase';
 import { Mail, Phone, X } from 'lucide-react';
+import { WHATSAPP_LIVE } from '@/lib/features';
+import { waNumber } from '@/lib/phone';
 
 export const VerificationBanner = () => {
     const { session, user } = useAuth();
@@ -15,19 +17,11 @@ export const VerificationBanner = () => {
     if (!session?.user || !isVisible) return null;
 
     const emailVerified = session.user.email_confirmed_at;
-    const phoneVerified = session.user.phone_confirmed_at;
+    // Phones are confirmed with a WhatsApp code (there's no SMS), so only ask
+    // once WhatsApp is live, and only for a number WhatsApp can reach.
+    const needsPhoneVerification = WHATSAPP_LIVE && !!user?.phone && !user.phone_verified_at && !!waNumber(user.phone);
 
-    // If both are verified (or phone is missing and email is verified), don't show
-    if (emailVerified && (phoneVerified || !user?.phone)) return null;
-
-    // Use user.phone (from profile) if session phone is missing
-    const userPhone = user?.phone || session.user.phone;
-
-    // Check if we really need to show this
-    // If phone exists in profile but is not verified in auth
-    const needsPhoneVerification = userPhone && !phoneVerified;
-
-    if (!needsPhoneVerification && emailVerified) return null;
+    if (emailVerified && !needsPhoneVerification) return null;
 
     const handleVerifyEmail = async () => {
         setLoading('email');
@@ -76,7 +70,7 @@ export const VerificationBanner = () => {
                 )}
                 {needsPhoneVerification && (
                     <Button size="sm" variant="secondary" onClick={handleVerifyPhone} leftIcon={<Phone className="h-3.5 w-3.5" />}>
-                        Verify phone
+                        Confirm on WhatsApp
                     </Button>
                 )}
                 <button onClick={() => setIsVisible(false)} className="rounded p-1 text-warning-600 hover:text-warning-800" aria-label="Dismiss">

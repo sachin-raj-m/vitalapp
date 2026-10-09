@@ -42,9 +42,11 @@ by replying STOP. Existing donors can turn it on in Settings.
    - Callback URL: `https://vitalapp.in/api/whatsapp/webhook`
    - Verify token: the value of `WHATSAPP_VERIFY_TOKEN`
    - Subscribe to the **messages** field.
-7. Submit the five templates below (category **Utility**, language **English**).
-8. Set the variables in Vercel (Production), then `WHATSAPP_ENABLED=true` once
-   the templates are approved.
+7. Submit the templates below: the five alert templates as **Utility** and
+   `vital_verify_code` as **Authentication** (language **English**).
+8. Set the variables in Vercel (Production), then `WHATSAPP_ENABLED=true` and
+   `NEXT_PUBLIC_WHATSAPP_ENABLED=true` once the templates are approved, and
+   redeploy (the public one is read at build time).
 
 | Variable | Where it comes from |
 |---|---|
@@ -54,6 +56,7 @@ by replying STOP. Existing donors can turn it on in Settings.
 | `WHATSAPP_VERIFY_TOKEN` | Any long random string you choose |
 | `CRON_SECRET` | Any long random string (Vercel sends it to the daily job) |
 | `WHATSAPP_ENABLED` | `true` to send |
+| `NEXT_PUBLIC_WHATSAPP_ENABLED` | `true` to show "Confirm on WhatsApp" for phone numbers |
 | `WHATSAPP_TEMPLATE_LANG` | Optional, default `en` |
 
 ## Templates
@@ -93,6 +96,18 @@ Buttons: Quick reply **Yes** · Quick reply **Not yet** · Quick reply **No**
 
 **vital_request_covered**
 > Update: the {{1}} request at {{2}} now has the donors it needs. Thank you for being ready to help. We'll alert you again when you're needed.
+
+**vital_verify_code** (Authentication)
+Use Meta's authentication template builder: code delivery **Copy code**, with
+the security recommendation and a 10-minute expiry note. The code fills `{{1}}`
+and the copy-code button.
+
+## Phone numbers
+
+There is no SMS. A new number in **Settings** is confirmed with a 6-digit code
+sent on WhatsApp (`app/api/profile/phone`); `profiles.phone_verified_at` records
+it, and any user-made change to the number clears it. While WhatsApp is off,
+numbers are saved without a code, as at registration.
 
 ## Testing without Meta
 
