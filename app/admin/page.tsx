@@ -13,6 +13,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { ConfirmationModal } from '@/components/ui/ConfirmationModal';
+import { isRequestOpen } from '@/lib/requests';
 
 interface Profile {
     id: string;
@@ -122,7 +123,8 @@ export default function AdminDashboard() {
                 users: allUsers.length,
                 donors: allUsers.filter(u => u.is_donor).length,
                 pending: allUsers.filter(u => u.verification_status === 'pending' && u.is_donor).length,
-                requests: allRequests.filter(r => r.status === 'active').length
+                // Same rule as the public site: active and not past its needed-by date.
+                requests: allRequests.filter(r => isRequestOpen(r)).length
             });
         } catch (err: any) {
             setError(err.message);
@@ -314,7 +316,7 @@ export default function AdminDashboard() {
                         <div className="p-3 bg-success-100 rounded-full text-success-600"><Activity size={24} /></div>
                         <div>
                             <div className="text-2xl font-bold">{stats.requests}</div>
-                            <div className="text-sm text-gray-500">Active Requests</div>
+                            <div className="text-sm text-gray-500">Open requests</div>
                         </div>
                     </CardBody>
                 </Card>
@@ -509,8 +511,8 @@ export default function AdminDashboard() {
                                             <td className="px-6 py-4 text-sm font-medium text-gray-900">{req.hospital_name}</td>
                                             <td className="px-6 py-4 text-sm text-gray-900">{req.blood_group} ({req.units_needed} units) <span className="text-xs text-red-500 border border-red-200 px-1 rounded">{req.urgency_level}</span></td>
                                             <td className="px-6 py-4 text-sm">
-                                                <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${req.status === 'active' ? 'bg-success-100 text-success-800' : 'bg-gray-100 text-gray-800'}`}>
-                                                    {req.status}
+                                                <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${isRequestOpen(req) ? 'bg-success-100 text-success-800' : req.status === 'active' ? 'bg-warning-100 text-warning-800' : 'bg-gray-100 text-gray-800'}`}>
+                                                    {isRequestOpen(req) ? 'open' : req.status === 'active' ? 'expired' : req.status}
                                                 </span>
                                             </td>
                                             <td className="px-6 py-4 text-sm text-gray-500">{new Date(req.created_at).toLocaleDateString()}</td>
