@@ -4,6 +4,7 @@ import { AuthProvider } from "@/context/AuthContext";
 import { PWAInstallPrompt } from "@/components/PWAInstallPrompt";
 import { Toaster } from 'sonner';
 import { SITE_URL } from '@/lib/site';
+import { ConsentPrompt } from '@/components/ConsentPrompt';
 
 // Body and UI text.
 const sans = Manrope({ subsets: ["latin"], variable: "--font-sans", display: "swap" });
@@ -83,6 +84,7 @@ export default function RootLayout({
                     <div className="min-h-screen flex flex-col">
                         {children}
                         <PWAInstallPrompt />
+                        <ConsentPrompt />
                         <Toaster
                             position="top-center"
                             toastOptions={{
