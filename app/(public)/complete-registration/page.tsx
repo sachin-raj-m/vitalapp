@@ -15,6 +15,7 @@ import { addDays } from 'date-fns';
 import { toast } from 'sonner';
 import Link from 'next/link';
 import { PRIVACY_VERSION, earliestConsentAt } from '@/lib/legal';
+import { takeReferral } from '@/lib/referrals';
 
 interface PendingRegistration {
     userId: string;
@@ -208,6 +209,13 @@ export default function CompleteRegistration() {
                 );
 
             if (profileError) throw profileError;
+
+            // Credit whoever invited this donor, if they came from a referral link.
+            // Best effort: the database checks the code and the limits.
+            const referralCode = nbtcEligible ? takeReferral() : null;
+            if (referralCode) {
+                await supabase.rpc('claim_referral', { p_code: referralCode }).then(() => {}, () => {});
+            }
 
             // Place the donor on the map from their PIN code (server-side geocode).
             // Fire-and-forget: if it fails, nearby search still ranks by PIN area.

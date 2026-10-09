@@ -209,3 +209,50 @@ export const getResetPasswordEmailHtml = ({ resetLink }: { resetLink: string }) 
 </html>
     `;
 };
+
+/**
+ * Sent to a donor once their donation is confirmed with their PIN. A personal
+ * note from Sachin plus their invite link. Plain layout on purpose: it should
+ * read like a letter, not a newsletter.
+ */
+export const getDonorThankYouEmailHtml = ({ name, place, referralLink }: { name: string; place: string; referralLink: string | null }) => {
+    const p = 'margin: 0 0 16px 0; color: #1f2937; font-size: 16px; line-height: 26px;';
+    return `
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Thank you for donating</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #fafaf9; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;">
+    <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
+        <tr>
+            <td align="center" style="padding: 40px 16px;">
+                <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 560px; background-color: #ffffff; border: 1px solid #e7e5e4; border-radius: 12px;">
+                    <tr>
+                        <td style="padding: 36px 32px;">
+                            <p style="${p}">Hi ${escapeHtml(name)},</p>
+                            <p style="${p}">Thank you for donating blood${place ? ` at ${escapeHtml(place)}` : ''}. The family you helped has confirmed it on Vital.</p>
+                            <p style="${p}">You didn't have to show up, and you did. Someone is better today because of it.</p>
+                            ${referralLink ? `
+                            <p style="${p}">If you know someone who could be a donor, would you send them your invite link? Every new donor means the next request reaches more people nearby.</p>
+                            <p style="margin: 0 0 24px 0;">
+                                <a href="${escapeHtml(referralLink)}" style="color: #b91c1c; font-size: 16px; font-weight: 600;">${escapeHtml(referralLink.replace(/^https?:\/\//, ''))}</a>
+                            </p>` : ''}
+                            <p style="${p}">With gratitude,<br>Sachin<br><span style="color: #6b7280;">Vital</span></p>
+                            <p style="margin: 24px 0 0 0; color: #6b7280; font-size: 13px; line-height: 20px;">
+                                Please rest and wait the recommended gap before donating again. Your next eligible date is on your
+                                <a href="${SITE_URL}/donations" style="color: #6b7280;">My donations</a> page.
+                                Vital only connects people and is not involved in any payment.
+                            </p>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>
+    `;
+};

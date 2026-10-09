@@ -6,6 +6,8 @@ import { Check } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { fetchUserStats, describePoints, type UserStats } from '@/lib/stats';
 import { POINTS_PER_DONATION } from '@/lib/constants';
+import { REFERRAL_POINTS } from '@/lib/referrals';
+import { ReferralLeaderboard } from '@/components/ReferralLeaderboard';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { Alert } from '@/components/ui/Alert';
 import { cn } from '@/lib/cn';
@@ -31,17 +33,19 @@ export default function AchievementsPage() {
                 <h1 className="display text-4xl sm:text-[2.75rem]">Milestones</h1>
                 <p className="mt-3 max-w-lg text-gray-600">
                     {stats && `You have reached ${earned} of ${achievements.length} milestones. `}
-                    You earn {POINTS_PER_DONATION} points for each completed donation, plus a one-time bonus for each milestone you reach.
-                    Points are visible only to you and can’t be exchanged for anything.
+                    You earn {POINTS_PER_DONATION} points for each completed donation, a one-time bonus for each milestone you reach,
+                    and {REFERRAL_POINTS} points for each donor who joins with your invite link (on your Profile).
+                    Points are recognition only: they are visible only to you and can’t be exchanged for anything.
                 </p>
             </header>
 
             {error && <Alert variant="error">{error}</Alert>}
 
-            <dl className="grid grid-cols-2 gap-6 border-y border-gray-200 py-6 sm:grid-cols-3 sm:gap-8">
+            <dl className="grid grid-cols-2 gap-6 border-y border-gray-200 py-6 sm:grid-cols-4 sm:gap-8">
                 {[
                     ['Donations', stats?.total_donations],
                     ['Points', stats?.total_points],
+                    ['Donors invited', stats?.total_referrals],
                     ['Requests posted', stats?.total_requests],
                 ].map(([label, value]) => (
                     <div key={label as string}>
@@ -102,6 +106,8 @@ export default function AchievementsPage() {
                         );
                     })}
             </ol>
+
+            <ReferralLeaderboard />
         </div>
     );
 }

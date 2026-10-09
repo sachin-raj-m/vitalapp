@@ -1,7 +1,7 @@
 "use client";
 
 import { authedFetch } from '@/lib/api';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { AuthFrame, authLinkClass } from '@/components/auth/AuthFrame';
@@ -13,6 +13,7 @@ import { supabase } from '@/lib/supabase';
 import { PLATFORM_DISCLAIMER, consentStamp } from '@/lib/legal';
 import { ConfirmEmailCode } from '@/components/auth/ConfirmEmailCode';
 import type { User } from '@supabase/supabase-js';
+import { rememberReferral } from '@/lib/referrals';
 
 export default function RegisterPage() {
     const router = useRouter();
@@ -27,6 +28,11 @@ export default function RegisterPage() {
     const [agreed, setAgreed] = useState(false);
     // Set once the account exists but the email still has to be confirmed with a code.
     const [pendingEmail, setPendingEmail] = useState<string | null>(null);
+    // Arrived from a referral link (/r/CODE): keep the code until registration completes.
+    useEffect(() => {
+        rememberReferral(new URLSearchParams(window.location.search).get('ref'));
+    }, []);
+
     const consentError = 'Tick the box to agree to the Terms and Privacy notice before continuing.';
 
     const handleGoogleSignUp = async () => {

@@ -20,6 +20,7 @@ import { motion } from 'framer-motion';
 
 import { PushNotificationManager } from '@/components/PushNotificationManager';
 import DonorCard from '@/components/DonorCard';
+import { InviteDonors } from '@/components/InviteDonors';
 import { toast } from 'sonner';
 import { TypeToConfirmModal } from '@/components/ui/TypeToConfirmModal';
 
@@ -297,6 +298,8 @@ export default function ProfilePage() {
                             </div>
                         )}
                     </div>
+
+                    {user?.is_donor && <InviteDonors bloodGroup={user.blood_group} />}
 
                     <div className="flex items-start justify-between gap-6 border-t border-gray-200 pt-8">
                         <div>
