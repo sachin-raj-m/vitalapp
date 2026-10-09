@@ -631,4 +631,68 @@ SELECT tests.is(tests.val($q$SELECT display_name || '|' || referrals || '|' || i
   'referral: leaderboard shows public donors by short name');
 SELECT tests.login('postgres');
 
+
+-- ---------------------------------------------------------------------------
+-- 13. WhatsApp (20261009000200)
+-- ---------------------------------------------------------------------------
+SELECT tests.login('postgres');
+SELECT tests.is(public.wa_number('98765 43210'), '919876543210', 'wa: 10-digit mobile gets 91');
+SELECT tests.is(public.wa_number('+91-98765-43210'), '919876543210', 'wa: +91 with dashes');
+SELECT tests.is(public.wa_number('098765 43210'), '919876543210', 'wa: leading 0');
+SELECT tests.is(public.wa_number('12345'), NULL::text, 'wa: not a mobile number');
+SELECT tests.is(public.wa_number('5876543210'), NULL::text, 'wa: landline-style prefix rejected');
+
+-- Two fresh open requests owned by the requester.
+INSERT INTO public.blood_requests (id, user_id, blood_group, units_needed, hospital_name, hospital_address, urgency_level,
+  contact_name, location, status, city, date_needed) VALUES
+  ('aaaaaaaa-0000-4000-8000-000000000101', tests.uid('requester'), 'A+', 2, 'WA Hospital', '9 Example Road', 'High', 'Riya', '{}', 'active', 'Testville', current_date + 2),
+  ('aaaaaaaa-0000-4000-8000-000000000102', tests.uid('requester'), 'A+', 1, 'WA Clinic', '10 Example Road', 'Low', 'Riya', '{}', 'active', 'Testville', current_date + 2);
+
+SELECT tests.login('anon');
+SELECT tests.denied($q$SELECT * FROM public.whatsapp_messages$q$, 'wa: anon cannot read the message log');
+SELECT tests.login('fresh');
+SELECT tests.denied($q$SELECT * FROM public.contact_links$q$, 'wa: users cannot read contact links');
+SELECT tests.denied($q$SELECT * FROM public.whatsapp_sessions$q$, 'wa: users cannot read sessions');
+SELECT tests.throws(format($q$SELECT public.create_offer_for(%L, 'aaaaaaaa-0000-4000-8000-000000000101')$q$, tests.uid('fresh')),
+  '42501', 'wa: users cannot call create_offer_for');
+SELECT tests.throws(format($q$SELECT public.verify_donation_for(%L, gen_random_uuid(), '0000', 1)$q$, tests.uid('requester')),
+  '42501', 'wa: users cannot call verify_donation_for');
+SELECT tests.throws($q$SELECT public.profile_for_wa('919876543210')$q$, '42501', 'wa: users cannot look up numbers');
+
+-- Opt-in is stamped.
+UPDATE public.profiles SET phone = '+91 98765 43210', whatsapp_alerts = true WHERE id = auth.uid();
+SELECT tests.ok(tests.val($q$SELECT whatsapp_alerts_changed_at IS NOT NULL FROM public.profiles WHERE id = auth.uid()$q$) = 'true',
+  'wa: opting in records when');
+
+-- An offer made in the app can't pick server-owned columns.
+INSERT INTO public.donations (request_id, donor_id, status, source, followup_count, followup_sent_at)
+  VALUES ('aaaaaaaa-0000-4000-8000-000000000102', auth.uid(), 'pending', 'whatsapp', 9, now());
+SELECT tests.is(tests.val($q$SELECT source || '|' || followup_count || '|' || coalesce(followup_sent_at::text, 'null') FROM public.donations
+  WHERE request_id = 'aaaaaaaa-0000-4000-8000-000000000102' AND donor_id = auth.uid()$q$), 'web|0|null',
+  'wa: app offers cannot set source or follow-up fields');
+
+SELECT tests.login('service');
+SELECT tests.is(public.profile_for_wa('919876543210'), tests.uid('fresh'), 'wa: number maps to the opted-in profile');
+SELECT set_config('tests.offer', public.create_offer_for(tests.uid('fresh'), 'aaaaaaaa-0000-4000-8000-000000000101')::text, false);
+SELECT tests.is(public.create_offer_for(tests.uid('fresh'), 'aaaaaaaa-0000-4000-8000-000000000101')::text, current_setting('tests.offer'),
+  'wa: offering twice returns the same offer');
+SELECT tests.is(tests.val($q$SELECT source FROM public.donations WHERE id = current_setting('tests.offer')::uuid$q$), 'whatsapp',
+  'wa: offer is marked as from WhatsApp');
+SELECT tests.ok(tests.val(format($q$SELECT pin FROM public.donor_secrets WHERE user_id = %L$q$, tests.uid('fresh'))) ~ '^[0-9]{4}$',
+  'wa: a donor without a PIN gets one');
+SELECT tests.throws(format($q$SELECT public.create_offer_for(%L, 'aaaaaaaa-0000-4000-8000-000000000101')$q$, tests.uid('requester')),
+  '42501', 'wa: a non-donor cannot offer');
+SELECT tests.throws(format($q$SELECT public.create_offer_for(%L, 'aaaaaaaa-0000-4000-8000-000000000004')$q$, tests.uid('fresh')),
+  '22023', 'wa: cannot offer on an expired request');
+
+SELECT tests.throws(format($q$SELECT public.verify_donation_for(%L, %L, '0000', 1)$q$, tests.uid('fresh'), current_setting('tests.offer')),
+  '42501', 'wa: only the request owner can confirm');
+SELECT tests.is(public.verify_donation_for(tests.uid('requester'), current_setting('tests.offer')::uuid,
+  CASE WHEN (SELECT pin FROM public.donor_secrets WHERE user_id = tests.uid('fresh')) = '0000' THEN '1111' ELSE '0000' END, 1)->>'error',
+  'pin_mismatch', 'wa: wrong PIN is counted, not raised');
+SELECT tests.is(public.verify_donation_for(tests.uid('requester'), current_setting('tests.offer')::uuid,
+  (SELECT pin FROM public.donor_secrets WHERE user_id = tests.uid('fresh')), 1)->>'total_collected',
+  '1', 'wa: right PIN completes the donation');
+SELECT tests.login('postgres');
+
 \o

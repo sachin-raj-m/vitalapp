@@ -34,6 +34,7 @@ export interface User {
   consent_agreed?: boolean | null;
   consent_at?: string | null;
   consent_version?: string | null;
+  whatsapp_alerts?: boolean;
   created_at: string;
 }
 

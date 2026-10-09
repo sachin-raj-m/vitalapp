@@ -12,6 +12,8 @@ import { supabase } from '@/lib/supabase';
 import { authedFetch } from '@/lib/api';
 import { ArrowLeft } from 'lucide-react';
 import { SecuritySettings } from '@/app/(protected)/profile/SecuritySettings';
+import { PushNotificationManager } from '@/components/PushNotificationManager';
+import { formatWaNumber, waNumber } from '@/lib/phone';
 
 export default function ProfileEditPage() {
     const router = useRouter();
@@ -26,7 +28,8 @@ export default function ProfileEditPage() {
         is_available: false,
         permanent_zip: '',
         present_zip: '',
-        is_public_profile: false
+        is_public_profile: false,
+        whatsapp_alerts: false,
     });
 
     // OTP Verification State
@@ -42,7 +45,8 @@ export default function ProfileEditPage() {
                 is_available: user.is_available || false,
                 permanent_zip: user.permanent_zip || '',
                 present_zip: user.present_zip || '',
-                is_public_profile: user.is_public_profile || false
+                is_public_profile: user.is_public_profile || false,
+                whatsapp_alerts: user.whatsapp_alerts || false,
             });
         }
     }, [user]);
@@ -62,9 +66,13 @@ export default function ProfileEditPage() {
         setIsLoading(true);
         const previousZip = user?.present_zip;
 
+        if (editForm.whatsapp_alerts && !waNumber(editForm.phone)) {
+            setError('WhatsApp alerts need a 10-digit Indian mobile number. Update your phone number or turn WhatsApp alerts off.');
+            setIsLoading(false);
+            return;
+        }
+
         try {
-
-
             // Check if phone number changed
             if (editForm.phone !== user?.phone) {
 
@@ -93,7 +101,8 @@ export default function ProfileEditPage() {
                 is_available: editForm.is_available,
                 permanent_zip: editForm.permanent_zip,
                 present_zip: editForm.present_zip,
-                is_public_profile: editForm.is_public_profile
+                is_public_profile: editForm.is_public_profile,
+                whatsapp_alerts: editForm.whatsapp_alerts,
                 // phone is not updated here directly if not changed
             });
             refreshLocationIfPinChanged(previousZip);
@@ -129,7 +138,8 @@ export default function ProfileEditPage() {
                 is_available: editForm.is_available,
                 permanent_zip: editForm.permanent_zip,
                 present_zip: editForm.present_zip,
-                is_public_profile: editForm.is_public_profile
+                is_public_profile: editForm.is_public_profile,
+                whatsapp_alerts: editForm.whatsapp_alerts,
             });
             refreshLocationIfPinChanged(previousZip);
 
@@ -154,7 +164,7 @@ export default function ProfileEditPage() {
         </section>
     );
 
-    const toggle = (checked: boolean, onChange: (v: boolean) => void, title: string, body: string) => (
+    const toggle = (checked: boolean, onChange: (v: boolean) => void, title: string, body: React.ReactNode) => (
         <label className="flex cursor-pointer items-start justify-between gap-6">
             <span>
                 <span className="block text-gray-900">{title}</span>
@@ -173,8 +183,8 @@ export default function ProfileEditPage() {
                 <ArrowLeft className="h-3.5 w-3.5" /> Back to profile
             </Link>
             <header className="pb-8 pt-6">
-                <h1 className="display text-4xl sm:text-[2.75rem]">Edit profile</h1>
-                <p className="mt-3 max-w-lg text-gray-600">Update your contact details, location and availability.</p>
+                <h1 className="display text-4xl sm:text-[2.75rem]">Settings</h1>
+                <p className="mt-3 max-w-lg text-gray-600">Your details, alerts and privacy, all in one place.</p>
             </header>
 
             {error && <Alert variant="error" className="mb-6">{error}</Alert>}
@@ -191,10 +201,30 @@ export default function ProfileEditPage() {
                     <Input label="Permanent PIN code" inputMode="numeric" value={editForm.permanent_zip} onChange={(e) => setEditForm({ ...editForm, permanent_zip: e.target.value })} required />
                 </div>)}
 
-                {section('Availability', 'You can pause requests at any time, for example while travelling or unwell.', <div className="space-y-5">
-                    {toggle(editForm.is_available, v => setEditForm({ ...editForm, is_available: v }), 'Available to donate', 'Turn off to stop getting requests for a while.')}
-                    {toggle(editForm.is_public_profile, v => setEditForm({ ...editForm, is_public_profile: v }), 'Public donor card', 'Anyone with your link can see your first name, blood group and donation count.')}
+                {user?.is_donor && section('Donating', 'Pause any time, for example while travelling or unwell.', <>
+                    {toggle(editForm.is_available, v => setEditForm({ ...editForm, is_available: v }), 'Available to donate',
+                        'When off, you get no alerts at all, on any channel, until you turn it back on.')}
+                </>)}
+
+                {user?.is_donor && section('Alerts', 'How we tell you when someone nearby needs your blood group.', <div className="space-y-6">
+                    {toggle(editForm.whatsapp_alerts, v => setEditForm({ ...editForm, whatsapp_alerts: v }), 'WhatsApp',
+                        waNumber(editForm.phone)
+                            ? <>Messages to {formatWaNumber(waNumber(editForm.phone)!)}. Phone numbers are never shared in WhatsApp. You can also reply STOP there.</>
+                            : 'Needs a 10-digit Indian mobile number in Personal details.')}
+                    <div className="flex items-start justify-between gap-6">
+                        <span>
+                            <span className="block text-gray-900">Notifications on this device</span>
+                            <span className="mt-0.5 block text-sm text-gray-500">Push notifications in this browser. Applies straight away; set it on each device you use.</span>
+                        </span>
+                        <div className="shrink-0 pt-1"><PushNotificationManager /></div>
+                    </div>
+                    {!editForm.whatsapp_alerts && <p className="text-sm text-gray-500">Without WhatsApp, alerts come by email.</p>}
                 </div>)}
+
+                {user?.is_donor && section('Privacy', 'Your contact details are never on your card.', <>
+                    {toggle(editForm.is_public_profile, v => setEditForm({ ...editForm, is_public_profile: v }), 'Public donor card',
+                        'Anyone with your link can see your first name, blood group and donation count. Needed to appear on the Top inviters list.')}
+                </>)}
 
                 <div className="flex flex-col-reverse gap-2 border-t border-gray-200 py-6 sm:flex-row sm:justify-end">
                     <Button type="button" variant="ghost" onClick={() => router.push('/profile')}>Cancel</Button>
