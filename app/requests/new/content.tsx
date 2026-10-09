@@ -1,7 +1,7 @@
 "use client";
 
 import { authedFetch } from '@/lib/api';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { MapPin } from 'lucide-react';
@@ -17,6 +17,7 @@ import { logActivity } from '@/lib/logger';
 import { toast } from 'sonner';
 import { consentStamp, earliestConsentAt, hasRecordedConsent, type ConsentFields } from '@/lib/legal';
 import { waNumber } from '@/lib/phone';
+import { TurnstileField, type TurnstileHandle } from '@/components/TurnstileField';
 
 const Map = dynamic(() => import('@/components/Map'), {
     ssr: false,
@@ -66,6 +67,7 @@ export default function CreateRequestPage() {
     const [codeSent, setCodeSent] = useState(false);
     const [code, setCode] = useState('');
     const [verifyBusy, setVerifyBusy] = useState(false);
+    const captcha = useRef<TurnstileHandle>(null);
     const [verifiedUserId, setVerifiedUserId] = useState<string | null>(null);
     const [guestConsent, setGuestConsent] = useState(false);
     const userId = user?.id ?? verifiedUserId;
@@ -95,9 +97,11 @@ export default function CreateRequestPage() {
             return;
         }
         setVerifyBusy(true);
+        const captchaToken = await captcha.current?.getToken();
         const { error: otpError } = await supabase.auth.signInWithOtp({
             email: verifyEmail,
             options: {
+                captchaToken,
                 shouldCreateUser: true,
                 emailRedirectTo: `${window.location.origin}/requests/new`,
                 // Recorded in auth.users when the code creates a new account
@@ -106,6 +110,7 @@ export default function CreateRequestPage() {
             },
         });
         setVerifyBusy(false);
+        captcha.current?.reset(); // tokens work once
         if (otpError) {
             setError(otpError.message);
             return;
@@ -455,6 +460,7 @@ export default function CreateRequestPage() {
                             {!guestConsent && !codeSent && (
                                 <p id="guest-consent-hint" className="ml-7 text-[13px] text-gray-500">Tick the box to get a code.</p>
                             )}
+                            {!codeSent && <TurnstileField ref={captcha} />}
                             <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
                                 <div className="flex-1">
                                     <Input label="Your email" type="email" autoComplete="email" value={verifyEmail} onChange={(e) => setVerifyEmail(e.target.value)} disabled={codeSent} />

@@ -1,11 +1,12 @@
 "use client";
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import type { User } from '@supabase/supabase-js';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { Alert } from '@/components/ui/Alert';
 import { supabase } from '@/lib/supabase';
+import { TurnstileField, type TurnstileHandle } from '@/components/TurnstileField';
 
 const RESEND_SECONDS = 60;
 
@@ -31,6 +32,7 @@ export function ConfirmEmailCode({
     const [notice, setNotice] = useState(sentOnMount ? `We sent a 6-digit code to ${email}.` : '');
     const [busy, setBusy] = useState(false);
     const [cooldown, setCooldown] = useState(sentOnMount ? RESEND_SECONDS : 0);
+    const captcha = useRef<TurnstileHandle>(null);
 
     useEffect(() => {
         if (cooldown <= 0) return;
@@ -58,8 +60,9 @@ export function ConfirmEmailCode({
         const { error: resendError } = await supabase.auth.resend({
             type: 'signup',
             email,
-            options: { emailRedirectTo: `${window.location.origin}/complete-registration` },
+            options: { emailRedirectTo: `${window.location.origin}/complete-registration`, captchaToken: await captcha.current?.getToken() },
         });
+        captcha.current?.reset(); // tokens work once
         if (resendError) {
             setError(resendError.message.toLowerCase().includes('rate')
                 ? 'Too many codes requested. Wait a few minutes and try again.'
@@ -91,6 +94,7 @@ export function ConfirmEmailCode({
                 </Button>
             </form>
 
+            <TurnstileField ref={captcha} />
             <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
                 <button type="button" onClick={onBack} className="text-gray-600 underline underline-offset-4 hover:text-gray-900">
                     Use a different email

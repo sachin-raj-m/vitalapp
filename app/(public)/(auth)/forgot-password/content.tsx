@@ -1,18 +1,20 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import Link from 'next/link';
 import { AuthFrame, authLinkClass } from '@/components/auth/AuthFrame';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { Alert } from '@/components/ui/Alert';
 import { supabase } from '@/lib/supabase';
+import { TurnstileField, type TurnstileHandle } from '@/components/TurnstileField';
 
 export default function ForgotPasswordContent() {
     const [email, setEmail] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [isSuccess, setIsSuccess] = useState(false);
     const [error, setError] = useState('');
+    const captcha = useRef<TurnstileHandle>(null);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -24,7 +26,7 @@ export default function ForgotPasswordContent() {
             const response = await fetch('/api/auth/recovery', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email })
+                body: JSON.stringify({ email, captchaToken: await captcha.current?.getToken() })
             });
 
             const data = await response.json();
@@ -39,6 +41,7 @@ export default function ForgotPasswordContent() {
         } catch (err: any) {
             console.error('Password reset error', err);
             setError(err.message || 'Failed to send reset email. Please try again.');
+            captcha.current?.reset(); // tokens work once
         } finally {
             setIsLoading(false);
         }
@@ -65,6 +68,7 @@ export default function ForgotPasswordContent() {
             {error && <Alert variant="error" className="mb-6">{error}</Alert>}
             <form onSubmit={handleSubmit} className="space-y-4">
                 <Input label="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="email" />
+                <TurnstileField ref={captcha} />
                 <Button type="submit" variant="ink" size="lg" className="w-full !mt-6" isLoading={isLoading}>
                     Send reset link
                 </Button>
