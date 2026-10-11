@@ -7,6 +7,12 @@ interface SendEmailParams {
 }
 
 export const sendEmail = async ({ to, subject, html }: SendEmailParams) => {
+    // Staging: never send real email (EMAIL_DISABLED=true in the dev branch's Vercel env).
+    if (process.env.EMAIL_DISABLED === 'true') {
+        console.info(`Email disabled; not sending "${subject}"`);
+        return { skipped: true };
+    }
+
     const SMTP_HOST = process.env.SMTP_HOST;
     const SMTP_PORT = process.env.SMTP_PORT || '465';
     const SMTP_USER = process.env.SMTP_USER;
