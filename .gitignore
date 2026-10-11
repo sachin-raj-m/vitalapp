@@ -27,3 +27,12 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 .vercel
+
+# Internal material lives in the private vitalapp-ops repo. Never commit it here
+# (this repo is public), even if a copy is placed in the working tree.
+docs/STAGING.md
+docs/WHATSAPP.md
+docs/MONITORING.md
+docs/internal/
+supabase/seed.staging.sql
+staging/
