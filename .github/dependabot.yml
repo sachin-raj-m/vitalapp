@@ -1,0 +1,28 @@
+# Dependabot: security fixes only, bundled into one PR against dev.
+#
+# - Security fixes are grouped: one open PR at a time that Dependabot updates as
+#   new alerts appear (GitHub raises security fixes when a vulnerability is
+#   published; they can't be put on a calendar).
+# - Routine version-bump PRs are off (open-pull-requests-limit: 0). The monthly
+#   schedule only matters if that limit is raised later.
+# - No major-version jumps; those are upgraded by hand, tested on staging first.
+# Alerts still appear under Security > Dependabot either way.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    target-branch: dev
+    schedule:
+      interval: monthly
+      timezone: Asia/Kolkata
+    open-pull-requests-limit: 0
+    groups:
+      security-fixes:
+        applies-to: security-updates
+        patterns: ["*"]
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+    commit-message:
+      prefix: "Chore"
+    labels: ["dependencies"]
