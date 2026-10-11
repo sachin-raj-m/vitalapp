@@ -6,7 +6,7 @@ import { serviceClient } from '@/lib/supabase-route';
  *
  * Messages Vital starts (alerts, follow-ups, thank-yous) must use templates
  * approved in Meta's WhatsApp Manager; their exact wording is in
- * docs/WHATSAPP.md. Replies within 24 hours of the person's last message can
+ * the private vitalapp-ops repo (docs/WHATSAPP.md). Replies within 24 hours of the person's last message can
  * be free-form text or buttons.
  *
  * Phone numbers are never put in a message. Contacts are shown on vitalapp.in
