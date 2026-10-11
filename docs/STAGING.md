@@ -8,6 +8,26 @@ PIN flow, and account deletion.
 Nothing here touches production. Production's project ref, keys and SMTP
 credentials must never be used in any step below.
 
+## Current setup (October 2026)
+
+| | |
+|---|---|
+| Supabase project | `vitalapp-staging` (ref `sceeybctbevrdgpypdtf`), org **Vital**, ap-south-1, Postgres 17 |
+| Production project | `vital-prod` (ref `fojofteguyrwwgqkmhlf`), same org, Postgres 15 |
+| Staging site | `https://vitalapp-git-dev-sachin-raj-ms-projects.vercel.app`: every push to `dev`, behind Vercel login |
+| Database | all migrations applied; `seed.staging.sql` loaded (accounts below) |
+| Auth | Confirm email on, 6-digit codes, 8-char passwords, sign-up hook on, captcha and Google **off** |
+| Email | Supabase's built-in mailer (team members only, a few per hour, default templates with a link, no code). The app's own emails are off (`EMAIL_DISABLED=true`). |
+| Local | `.env.staging` (git-ignored) has staging's keys: `cp .env.staging .env.local && npm run dev`, delete `.env.local` afterwards |
+
+Still to do: a sandbox SMTP inbox (step 4) so staging can use production's
+code templates, and Turnstile keys once the Vital Cloudflare widget exists.
+
+To apply new migrations to staging without touching the production link, run
+from a scratch copy of `supabase/` linked to the staging ref (`supabase link
+--project-ref sceeybctbevrdgpypdtf --workdir <copy>` then `supabase db push
+--linked --workdir <copy>`), using the Vital org's access token.
+
 Before you start, the database rules can be checked locally with no Supabase
 project at all:
 
@@ -137,6 +157,7 @@ Production values.
 | Variable | Value |
 |---|---|
 | `NEXT_PUBLIC_SUPABASE_URL` | `https://<staging-ref>.supabase.co` |
+| `EMAIL_DISABLED` | `true` (the app logs instead of sending email) |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | staging `anon` key |
 | `SUPABASE_SERVICE_ROLE_KEY` | staging `service_role` key (server only, never `NEXT_PUBLIC_`) |
 | `NEXT_PUBLIC_SITE_URL` | the stable branch URL, e.g. `https://vitalapp-git-dev-<team>.vercel.app` |

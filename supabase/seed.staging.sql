@@ -71,13 +71,14 @@ DELETE FROM auth.users WHERE id IN (SELECT id FROM seed_users);
 INSERT INTO auth.users (
   instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
   raw_app_meta_data, raw_user_meta_data, created_at, updated_at,
-  confirmation_token, recovery_token, email_change_token_new, email_change
+  confirmation_token, recovery_token, email_change_token_new, email_change,
+  email_change_token_current, phone_change, phone_change_token, reauthentication_token
 )
 SELECT '00000000-0000-0000-0000-000000000000', id, 'authenticated', 'authenticated', email,
        extensions.crypt('VitalStaging-2026!', extensions.gen_salt('bf')), now(),
        '{"provider": "email", "providers": ["email"]}'::jsonb,
-       jsonb_build_object('full_name', full_name), now(), now(),
-       '', '', '', ''
+       jsonb_build_object('full_name', full_name, 'registration_completed', true), now(), now(),
+       '', '', '', '', '', '', '', ''
 FROM seed_users;
 
 INSERT INTO auth.identities (id, user_id, provider_id, provider, identity_data, last_sign_in_at, created_at, updated_at)
@@ -105,7 +106,7 @@ UPDATE public.profiles p SET
   verification_status = CASE WHEN s.is_donor OR s.role = 'admin' THEN 'verified' ELSE 'pending' END,
   consent_agreed = true,
   consent_at = now(),
-  consent_version = 'staging-seed'
+  consent_version = '2026-10-06' -- lib/legal.ts PRIVACY_VERSION, so no re-consent prompt
 FROM seed_users s
 WHERE p.id = s.id;
 
