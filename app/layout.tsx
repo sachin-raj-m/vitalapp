@@ -5,6 +5,7 @@ import { PWAInstallPrompt } from "@/components/PWAInstallPrompt";
 import { Toaster } from 'sonner';
 import { SITE_URL } from '@/lib/site';
 import { ConsentPrompt } from '@/components/ConsentPrompt';
+import { StagingBanner } from '@/components/StagingBanner';
 
 // Body and UI text.
 const sans = Manrope({ subsets: ["latin"], variable: "--font-sans", display: "swap" });
@@ -80,6 +81,7 @@ export default function RootLayout({
                 >
                     Skip to content
                 </a>
+                <StagingBanner />
                 <AuthProvider>
                     <div className="min-h-screen flex flex-col">
                         {children}
