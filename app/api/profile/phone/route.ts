@@ -50,7 +50,14 @@ export async function POST(request: Request) {
         if (error) return NextResponse.json({ error: 'Could not start verification.' }, { status: 500 });
 
         const id = await sendTemplate(wa, TEMPLATES.verifyCode, { body: [code], urlSuffix: { index: 0, value: code } }, { kind: 'verify', userId: user.id });
-        if (!id) return NextResponse.json({ error: 'Couldn’t send the code on WhatsApp. Check the number is on WhatsApp and try again.' }, { status: 502 });
+        if (!id) {
+            // Code couldn't be sent (e.g. the code template isn't approved yet):
+            // save the number unverified, as before WhatsApp codes existed.
+            await admin.from('phone_change_codes').delete().eq('user_id', user.id);
+            const { error: saveError } = await admin.from('profiles').update({ phone, phone_verified_at: null }).eq('id', user.id);
+            if (saveError) return NextResponse.json({ error: 'Could not save the number.' }, { status: 500 });
+            return NextResponse.json({ saved: true });
+        }
         return NextResponse.json({ sent: true, to: formatWaNumber(wa), minutes: CODE_MINUTES });
     }
 

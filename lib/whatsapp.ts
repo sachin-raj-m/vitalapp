@@ -17,11 +17,14 @@ import { serviceClient } from '@/lib/supabase-route';
  * setup), optional WHATSAPP_API_VERSION and WHATSAPP_TEMPLATE_LANG.
  */
 
+// Names as approved in WhatsApp Manager (Utility category; _v2 = reworded after
+// Meta classed the first versions as Marketing). requestResponse names nobody:
+// the donor's name and contact arrive in the free reply after "View details".
 export const TEMPLATES = {
-    donorAlert: 'vital_donor_alert',
-    offerReceived: 'vital_offer_received',
-    donationFollowup: 'vital_donation_followup',
-    donorThanks: 'vital_donor_thanks',
+    donorAlert: 'vital_donor_alert_v2',
+    requestResponse: 'vital_request_response',
+    donationFollowup: 'vital_donation_followup_v2',
+    donorThanks: 'vital_donor_thanks_v2',
     requestCovered: 'vital_request_covered',
     verifyCode: 'vital_verify_code',
 } as const;

@@ -22,7 +22,7 @@ import { TEMPLATES, sendButtons, sendTemplate, sendText, waNumber } from '@/lib/
  */
 
 const DONOR_LINK_MINUTES = 30;
-const REQUESTER_LINK_MINUTES = 24 * 60;
+const REQUESTER_LINK_MINUTES = 30;
 const PIN_WAIT_HOURS = 24;
 
 const SELF_CHECK = [
@@ -52,6 +52,7 @@ export async function handleInbound(msg: Inbound) {
             case 'selfok': return makeOffer(from, id);
             case 'selfno': return reply(from, 'Thank you for checking. Please don’t donate today. We’ll keep alerting you for future requests when you’re well.');
             case 'decline': return reply(from, 'No problem, thank you for letting us know. We’ll alert you again when your blood group is needed nearby.');
+            case 'contact': return sendRequesterContact(from, id);
             case 'fu_yes': return askForPin(from, id);
             case 'fu_later': return followUpLater(from, id);
             case 'fu_no': return followUpNo(from, id);
@@ -132,11 +133,16 @@ async function makeOffer(from: string, requestId: string) {
         'Reply LINK any time for a new link.',
     ].join('\n\n'), { userId: donor.id, requestId: req.id, donationId: donationId as string });
 
-    await tellRequester(req.id, donationId as string, donor.full_name);
+    await tellRequester(req.id, donationId as string);
 }
 
-/** "Asha offered to donate" to the request's contact number, if they asked for updates. */
-async function tellRequester(requestId: string, donationId: string, donorName: string | null) {
+/**
+ * "New response to your request" to the request's contact number, if they asked
+ * for updates. The template names nobody (Meta rejects templates about another
+ * person's offer as Utility); tapping "View details" gets the donor's name and a
+ * private contact link as a free reply (sendRequesterContact).
+ */
+async function tellRequester(requestId: string, donationId: string) {
     const admin = serviceClient();
     const [{ data: contact }, { data: req }] = await Promise.all([
         admin.from('request_contacts').select('contact_phone, whatsapp_updates').eq('request_id', requestId).maybeSingle(),
@@ -144,11 +150,28 @@ async function tellRequester(requestId: string, donationId: string, donorName: s
     ]);
     const to = contact?.whatsapp_updates ? waNumber(contact.contact_phone) : null;
     if (!to || !req) return;
-    const { token } = await createContactLink(donationId, 'requester', REQUESTER_LINK_MINUTES);
-    await sendTemplate(to, TEMPLATES.offerReceived, {
-        body: [firstName(donorName), formatBloodGroup(req.blood_group), placeLabel(req.hospital_name, req.city) || 'your hospital'],
-        urlSuffix: { index: 0, value: token },
+    await sendTemplate(to, TEMPLATES.requestResponse, {
+        body: [formatBloodGroup(req.blood_group), placeLabel(req.hospital_name, req.city) || 'your hospital'],
+        quickReplies: [`contact:${donationId}`],
     }, { kind: 'offer_received', userId: req.user_id, requestId, donationId });
+}
+
+/** After "View details": who offered, plus a private link to their number. */
+async function sendRequesterContact(from: string, donationId: string) {
+    const offer = await offerForRequester(from, donationId);
+    if (!offer) return reply(from, HELP);
+    if (offer.status !== 'pending') return reply(from, 'This offer is no longer open. Check My requests on Vital for the latest.', { donationId: offer.id });
+    const { url } = await createContactLink(offer.id, 'requester', REQUESTER_LINK_MINUTES);
+    // Typing the donor's PIN here later confirms the donation.
+    await serviceClient().from('whatsapp_sessions').upsert({
+        wa_number: from, awaiting: 'pin', donation_id: offer.id, request_id: offer.request_id,
+        expires_at: new Date(Date.now() + PIN_WAIT_HOURS * 3600_000).toISOString(), updated_at: new Date().toISOString(),
+    });
+    return reply(from, [
+        `${offer.donorFirst} has offered to donate.`,
+        `Open this private link to see their number. It works for ${REQUESTER_LINK_MINUTES} minutes:\n${url}`,
+        `Call them to arrange the donation. After they donate, ask for their 4-digit PIN and send it here to confirm it.`,
+    ].join('\n\n'), { donationId: offer.id, requestId: offer.request_id });
 }
 
 /** The offer, if `from` is the contact number of its request. */

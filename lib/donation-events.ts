@@ -52,8 +52,10 @@ export async function onDonationConfirmed(donationId: string) {
         }
         const wa = donor?.whatsapp_alerts ? waNumber(donor.phone) : null;
         if (wa) {
+            // The WhatsApp version has no invite link (Meta treats it as promotional);
+            // the thank-you email above carries it.
             jobs.push(sendTemplate(wa, TEMPLATES.donorThanks, {
-                body: [name, place || 'the hospital', inviteLink ? inviteLink.replace(/^https?:\/\//, '') : 'vitalapp.in'],
+                body: [name, place || 'the hospital'],
             }, { kind: 'thanks', userId: donation.donor_id, requestId: donation.request_id, donationId }));
         }
         const results = await Promise.allSettled(jobs);
