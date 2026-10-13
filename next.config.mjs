@@ -41,8 +41,9 @@ const securityHeaders = [
   { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
   { key: 'Permissions-Policy', value: 'geolocation=(self), camera=(), microphone=(), payment=(), usb=()' },
   { key: 'Strict-Transport-Security', value: 'max-age=63072000; includeSubDomains; preload' },
-  // Staging (Vercel preview builds) is public but must never be indexed.
-  ...(process.env.VERCEL_ENV === 'preview' ? [{ key: 'X-Robots-Tag', value: 'noindex, nofollow' }] : []),
+  // Staging (NEXT_PUBLIC_APP_ENV=staging) and preview builds must never be indexed.
+  ...(process.env.NEXT_PUBLIC_APP_ENV === 'staging' || process.env.VERCEL_ENV === 'preview'
+    ? [{ key: 'X-Robots-Tag', value: 'noindex, nofollow' }] : []),
 ];
 
 /** @type {import('next').NextConfig} */

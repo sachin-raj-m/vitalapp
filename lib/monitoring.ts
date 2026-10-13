@@ -52,9 +52,10 @@ export function scrubEvent(event: ErrorEvent, _hint?: EventHint): ErrorEvent | n
 export const sentryOptions = {
     dsn: SENTRY_DSN,
     enabled: !!SENTRY_DSN,
-    // "production" on vitalapp.in, "preview" on staging. NEXT_PUBLIC_VERCEL_ENV is the
-    // browser-visible copy Vercel provides; VERCEL_ENV alone only exists on the server.
-    environment: process.env.NEXT_PUBLIC_VERCEL_ENV || process.env.VERCEL_ENV || process.env.NODE_ENV,
+    // "production" on vitalapp.in, "staging" on staging.vitalapp.in (its own Vercel
+    // project sets NEXT_PUBLIC_APP_ENV), "preview" on other preview builds.
+    // NEXT_PUBLIC_VERCEL_ENV is the browser-visible copy of VERCEL_ENV.
+    environment: process.env.NEXT_PUBLIC_APP_ENV || process.env.NEXT_PUBLIC_VERCEL_ENV || process.env.VERCEL_ENV || process.env.NODE_ENV,
     sendDefaultPii: false,
     tracesSampleRate: 0,
     beforeSend: scrubEvent,

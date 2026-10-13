@@ -2,8 +2,8 @@ import { MetadataRoute } from 'next'
 import { SITE_URL } from '@/lib/site'
 
 export default function robots(): MetadataRoute.Robots {
-    // Staging (staging.vitalapp.in, a Vercel preview build) is public but not for search engines.
-    if (process.env.VERCEL_ENV === 'preview') {
+    // Staging (staging.vitalapp.in) and preview builds are public but not for search engines.
+    if (process.env.NEXT_PUBLIC_APP_ENV === 'staging' || process.env.VERCEL_ENV === 'preview') {
         return { rules: { userAgent: '*', disallow: '/' } }
     }
     return {
