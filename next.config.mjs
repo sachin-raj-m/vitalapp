@@ -12,15 +12,16 @@ const csp = [
   // Next.js injects inline bootstrap scripts; nonces would remove 'unsafe-inline'.
   // React Refresh in `next dev` needs eval.
   // challenges.cloudflare.com: Turnstile bot check on the auth forms.
-  `script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com${isDev ? " 'unsafe-eval'" : ''}`,
+  // accounts.google.com/gsi: Google's own sign-in button (components/auth/GoogleSignIn.tsx).
+  `script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com https://accounts.google.com/gsi/client${isDev ? " 'unsafe-eval'" : ''}`,
   // Leaflet marker HTML and React style props use inline styles.
-  "style-src 'self' 'unsafe-inline'",
+  "style-src 'self' 'unsafe-inline' https://accounts.google.com/gsi/style",
   "img-src 'self' data: blob: https://tile.openstreetmap.org",
   "font-src 'self'",
-  `connect-src 'self'${supabaseHost ? ` https://${supabaseHost} wss://${supabaseHost}` : ''}${isDev ? ' ws: http://localhost:* http://127.0.0.1:*' : ''}`,
+  `connect-src 'self' https://accounts.google.com/gsi/${supabaseHost ? ` https://${supabaseHost} wss://${supabaseHost}` : ''}${isDev ? ' ws: http://localhost:* http://127.0.0.1:*' : ''}`,
   "worker-src 'self'",
   "manifest-src 'self'",
-  "frame-src https://challenges.cloudflare.com",
+  "frame-src https://challenges.cloudflare.com https://accounts.google.com/gsi/",
   "frame-ancestors 'none'",
   "form-action 'self'",
   "base-uri 'self'",

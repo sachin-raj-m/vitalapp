@@ -6,10 +6,11 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Alert } from '@/components/ui/Alert';
 import { Modal } from '@/components/ui/Modal';
-import { GoogleButton, OrDivider, friendlyAuthError } from '@/components/auth/GoogleButton';
+import { OrDivider, friendlyAuthError } from '@/components/auth/GoogleButton';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { TurnstileField, type TurnstileHandle } from '@/components/TurnstileField';
+import { GoogleSignIn } from '@/components/auth/GoogleSignIn';
 
 interface AuthModalProps {
     isOpen: boolean;
@@ -72,7 +73,12 @@ export function AuthModal({ isOpen, onClose, onSuccess, message = "Sign in to co
             </form>
 
             <OrDivider />
-            <GoogleButton onClick={handleGoogleSignIn} isLoading={isGoogleLoading} />
+            <GoogleSignIn
+                onFallback={handleGoogleSignIn}
+                fallbackLoading={isGoogleLoading}
+                getCaptchaToken={async () => { const t = await captcha.current?.getToken(); captcha.current?.reset(); return t; }}
+                onError={message => setError(friendlyAuthError(message))}
+            />
 
             <p className="mt-6 text-center text-sm text-gray-600">
                 New here?{' '}

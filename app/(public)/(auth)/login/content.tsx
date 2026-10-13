@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { AuthFrame, authLinkClass } from '@/components/auth/AuthFrame';
-import { GoogleButton, OrDivider, friendlyAuthError } from '@/components/auth/GoogleButton';
+import { OrDivider, friendlyAuthError } from '@/components/auth/GoogleButton';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { Alert } from '@/components/ui/Alert';
@@ -14,6 +14,7 @@ import { isRegistrationComplete } from '@/lib/auth-helpers';
 import { safeInternalPath } from '@/lib/site';
 import { ConfirmEmailCode } from '@/components/auth/ConfirmEmailCode';
 import { TurnstileField, type TurnstileHandle } from '@/components/TurnstileField';
+import { GoogleSignIn } from '@/components/auth/GoogleSignIn';
 
 export default function LoginPage() {
     const router = useRouter();
@@ -131,7 +132,12 @@ export default function LoginPage() {
         >
             {error && <Alert variant="error" className="mb-6">{error}</Alert>}
 
-            <GoogleButton onClick={handleGoogleSignIn} isLoading={isGoogleLoading} />
+            <GoogleSignIn
+                onFallback={handleGoogleSignIn}
+                fallbackLoading={isGoogleLoading}
+                getCaptchaToken={async () => { const t = await captcha.current?.getToken(); captcha.current?.reset(); return t; }}
+                onError={message => setError(friendlyAuthError(message))}
+            />
             <p className="mt-3 text-[13px] leading-relaxed text-gray-500">
                 New to Vital? Continuing with Google creates an account, and means you accept the{' '}
                 <Link href="/terms" className={authLinkClass}>Terms</Link> and{' '}

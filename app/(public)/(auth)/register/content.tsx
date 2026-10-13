@@ -5,7 +5,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { AuthFrame, authLinkClass } from '@/components/auth/AuthFrame';
-import { GoogleButton, OrDivider, friendlyAuthError } from '@/components/auth/GoogleButton';
+import { OrDivider, friendlyAuthError } from '@/components/auth/GoogleButton';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { Alert } from '@/components/ui/Alert';
@@ -15,6 +15,7 @@ import { ConfirmEmailCode } from '@/components/auth/ConfirmEmailCode';
 import type { User } from '@supabase/supabase-js';
 import { rememberReferral } from '@/lib/referrals';
 import { TurnstileField, type TurnstileHandle } from '@/components/TurnstileField';
+import { GoogleSignIn } from '@/components/auth/GoogleSignIn';
 
 export default function RegisterPage() {
     const router = useRouter();
@@ -191,7 +192,16 @@ export default function RegisterPage() {
 
             {/* A disabled fieldset disables the Google button until consent is ticked. */}
             <fieldset disabled={!agreed} aria-describedby={!agreed ? 'consent-hint' : undefined} className="m-0 min-w-0 border-0 p-0">
-                <GoogleButton onClick={handleGoogleSignUp} isLoading={isGoogleLoading} />
+                <GoogleSignIn
+                    disabled={!agreed}
+                    onFallback={handleGoogleSignUp}
+                    fallbackLoading={isGoogleLoading}
+                    getCaptchaToken={async () => { const t = await captcha.current?.getToken(); captcha.current?.reset(); return t; }}
+                    // Google can't carry user metadata, so remember the consent locally;
+                    // complete-registration records it against the account.
+                    onBeforeSignIn={() => { try { localStorage.setItem('pendingConsent', JSON.stringify(consentStamp())); } catch { /* storage unavailable */ } }}
+                    onError={message => setError(friendlyAuthError(message))}
+                />
             </fieldset>
             <OrDivider />
 
