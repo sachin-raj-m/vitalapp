@@ -63,10 +63,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const isRefreshing = useRef(false);
   const lastProfileFetch = useRef<number>(0);
 
-  const fetchUserProfile = async (userId: string, options: { silent?: boolean } = {}) => {
-    // Prevent duplicate fetches within 2 seconds
+  const fetchUserProfile = async (userId: string, options: { silent?: boolean; force?: boolean } = {}) => {
+    // Prevent duplicate fetches within 2 seconds (unless forced, e.g. right after
+    // the profile was saved and the caller needs the new values).
     const now = Date.now();
-    if (now - lastProfileFetch.current < 2000 && !options.silent) {
+    if (now - lastProfileFetch.current < 2000 && !options.silent && !options.force) {
       // If mostly silent update, we might still want to proceed if data is stale, 
       // but strictly following existing debounce for now unless forced.
       return state.user;
@@ -459,8 +460,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const refreshProfile = async () => {
     try {
-      // If already refreshing, exit early
-      // If already refreshing, exit early
+      // A refresh already in flight will return the latest data.
       if (isRefreshing.current) {
         return;
       }
@@ -471,7 +471,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const { data: { session } } = await supabase.auth.getSession();
 
       if (session?.user?.id) {
-        await fetchUserProfile(session.user.id);
+        await fetchUserProfile(session.user.id, { force: true });
       } else {
         setState(prev => ({
           ...prev,

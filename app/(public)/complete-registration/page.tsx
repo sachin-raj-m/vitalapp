@@ -45,7 +45,7 @@ interface CompleteRegistrationForm {
 
 export default function CompleteRegistration() {
     const router = useRouter();
-    const { user, loading: authLoading } = useAuth();
+    const { user, loading: authLoading, refreshProfile } = useAuth();
     const [error, setError] = useState<string>('');
     const [status, setStatus] = useState<string>('loading');
     const [progress, setProgress] = useState<number>(0);
@@ -241,6 +241,10 @@ export default function CompleteRegistration() {
             });
 
             if (updateError) throw updateError;
+
+            // Reload the signed-in profile so the dashboard, profile and card show
+            // the blood group and details just saved (not the pre-registration copy).
+            await refreshProfile();
 
             setProgress(100);
             setStatus('completed');
