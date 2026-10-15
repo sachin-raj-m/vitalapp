@@ -76,7 +76,8 @@ SELECT tests.throws($q$SELECT public.rate_limit_hit('x', 60, 1)$q$, '42501', 'an
 SELECT tests.throws($q$SELECT public.is_admin()$q$, '42501', 'anon: is_admin() not executable');
 SELECT tests.throws($q$SELECT public.owns_request('aaaaaaaa-0000-4000-8000-000000000001')$q$, '42501', 'anon: owns_request() not executable');
 
-SELECT tests.is(tests.val($q$SELECT public.public_stats()$q$)::jsonb, '{"open": 2, "donors": 2, "fulfilled": 1}'::jsonb,
+-- Full key-by-key checks live in public_stats.test.sql.
+SELECT tests.ok(tests.val($q$SELECT public.public_stats()$q$)::jsonb @> '{"open": 2, "donors": 2, "fulfilled": 1}'::jsonb,
   'anon: public_stats() works and counts only real donors');
 SELECT tests.is(tests.rows($q$SELECT * FROM public.public_donor_activity('22222222-2222-4222-8222-222222222222')$q$), 0::bigint,
   'anon: public_donor_activity() of a private donor is empty');
