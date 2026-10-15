@@ -62,7 +62,6 @@ export async function POST(request: Request) {
         await step('donation offers', () => admin.from('donations').delete().eq('donor_id', userId));
         await step('alert subscriptions', () => admin.from('push_subscriptions').delete().eq('user_id', userId));
         await step('notifications', () => admin.from('notifications').delete().eq('user_id', userId));
-        await step('donor PIN', () => admin.from('donor_secrets').delete().eq('user_id', userId));
         // The FK is ON DELETE SET NULL, which would keep the rows; remove them outright.
         await step('activity log', () => admin.from('user_activity_logs').delete().eq('user_id', userId));
         await removeProofs(admin, userId);

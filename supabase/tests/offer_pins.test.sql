@@ -4,8 +4,8 @@
 -- reaches rls.test.sql.
 --
 -- Seed: R1 (requester Riya, A+, 2 units, active); D1 = donor Dev's pending
--- offer on R1 (PIN fixed to 4719 by the seed); Eve ("unrelated") has a lifetime
--- PIN 1234 in donor_secrets and a cancelled offer D3 on R1.
+-- offer on R1 (PIN fixed to 4719 by the seed); Eve ("unrelated") has a
+-- cancelled offer D3 on R1 (PIN fixed to 1234).
 
 \set ON_ERROR_STOP 1
 \pset tuples_only on
@@ -45,12 +45,12 @@ SELECT tests.throws($q$SELECT public.new_offer_pin()$q$, '42501', 'offer pin: an
 
 -- 2. Only this offer's PIN confirms it ---------------------------------------
 SELECT tests.login('postgres');
--- Make sure the random PIN differs from Eve's old lifetime PIN for the check below.
+-- Make sure the random PIN differs from D3's PIN for the check below.
 UPDATE public.donation_pins SET pin = '8642' WHERE donation_id = 'dddddddd-0000-4000-8000-0000000000a1';
 
 SELECT tests.login('requester');
 SELECT tests.is(public.verify_donation('dddddddd-0000-4000-8000-0000000000a1', '1234', 1)->>'error', 'pin_mismatch',
-  'offer pin: the donor''s old lifetime PIN no longer works');
+  'offer pin: the donor''s PIN from an earlier offer does not work');
 SELECT tests.is(public.verify_donation('dddddddd-0000-4000-8000-0000000000a1', '4719', 1)->>'error', 'pin_mismatch',
   'offer pin: another offer''s PIN does not work');
 SELECT tests.is(public.verify_donation('dddddddd-0000-4000-8000-0000000000a1', '8642', 1)->>'total_collected', '1',
@@ -64,9 +64,8 @@ VALUES ('dddddddd-0000-4000-8000-0000000000a2', 'aaaaaaaa-0000-4000-8000-0000000
 SELECT tests.ok(tests.val($q$SELECT pin FROM public.donation_pins WHERE donation_id = 'dddddddd-0000-4000-8000-0000000000a2'$q$) ~ '^[0-9]{4}$',
   'offer pin: offering again creates a fresh PIN');
 
--- 4. WhatsApp offers get one too, and no lifetime PIN is created -------------
+-- 4. WhatsApp offers get one too ---------------------------------------------
 SELECT tests.login('postgres');
-DELETE FROM public.donor_secrets WHERE user_id = '22222222-2222-4222-8222-222222222222';
 INSERT INTO public.blood_requests
   (id, user_id, blood_group, units_needed, hospital_name, hospital_address, urgency_level,
    contact_name, location, status, city, date_needed)
@@ -79,8 +78,6 @@ CREATE TEMP TABLE wa_offer AS
   SELECT public.create_offer_for('22222222-2222-4222-8222-222222222222', 'aaaaaaaa-0000-4000-8000-0000000000a5') AS id;
 SELECT tests.ok((SELECT pin FROM public.donation_pins WHERE donation_id = (SELECT id FROM wa_offer)) ~ '^[0-9]{4}$',
   'offer pin: a WhatsApp offer gets a PIN');
-SELECT tests.is((SELECT count(*) FROM public.donor_secrets WHERE user_id = '22222222-2222-4222-8222-222222222222'), 0::bigint,
-  'offer pin: create_offer_for no longer creates a lifetime PIN');
 SELECT tests.is(public.create_offer_for('22222222-2222-4222-8222-222222222222', 'aaaaaaaa-0000-4000-8000-0000000000a5'),
   (SELECT id FROM wa_offer), 'offer pin: offering twice returns the same offer (and keeps its PIN)');
 SELECT tests.is((SELECT count(*) FROM public.donation_pins WHERE donation_id = (SELECT id FROM wa_offer)), 1::bigint,

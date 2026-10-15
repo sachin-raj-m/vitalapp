@@ -21,7 +21,7 @@ SELECT tests.login('anon');
 
 SELECT tests.denied($q$SELECT * FROM public.profiles$q$, 'anon: cannot read profiles');
 SELECT tests.denied($q$SELECT * FROM public.donations$q$, 'anon: cannot read donations');
-SELECT tests.denied($q$SELECT * FROM public.donor_secrets$q$, 'anon: cannot read donor_secrets (PINs)');
+SELECT tests.denied($q$SELECT * FROM public.donation_pins$q$, 'anon: cannot read donation_pins (PINs)');
 SELECT tests.denied($q$SELECT * FROM public.request_contacts$q$, 'anon: cannot read request_contacts (phones)');
 SELECT tests.denied($q$SELECT * FROM public.notifications$q$, 'anon: cannot read notifications');
 SELECT tests.denied($q$SELECT * FROM public.push_subscriptions$q$, 'anon: cannot read push_subscriptions');
@@ -94,12 +94,12 @@ SELECT tests.login('unrelated');
 SELECT tests.is(tests.rows($q$SELECT 1 FROM public.profiles$q$), 1::bigint, 'user: reads only own profile');
 SELECT tests.denied($q$SELECT phone FROM public.profiles WHERE id = '22222222-2222-4222-8222-222222222222'$q$,
   'user: cannot read another profile''s phone');
-SELECT tests.is(tests.val($q$SELECT pin FROM public.donor_secrets$q$), '1234', 'user: reads own PIN');
-SELECT tests.is(tests.rows($q$SELECT 1 FROM public.donor_secrets$q$), 1::bigint, 'user: sees no other PINs');
-SELECT tests.denied($q$UPDATE public.donor_secrets SET pin = '0000' WHERE user_id = '22222222-2222-4222-8222-222222222222'$q$,
+SELECT tests.is(tests.val($q$SELECT pin FROM public.donation_pins$q$), '1234', 'user: reads own offer''s PIN');
+SELECT tests.is(tests.rows($q$SELECT 1 FROM public.donation_pins$q$), 1::bigint, 'user: sees no other offers'' PINs');
+SELECT tests.denied($q$UPDATE public.donation_pins SET pin = '0000' WHERE donation_id = 'dddddddd-0000-4000-8000-000000000001'$q$,
   'user: cannot change another donor''s PIN');
-SELECT tests.throws($q$INSERT INTO public.donor_secrets (user_id, pin) VALUES ('44444444-4444-4444-8444-444444444444', '0000')$q$,
-  '42501', 'user: cannot create a PIN for someone else');
+SELECT tests.denied($q$INSERT INTO public.donation_pins (donation_id, pin) VALUES ('dddddddd-0000-4000-8000-000000000002', '0000')$q$,
+  'user: cannot create a PIN');
 SELECT tests.is(tests.rows($q$SELECT 1 FROM public.donations$q$), 1::bigint, 'user: reads only own donations');
 SELECT tests.denied($q$SELECT * FROM public.request_contacts WHERE request_id = 'aaaaaaaa-0000-4000-8000-000000000001'$q$,
   'user: cannot read contact rows of others'' requests');
@@ -197,9 +197,10 @@ SELECT tests.throws($q$UPDATE storage.objects SET name = '22222222-2222-4222-822
 -- =========================================================================
 SELECT tests.login('donor');
 
-SELECT tests.is(tests.val($q$SELECT pin FROM public.donor_secrets$q$), '4719', 'donor: reads own PIN');
-SELECT tests.throws($q$UPDATE public.donor_secrets SET pin = '12ab' WHERE user_id = auth.uid()$q$, '23514',
-  'donor: PIN must be 4 digits');
+SELECT tests.is(tests.val($q$SELECT pin FROM public.donation_pins WHERE donation_id = 'dddddddd-0000-4000-8000-000000000001'$q$), '4719',
+  'donor: reads own offer''s PIN');
+SELECT tests.denied($q$UPDATE public.donation_pins SET pin = '1111' WHERE donation_id = 'dddddddd-0000-4000-8000-000000000001'$q$,
+  'donor: cannot change own offer''s PIN');
 SELECT tests.is(tests.val($q$SELECT contact_phone FROM public.get_request_contact('aaaaaaaa-0000-4000-8000-000000000001')$q$),
   '0000000101', 'contact: visible to a donor with a live offer');
 SELECT tests.is(tests.rows($q$SELECT * FROM public.get_request_contact('aaaaaaaa-0000-4000-8000-000000000003')$q$), 0::bigint,
@@ -230,7 +231,7 @@ SELECT tests.is(tests.rows($q$SELECT 1 FROM public.donations WHERE request_id = 
   'requester: sees offers on own request');
 SELECT tests.is(tests.rows($q$SELECT 1 FROM public.donations WHERE otp IS NOT NULL$q$), 0::bigint,
   'requester: no PIN copied into donations.otp');
-SELECT tests.denied($q$SELECT * FROM public.donor_secrets$q$, 'requester: cannot read donors'' PINs');
+SELECT tests.is(tests.rows($q$SELECT 1 FROM public.donation_pins$q$), 0::bigint, 'requester: cannot read donors'' PINs');
 SELECT tests.is(tests.val($q$SELECT full_name || '|' || phone FROM public.get_my_request_donors() WHERE donation_id = 'dddddddd-0000-4000-8000-000000000001'$q$),
   'Dev D.|0000000002', 'get_my_request_donors: masked name, phone shown while request is open');
 SELECT tests.is(tests.val($q$SELECT coalesce(phone, '<null>') FROM public.get_my_request_donors() WHERE donation_id = 'dddddddd-0000-4000-8000-000000000002'$q$),
@@ -366,7 +367,7 @@ SELECT tests.login('admin');
 SELECT tests.is(tests.val($q$SELECT public.is_admin()::text$q$), 'true', 'admin: is_admin() is true');
 SELECT tests.is(tests.rows($q$SELECT 1 FROM public.profiles$q$), 5::bigint, 'admin: reads all profiles');
 SELECT tests.is(tests.rows($q$SELECT 1 FROM public.donations$q$), 4::bigint, 'admin: reads all donations');
-SELECT tests.is(tests.rows($q$SELECT 1 FROM public.donor_secrets$q$), 0::bigint, 'admin: cannot read donor PINs');
+SELECT tests.is(tests.rows($q$SELECT 1 FROM public.donation_pins$q$), 0::bigint, 'admin: cannot read donor PINs');
 SELECT tests.is(tests.rows($q$SELECT 1 FROM storage.objects WHERE bucket_id = 'proofs'$q$), 2::bigint, 'admin: reads all proof files');
 SELECT tests.allowed($q$UPDATE public.profiles SET verification_status = 'verified' WHERE id = '22222222-2222-4222-8222-222222222222'$q$, 1,
   'admin: can verify a donor');
@@ -393,14 +394,12 @@ DELETE FROM public.blood_requests WHERE user_id = '33333333-3333-4333-8333-33333
 DELETE FROM public.donations WHERE donor_id = '33333333-3333-4333-8333-333333333333';
 DELETE FROM public.push_subscriptions WHERE user_id = '33333333-3333-4333-8333-333333333333';
 DELETE FROM public.notifications WHERE user_id = '33333333-3333-4333-8333-333333333333';
-DELETE FROM public.donor_secrets WHERE user_id = '33333333-3333-4333-8333-333333333333';
 DELETE FROM public.profiles WHERE id = '33333333-3333-4333-8333-333333333333';
 DELETE FROM auth.users WHERE id = '33333333-3333-4333-8333-333333333333';
 SELECT tests.is(tests.rows($q$
   SELECT 1 FROM public.profiles WHERE id = '33333333-3333-4333-8333-333333333333'
   UNION ALL SELECT 1 FROM public.donations WHERE donor_id = '33333333-3333-4333-8333-333333333333'
   UNION ALL SELECT 1 FROM public.blood_requests WHERE user_id = '33333333-3333-4333-8333-333333333333'
-  UNION ALL SELECT 1 FROM public.donor_secrets WHERE user_id = '33333333-3333-4333-8333-333333333333'
   UNION ALL SELECT 1 FROM public.notifications WHERE user_id = '33333333-3333-4333-8333-333333333333'
   UNION ALL SELECT 1 FROM auth.users WHERE id = '33333333-3333-4333-8333-333333333333'$q$), 0::bigint,
   'account deletion: no rows left for the deleted user');

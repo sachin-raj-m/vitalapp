@@ -61,10 +61,6 @@ WHERE id = '33333333-3333-4333-8333-333333333333';
 UPDATE public.profiles SET phone = '0000000004', role = 'admin', verification_status = 'verified', is_donor = false
 WHERE id = '44444444-4444-4444-8444-444444444444';
 
-INSERT INTO public.donor_secrets (user_id, pin) VALUES
-  ('22222222-2222-4222-8222-222222222222', '4719'),
-  ('33333333-3333-4333-8333-333333333333', '1234');
-
 INSERT INTO public.blood_requests
   (id, user_id, blood_group, units_needed, hospital_name, hospital_address, urgency_level,
    contact_name, location, status, city, date_needed) VALUES
