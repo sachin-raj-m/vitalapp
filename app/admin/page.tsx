@@ -9,6 +9,7 @@ import { Download, Loader2, Check, X, FileText, ExternalLink, Users, Activity, S
 import { motion } from 'framer-motion';
 import { AnalyticsCharts } from '@/components/admin/AnalyticsCharts';
 import { AdminNotificationConsole } from './AdminNotificationConsole';
+import { AdminInsights } from '@/components/admin/AdminInsights';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
@@ -210,6 +211,11 @@ export default function AdminDashboard() {
         }
     };
 
+    // Closed from the Overview's "needs attention" list.
+    const handleRequestClosed = (requestId: string) => {
+        setRequests(prev => prev.map(r => r.id === requestId ? { ...r, status: 'cancelled' } : r));
+    };
+
     // Unified Action Handler
     const handleConfirmAction = () => {
         if (confirmation.type === 'role') executeToggleRole();
@@ -327,6 +333,8 @@ export default function AdminDashboard() {
                 {['overview', 'users', 'verifications', 'requests', 'analytics', 'notifications'].map((tab) => (
                     <button
                         key={tab}
+                        type="button"
+                        aria-pressed={activeTab === tab}
                         onClick={() => setActiveTab(tab as any)}
                         className={`px-4 py-2 capitalize font-medium text-sm transition-colors relative ${activeTab === tab ? 'text-red-600' : 'text-slate-500 hover:text-slate-700'
                             }`}
@@ -341,9 +349,10 @@ export default function AdminDashboard() {
 
             {/* Content Area */}
             <div className="min-h-[400px]">
-                <div className={activeTab === 'overview' ? 'block' : 'hidden'}>
+                <div className={activeTab === 'overview' ? 'block space-y-10' : 'hidden'}>
+                    <AdminInsights onRequestClosed={handleRequestClosed} />
                     <div className="space-y-6">
-                        <div className="flex justify-between items-center">
+                        <div className="flex flex-wrap gap-2 justify-between items-center">
                             <h3 className="text-lg font-semibold">Activity Stream</h3>
                             <div className="flex space-x-2">
                                 {(['all', 'users', 'requests', 'donations'] as const).map(filter => (
