@@ -489,7 +489,7 @@ SELECT tests.throws($q$INSERT INTO public.blood_requests (user_id, blood_group, 
 SELECT tests.login('fresh');
 UPDATE public.profiles SET consent_agreed = true, consent_at = now(), consent_version = '2026-10-06' WHERE id = auth.uid();
 SELECT tests.allowed($q$INSERT INTO public.blood_requests (user_id, blood_group, units_needed, hospital_name, hospital_address, urgency_level, contact_name, location)
-  VALUES (auth.uid(), 'A+', 1, 'x', 'x', 'Low', 'x', '{}')$q$, 1,
+  VALUES (auth.uid(), 'A+', 1, 'x', 'x', 'Low', 'x', '{"latitude": 9.98, "longitude": 76.28}')$q$, 1,
   'consent: can post a request once consent is recorded');
 
 -- Existing donors
@@ -645,8 +645,8 @@ SELECT tests.is(public.wa_number('5876543210'), NULL::text, 'wa: landline-style 
 -- Two fresh open requests owned by the requester.
 INSERT INTO public.blood_requests (id, user_id, blood_group, units_needed, hospital_name, hospital_address, urgency_level,
   contact_name, location, status, city, date_needed) VALUES
-  ('aaaaaaaa-0000-4000-8000-000000000101', tests.uid('requester'), 'A+', 2, 'WA Hospital', '9 Example Road', 'High', 'Riya', '{}', 'active', 'Testville', current_date + 2),
-  ('aaaaaaaa-0000-4000-8000-000000000102', tests.uid('requester'), 'A+', 1, 'WA Clinic', '10 Example Road', 'Low', 'Riya', '{}', 'active', 'Testville', current_date + 2);
+  ('aaaaaaaa-0000-4000-8000-000000000101', tests.uid('requester'), 'A+', 2, 'WA Hospital', '9 Example Road', 'High', 'Riya', '{"latitude": 9.98, "longitude": 76.28}', 'active', 'Testville', current_date + 2),
+  ('aaaaaaaa-0000-4000-8000-000000000102', tests.uid('requester'), 'A+', 1, 'WA Clinic', '10 Example Road', 'Low', 'Riya', '{"latitude": 9.98, "longitude": 76.28}', 'active', 'Testville', current_date + 2);
 
 SELECT tests.login('anon');
 SELECT tests.denied($q$SELECT * FROM public.whatsapp_messages$q$, 'wa: anon cannot read the message log');

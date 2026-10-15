@@ -138,7 +138,14 @@ for (const { target, ids } of groups.values()) {
     if (!coords) { notFound += ids.length; continue; }
     located += ids.length;
     if (!APPLY) continue;
-    const location = { ...coords, source: target.kind, geocoded_at: geocodedAt };
+    // Same shape as app/api/profile/location (normalised again by the database).
+    const location = {
+        ...coords,
+        source: target.kind,
+        accuracy_m: target.kind === 'pin' ? 5000 : 15000,
+        ...(target.kind === 'pin' ? { label: `PIN ${target.value} area` } : {}),
+        updated_at: geocodedAt,
+    };
     // "location IS NULL" again: never overwrite a value the app wrote meanwhile.
     const { data, error } = await db.from('profiles').update({ location }).in('id', ids).is('location', null).select('id');
     if (error) writeFailed += ids.length;
