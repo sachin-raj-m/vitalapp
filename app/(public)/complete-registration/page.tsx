@@ -17,6 +17,7 @@ import Link from 'next/link';
 import { PRIVACY_VERSION, earliestConsentAt } from '@/lib/legal';
 import { takeReferral } from '@/lib/referrals';
 import { waNumber } from '@/lib/phone';
+import { DonorLocationPicker, type PickedPoint } from '@/components/DonorLocationPicker';
 
 interface PendingRegistration {
     userId: string;
@@ -70,6 +71,8 @@ export default function CompleteRegistration() {
     });
     const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
     const [nbtcEligible, setNbtcEligible] = useState<boolean>(true);
+    // A point from the device or the map, saved once the profile exists.
+    const [pickedPoint, setPickedPoint] = useState<PickedPoint | null>(null);
 
     useEffect(() => {
         const init = async () => {
@@ -222,9 +225,18 @@ export default function CompleteRegistration() {
                 await supabase.rpc('claim_referral', { p_code: referralCode }).then(() => {}, () => {});
             }
 
-            // Place the donor on the map from their PIN code (server-side geocode).
-            // Fire-and-forget: if it fails, nearby search still ranks by PIN area.
-            authedFetch('/api/profile/location', { method: 'POST', keepalive: true }).catch(() => {});
+            // Place the donor: the point they chose, else their PIN code centre
+            // (both server-side). Waited for briefly so the dashboard shows it, but
+            // never blocks registration: without it we still match by city.
+            const saveLocation = async () => {
+                const post = (body: Record<string, unknown>) =>
+                    authedFetch('/api/profile/location', { method: 'POST', keepalive: true, body: JSON.stringify(body) });
+                const res = pickedPoint
+                    ? await post({ mode: 'point', source: pickedPoint.source, latitude: pickedPoint.latitude, longitude: pickedPoint.longitude, accuracy: pickedPoint.accuracy })
+                    : null;
+                if (!res?.ok) await post({ mode: 'pin' });
+            };
+            await Promise.race([saveLocation().catch(() => {}), new Promise(resolve => setTimeout(resolve, 10000))]);
 
             setProgress(90);
             setStatus('finalizing');
@@ -379,7 +391,7 @@ export default function CompleteRegistration() {
                     />
                 </>)}
 
-                {section('Location', 'Requests are matched by city, so this determines which alerts you receive.', <>
+                {section('Location', 'We alert you to requests near you, so this decides which alerts you receive.', <>
                     <div className="grid gap-4 sm:grid-cols-2">
                         <Input label="City" value={formData.city} onChange={e => set('city', e.target.value)} required placeholder="e.g. Kochi" error={fieldErrors.city} />
                         <Input label="District" value={formData.district} onChange={e => set('district', e.target.value)} required placeholder="e.g. Ernakulam" error={fieldErrors.district} />
@@ -388,6 +400,10 @@ export default function CompleteRegistration() {
                     <div className="grid gap-4 sm:grid-cols-2">
                         <Input label="Current PIN code" inputMode="numeric" value={formData.presentZip} onChange={e => set('presentZip', e.target.value)} required placeholder="e.g. 682011" error={fieldErrors.presentZip} />
                         <Input label="Permanent PIN code" inputMode="numeric" value={formData.permanentZip} onChange={e => set('permanentZip', e.target.value)} required placeholder="e.g. 682011" error={fieldErrors.permanentZip} />
+                    </div>
+                    <div>
+                        <h3 className="mb-1 text-[13px] font-medium text-gray-800">Where we alert you from</h3>
+                        <DonorLocationPicker mode="defer" onPick={setPickedPoint} />
                     </div>
                     <div>
                         <p className="mb-2 text-[13px] font-medium text-gray-800">Usually available on</p>

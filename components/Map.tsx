@@ -33,14 +33,18 @@ interface MapProps {
     selectedPosition?: Location | null;
     onLocationSelect?: (location: Location) => void;
     interactive?: boolean;
+    /** Name of the pin the user places (read by screen readers). */
+    pinLabel?: string;
 }
 
 function LocationMarker({
     onLocationSelect,
-    selectedPosition
+    selectedPosition,
+    pinLabel,
 }: {
     onLocationSelect?: (loc: Location) => void;
     selectedPosition?: Location | null;
+    pinLabel: string;
 }) {
     const [position, setPosition] = useState<Location | null>(selectedPosition || null);
 
@@ -66,8 +70,8 @@ function LocationMarker({
     }, [selLat, selLng, map]);
 
     return position === null ? null : (
-        <Marker position={position} icon={INK_DROP} title="Hospital location" eventHandlers={{ add: nameMarker('Hospital location') }}>
-            <Popup>Hospital location</Popup>
+        <Marker position={position} icon={INK_DROP} title={pinLabel} eventHandlers={{ add: nameMarker(pinLabel) }}>
+            <Popup>{pinLabel}</Popup>
         </Marker>
     );
 }
@@ -94,7 +98,8 @@ export default function Map({
     markers = [],
     selectedPosition,
     onLocationSelect,
-    interactive = false
+    interactive = false,
+    pinLabel = 'Hospital location',
 }: MapProps) {
     return (
         <MapContainer
@@ -130,7 +135,7 @@ export default function Map({
                 </Marker>
             ))}
 
-            {interactive && <LocationMarker onLocationSelect={onLocationSelect} selectedPosition={selectedPosition} />}
+            {interactive && <LocationMarker onLocationSelect={onLocationSelect} selectedPosition={selectedPosition} pinLabel={pinLabel} />}
         </MapContainer>
     );
 }
