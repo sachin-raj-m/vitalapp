@@ -46,14 +46,16 @@ type Inbound = { from: string; kind: 'payload' | 'text'; value: string };
 export async function handleInbound(msg: Inbound) {
     const from = waNumber(msg.from) ?? msg.from;
     if (msg.kind === 'payload') {
-        const [action, id] = msg.value.split(':');
+        const [action, id, extra] = msg.value.split(':');
         switch (action) {
             case 'offer': return askSelfCheck(from, id);
             case 'selfok': return makeOffer(from, id);
             case 'selfno': return reply(from, 'Thank you for checking. Please don’t donate today. We’ll keep alerting you for future requests when you’re well.');
             case 'decline': return reply(from, 'No problem, thank you for letting us know. We’ll alert you again when your blood group is needed nearby.');
             case 'contact': return sendRequesterContact(from, id);
-            case 'fu_yes': return askForPin(from, id);
+            case 'done': return askUnits(from, id);
+            case 'units': return askForPin(from, id, Number(extra));
+            case 'fu_yes': return askUnits(from, id);
             case 'fu_later': return followUpLater(from, id);
             case 'fu_no': return followUpNo(from, id);
             default: return reply(from, HELP);
@@ -162,16 +164,37 @@ async function sendRequesterContact(from: string, donationId: string) {
     if (!offer) return reply(from, HELP);
     if (offer.status !== 'pending') return reply(from, 'This offer is no longer open. Check My requests on Vital for the latest.', { donationId: offer.id });
     const { url } = await createContactLink(offer.id, 'requester', REQUESTER_LINK_MINUTES);
-    // Typing the donor's PIN here later confirms the donation.
-    await serviceClient().from('whatsapp_sessions').upsert({
-        wa_number: from, awaiting: 'pin', donation_id: offer.id, request_id: offer.request_id,
-        expires_at: new Date(Date.now() + PIN_WAIT_HOURS * 3600_000).toISOString(), updated_at: new Date().toISOString(),
-    });
-    return reply(from, [
+    return sendButtons(from, [
         `${offer.donorFirst} has offered to donate.`,
         `Open this private link to see their number. It works for ${REQUESTER_LINK_MINUTES} minutes:\n${url}`,
-        `Call them to arrange the donation. After they donate, ask for their 4-digit PIN and send it here to confirm it.`,
-    ].join('\n\n'), { donationId: offer.id, requestId: offer.request_id });
+        `Call them to arrange the donation. After they donate, tap the button below and have their 4-digit PIN ready.`,
+    ].join('\n\n'), [{ id: `done:${offer.id}`, title: 'They have donated' }],
+    { kind: 'reply', donationId: offer.id, requestId: offer.request_id });
+}
+
+/** Units the request still needs (0 if complete). */
+async function remainingUnits(requestId: string) {
+    const admin = serviceClient();
+    const [{ data: req }, { data: done }] = await Promise.all([
+        admin.from('blood_requests').select('units_needed').eq('id', requestId).maybeSingle(),
+        admin.from('donations').select('units_donated').eq('request_id', requestId).eq('status', 'completed'),
+    ]);
+    const collected = (done ?? []).reduce((sum, d) => sum + (Number(d.units_donated) || 0), 0);
+    return Math.max(0, (req?.units_needed ?? 0) - collected);
+}
+
+/** "How many units did Asha donate?" (skipped when only one unit is left). */
+async function askUnits(from: string, donationId: string) {
+    const offer = await offerForRequester(from, donationId);
+    if (!offer) return reply(from, HELP);
+    if (offer.status !== 'pending') return reply(from, 'This donation has already been confirmed. Thank you!');
+    const remaining = await remainingUnits(offer.request_id);
+    if (remaining === 0) return reply(from, 'Your request already has all the units it needs. You can check it in My requests on Vital.', { donationId: offer.id });
+    if (remaining === 1) return askForPin(from, offer.id, 1);
+    const options = Array.from({ length: Math.min(remaining, 3) }, (_, i) => i + 1);
+    return sendButtons(from, `How many units did ${offer.donorFirst} donate? Most donors give 1 unit.`,
+        options.map(n => ({ id: `units:${offer.id}:${n}`, title: n === 1 ? '1 unit' : `${n} units` })),
+        { kind: 'reply', donationId: offer.id, requestId: offer.request_id });
 }
 
 /** The offer, if `from` is the contact number of its request. */
@@ -192,15 +215,19 @@ async function offerForRequester(from: string, donationId?: string) {
     return { ...d, donorFirst: firstName(donor?.full_name) };
 }
 
-async function askForPin(from: string, donationId: string) {
+async function askForPin(from: string, donationId: string, units: number) {
     const offer = await offerForRequester(from, donationId);
     if (!offer) return reply(from, HELP);
     if (offer.status !== 'pending') return reply(from, 'This donation has already been confirmed. Thank you!');
+    const remaining = await remainingUnits(offer.request_id);
+    if (!Number.isInteger(units) || units < 1 || units > Math.max(remaining, 1)) {
+        return reply(from, `Please choose between 1 and ${Math.max(remaining, 1)} units.`, { donationId: offer.id });
+    }
     await serviceClient().from('whatsapp_sessions').upsert({
-        wa_number: from, awaiting: 'pin', donation_id: offer.id, request_id: offer.request_id,
+        wa_number: from, awaiting: 'pin', donation_id: offer.id, request_id: offer.request_id, units,
         expires_at: new Date(Date.now() + PIN_WAIT_HOURS * 3600_000).toISOString(), updated_at: new Date().toISOString(),
     });
-    return reply(from, `Wonderful. Please type the 4-digit PIN ${offer.donorFirst} gives you, to confirm the donation.`, { donationId: offer.id, requestId: offer.request_id });
+    return reply(from, `Thank you. Please type the 4-digit PIN ${offer.donorFirst} gives you, to confirm ${units === 1 ? '1 unit' : `${units} units`}.`, { donationId: offer.id, requestId: offer.request_id });
 }
 
 async function followUpLater(from: string, donationId: string) {
@@ -223,7 +250,7 @@ async function checkPin(from: string, pin: string) {
     const admin = serviceClient();
     const { data: session } = await admin.from('whatsapp_sessions').select('*').eq('wa_number', from).maybeSingle();
     if (!session || session.awaiting !== 'pin' || Date.parse(session.expires_at) < Date.now()) {
-        return reply(from, 'To confirm a donation, tap “Yes” on our message asking whether they donated, then send the PIN. You can also confirm it in My requests on vitalapp.in.');
+        return reply(from, 'To confirm a donation, tap “They have donated” (or “Yes” on our follow-up), choose the units, then send the PIN. You can also confirm it in My requests on Vital.');
     }
     const offer = await offerForRequester(from, session.donation_id);
     const { data: req } = offer
@@ -235,7 +262,7 @@ async function checkPin(from: string, pin: string) {
     }
 
     const { data: result, error } = await admin.rpc('verify_donation_for', {
-        p_actor: req.user_id, p_donation_id: offer.id, p_pin: pin, p_units: 1,
+        p_actor: req.user_id, p_donation_id: offer.id, p_pin: pin, p_units: session.units ?? 1,
     });
     if (error) {
         await admin.from('whatsapp_sessions').delete().eq('wa_number', from);

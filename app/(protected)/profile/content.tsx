@@ -249,7 +249,9 @@ export default function ProfilePage() {
                     <div>
                         <h2 className="text-lg font-medium tracking-tight text-gray-900">Details</h2>
                         <dl className="mt-3 divide-y divide-gray-200 border-y border-gray-200">
-                            {row('Blood group', formatBloodGroup(user?.blood_group))}
+                            {row('Blood group', user?.is_donor && user?.blood_group && !user?.blood_group_changed_at
+                                ? <>{formatBloodGroup(user.blood_group)} <Link href="/profile/edit#blood-group" className="ml-2 text-sm text-gray-500 underline underline-offset-4 hover:text-gray-900">Change</Link></>
+                                : formatBloodGroup(user?.blood_group))}
                             {row('Email', user?.email)}
                             {row('Phone', user?.phone)}
                             {row('City', [user?.city, user?.present_zip].filter(Boolean).join(' · '))}

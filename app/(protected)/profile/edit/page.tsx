@@ -273,14 +273,14 @@ export default function ProfileEditPage() {
 
                 {user?.is_donor && section('Donating', 'Pause any time, for example while travelling or unwell.', <>
                     {bloodGroupLocked ? (
-                    <div>
+                    <div id="blood-group" className="scroll-mt-24">
                         <span className="block text-gray-900">Blood group: <strong>{formatBloodGroup(user?.blood_group)}</strong></span>
                         <span className="mt-0.5 block text-sm text-gray-500">
                             You changed it on {new Date(user!.blood_group_changed_at!).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}. It can be changed only once; if it’s still wrong, contact Vital.
                         </span>
                     </div>
                     ) : (
-                    <div>
+                    <div id="blood-group" className="scroll-mt-24">
                         <span id="settings-blood-group" className="block text-gray-900">Blood group</span>
                         <span className="mt-0.5 block text-sm text-gray-500">Decides which requests you’re alerted to. You can change it <strong>once</strong>, only if it was entered wrongly; we’ll email you a code to confirm.</span>
                         <div className="mt-3 grid grid-cols-4 gap-1.5" role="radiogroup" aria-labelledby="settings-blood-group">
