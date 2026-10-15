@@ -8,18 +8,12 @@ const plural = (n: number, one: string, many: string) => (n === 1 ? one : many);
 
 /**
  * "Recorded on Vital so far". Zeros are left out rather than shown, and a
- * figure that would only repeat another one (all donors available, every
- * helped request fulfilled) is skipped, so a young network still reads well.
+ * figure that would only repeat another one (all donors available) is skipped, so a young network still reads well.
  */
 export function NetworkNumbers({ stats }: { stats: PublicStats }) {
     const s = stats;
     const items = [
         { key: 'fulfilled', value: s.fulfilled, label: plural(s.fulfilled, 'Request fulfilled', 'Requests fulfilled') },
-        {
-            key: 'helped',
-            value: s.requests_helped > s.fulfilled ? s.requests_helped : 0,
-            label: plural(s.requests_helped, 'Request helped, fully or in part', 'Requests helped, fully or in part'),
-        },
         { key: 'open', value: s.open, label: plural(s.open, 'Request open now', 'Requests open now') },
         { key: 'donors', value: s.donors, label: plural(s.donors, 'Registered donor', 'Registered donors') },
         {
@@ -27,7 +21,6 @@ export function NetworkNumbers({ stats }: { stats: PublicStats }) {
             value: s.available_donors < s.donors ? s.available_donors : 0,
             label: plural(s.available_donors, 'Donor available now', 'Donors available now'),
         },
-        { key: 'members', value: s.members, label: plural(s.members, 'Member', 'Members') },
         { key: 'cities', value: s.cities, label: plural(s.cities, 'City with donors', 'Cities with donors') },
     ].filter(item => item.value > 0);
 
@@ -80,7 +73,7 @@ export function NetworkNumbers({ stats }: { stats: PublicStats }) {
             <p className="mt-12 max-w-2xl text-sm leading-relaxed text-gray-600">
                 These are totals recorded in the app. A donation is counted when the person who posted the
                 request enters the donor’s PIN; Vital does not check donations with the hospital or blood
-                bank. Members are accounts that have finished registering. The numbers update every few minutes.
+                bank. The numbers update every few minutes.
             </p>
         </section>
     );
