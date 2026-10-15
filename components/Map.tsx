@@ -66,11 +66,16 @@ function LocationMarker({
     }, [selLat, selLng, map]);
 
     return position === null ? null : (
-        <Marker position={position} icon={INK_DROP}>
+        <Marker position={position} icon={INK_DROP} title="Hospital location" eventHandlers={{ add: nameMarker('Hospital location') }}>
             <Popup>Hospital location</Popup>
         </Marker>
     );
 }
+
+// Leaflet markers are focusable buttons with no text; give screen readers a name.
+const nameMarker = (label: string) => (e: L.LeafletEvent) => {
+    (e.target as L.Marker).getElement()?.setAttribute('aria-label', label);
+};
 
 // Component to handle map center updates
 // Depends on the coordinates, not the object, so re-renders with an
@@ -113,6 +118,8 @@ export default function Map({
                     key={`${marker.position.lat}-${marker.position.lng}-${idx}`}
                     position={[marker.position.lat, marker.position.lng]}
                     icon={marker.title === 'You are here' ? INK_DROP : RED_DROP}
+                    title={[marker.title, marker.description].filter(Boolean).join(', ') || 'Map pin'}
+                    eventHandlers={{ add: nameMarker([marker.title, marker.description].filter(Boolean).join(', ') || 'Map pin') }}
                 >
                     {(marker.title || marker.description) && (
                         <Popup>

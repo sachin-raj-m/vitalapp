@@ -75,7 +75,7 @@ export default function AchievementsPage() {
                                 <div
                                     className={cn(
                                         'flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-xs font-medium',
-                                        a.unlocked ? 'bg-gray-900 text-gray-50' : 'border border-dashed border-gray-300 text-gray-400',
+                                        a.unlocked ? 'bg-gray-900 text-gray-50' : 'border border-dashed border-gray-300 text-gray-500',
                                     )}
                                 >
                                     {a.unlocked ? <Check className="h-4 w-4" /> : a.threshold ?? '★'}
