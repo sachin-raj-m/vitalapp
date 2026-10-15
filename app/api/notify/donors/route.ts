@@ -146,13 +146,14 @@ export async function POST(request: Request) {
 
             const place = placeLabel(bloodRequest.hospital_name, bloodRequest.city) || 'a hospital near you'
             const neededBy = formatNeededBy(bloodRequest.date_needed)
+            // Only a send WhatsApp accepted counts; a failed one (e.g. a template
+            // still in review) falls through to email below.
             await Promise.allSettled(candidates.filter(d => (sentToday.get(d.id) ?? 0) < WHATSAPP_ALERTS_PER_DAY).map(donor => {
-                viaWhatsApp.add(donor.id)
                 return sendTemplate(waNumber(donor.phone)!, TEMPLATES.donorAlert, {
                     body: [group, place, neededBy ? `Needed by ${neededBy}.` : 'Needed as soon as possible.'],
                     quickReplies: [`offer:${bloodRequest.id}`, `decline:${bloodRequest.id}`],
                     urlSuffix: { index: 2, value: bloodRequest.id },
-                }, { kind: 'alert', userId: donor.id, requestId: bloodRequest.id }).then(id => { if (id) whatsappSent++ })
+                }, { kind: 'alert', userId: donor.id, requestId: bloodRequest.id }).then(id => { if (id) { whatsappSent++; viaWhatsApp.add(donor.id) } })
             }))
         }
 
