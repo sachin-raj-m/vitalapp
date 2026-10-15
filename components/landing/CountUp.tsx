@@ -2,8 +2,7 @@
 
 import React, { useEffect, useRef } from 'react';
 import { animate, useInView, useReducedMotion } from 'framer-motion';
-
-const fmt = (n: number) => Math.round(n).toLocaleString('en-IN');
+import { formatCount as fmt } from '@/lib/public-stats';
 
 /**
  * Counts from 0 to `value` the first time it scrolls into view. Screen readers

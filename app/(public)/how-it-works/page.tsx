@@ -2,6 +2,12 @@ import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
 import { PLATFORM_DISCLAIMER_LONG } from '@/lib/legal';
 import { pageMetadata } from '@/lib/seo';
+import { fetchPublicStats, formatCount } from '@/lib/public-stats';
+
+// The "so far" totals are cached for five minutes (PUBLIC_STATS_REVALIDATE).
+export const revalidate = 300;
+
+const plural = (n: number, one: string, many: string) => `${formatCount(n)} ${n === 1 ? one : many}`;
 
 export const metadata = pageMetadata({
     path: '/how-it-works',
@@ -93,7 +99,8 @@ const STEPS = [
     },
 ];
 
-export default function HowItWorksPage() {
+export default async function HowItWorksPage() {
+    const stats = await fetchPublicStats();
     return (
         <div>
             <section className="mx-auto max-w-6xl px-5 pb-12 pt-16 sm:px-8 sm:pt-24 lg:pb-16">
@@ -121,6 +128,19 @@ export default function HowItWorksPage() {
                         </li>
                     ))}
                 </ol>
+
+                {stats && stats.units_donated > 0 && (
+                    <div className="mt-20 max-w-3xl border-t border-gray-200 pt-10 lg:mt-28">
+                        <h2 className="font-serif text-2xl font-medium leading-tight text-gray-900 sm:text-3xl">Recorded on Vital so far</h2>
+                        <p className="mt-4 text-[17px] leading-relaxed text-gray-600">
+                            {plural(stats.units_donated, 'unit', 'units')} of blood donated through Vital, from{' '}
+                            {plural(stats.donations_completed, 'donation', 'donations')} confirmed with the donor’s PIN
+                            {stats.fulfilled > 0 && <>; {plural(stats.fulfilled, 'request', 'requests')} fulfilled</>}.
+                            These are what requesters recorded in the app; Vital does not check donations with the
+                            hospital or blood bank.
+                        </p>
+                    </div>
+                )}
 
                 <div className="mt-20 max-w-3xl border-t border-gray-200 pt-10 lg:mt-28">
                     <h2 className="font-serif text-2xl font-medium leading-tight text-gray-900 sm:text-3xl">What Vital does not do</h2>

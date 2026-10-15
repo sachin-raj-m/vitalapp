@@ -8,18 +8,10 @@ import { supabase } from '@/lib/supabase';
 import { GRIEVANCE_EMAIL } from '@/lib/legal';
 import { BloodTypeExplorer } from '@/components/landing/BloodTypeExplorer';
 import { LiveRequests } from '@/components/landing/LiveRequests';
-import { CountUp } from '@/components/landing/CountUp';
+import { NetworkNumbers } from '@/components/landing/NetworkNumbers';
 import { HeartbeatLine } from '@/components/landing/HeartbeatLine';
 import { Reveal } from '@/components/landing/Reveal';
-
-interface NetworkStats {
-    donors: number | null;
-    open: number | null;
-    fulfilled: number | null;
-}
-
-// Static class names so Tailwind generates them.
-const STAT_COLS: Record<number, string> = { 1: 'sm:grid-cols-1', 2: 'sm:grid-cols-2', 3: 'sm:grid-cols-3' };
+import { parsePublicStats, type PublicStats } from '@/lib/public-stats';
 
 const STEPS = [
     {
@@ -64,18 +56,19 @@ const FAQ = [
     { q: 'Who actually collects the blood?', a: 'Only hospitals and licensed blood banks. Vital is not a blood bank and does not collect, test, store or supply blood.' },
 ];
 
-export default function HomePage() {
-    const [stats, setStats] = useState<NetworkStats>({ donors: null, open: null, fulfilled: null });
+export default function HomePage({ initialStats }: { initialStats: PublicStats | null }) {
+    const [stats, setStats] = useState<PublicStats | null>(initialStats);
 
     useEffect(() => {
+        // The page normally arrives with cached totals; ask the database only if they're missing.
+        if (initialStats) return;
         // One RPC so guests get real totals (RLS hides fulfilled requests from them).
         supabase
-            .rpc('public_stats')
+            .rpc('public_stats', {}, { get: true })
             .then(({ data, error }) => {
-                if (error || !data) return;
-                setStats({ donors: data.donors ?? null, open: data.open ?? null, fulfilled: data.fulfilled ?? null });
+                if (!error) setStats(parsePublicStats(data));
             });
-    }, []);
+    }, [initialStats]);
 
     const handleShare = async () => {
         const url = window.location.origin;
@@ -95,13 +88,6 @@ export default function HomePage() {
             toast.error('Couldn’t copy the link');
         }
     };
-
-    // Only show numbers that exist and aren't zero; a lone "0 fulfilled" undersells the network.
-    const networkItems = [
-        { label: 'registered donors', value: stats.donors },
-        { label: 'requests open now', value: stats.open },
-        { label: 'requests fulfilled', value: stats.fulfilled },
-    ].filter(item => item.value);
 
     return (
         <div>
@@ -203,18 +189,7 @@ export default function HomePage() {
                     <ArrowRight className="h-3.5 w-3.5 transition-transform duration-200 group-hover:translate-x-0.5" />
                 </Link>
 
-                {networkItems.length > 0 && (
-                    <dl className={`mt-20 grid gap-px overflow-hidden rounded-xl border border-gray-200 bg-gray-200 ${STAT_COLS[networkItems.length] ?? 'sm:grid-cols-3'}`}>
-                        {networkItems.map(item => (
-                            <div key={item.label} className="flex flex-col-reverse bg-white px-6 py-7 sm:px-8 sm:py-9">
-                                <dt className="mt-2 text-sm font-medium text-gray-600">{item.label}</dt>
-                                <dd className="font-serif text-5xl font-semibold leading-none text-red-600 sm:text-6xl">
-                                    <CountUp value={item.value as number} />
-                                </dd>
-                            </div>
-                        ))}
-                    </dl>
-                )}
+                {stats && <NetworkNumbers stats={stats} />}
             </section>
 
             {/* ---------- What Vital is, and is not ---------- */}
