@@ -92,6 +92,11 @@ INSERT INTO public.donations (id, request_id, donor_id, status, units_donated) V
   ('dddddddd-0000-4000-8000-000000000002', 'aaaaaaaa-0000-4000-8000-000000000002', '22222222-2222-4222-8222-222222222222', 'completed', 1),
   ('dddddddd-0000-4000-8000-000000000003', 'aaaaaaaa-0000-4000-8000-000000000001', '33333333-3333-4333-8333-333333333333', 'cancelled', 0);
 
+-- Each offer gets a random PIN on insert (20261017000600); fix them so tests can use them.
+UPDATE public.donation_pins SET pin = '4719' WHERE donation_id = 'dddddddd-0000-4000-8000-000000000001';
+UPDATE public.donation_pins SET pin = '4720' WHERE donation_id = 'dddddddd-0000-4000-8000-000000000002';
+UPDATE public.donation_pins SET pin = '1234' WHERE donation_id = 'dddddddd-0000-4000-8000-000000000003';
+
 INSERT INTO public.notifications (user_id, title, message, type) VALUES
   ('22222222-2222-4222-8222-222222222222', 'Test', 'Fake notification for donor', 'system'),
   ('33333333-3333-4333-8333-333333333333', 'Test', 'Fake notification for unrelated', 'system');

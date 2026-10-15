@@ -71,7 +71,7 @@ export function ContactReveal({ token, viewer, address }: { token: string; viewe
 
             {viewer === 'donor' && details.pin && (
                 <div className="rounded-lg bg-gray-950 px-5 py-6 text-center">
-                    <p className="text-sm text-gray-400">Your donor PIN</p>
+                    <p className="text-sm text-gray-400">Your PIN for this offer</p>
                     <p className="mt-2 font-mono text-4xl tracking-[0.3em] text-white">{details.pin}</p>
                     <p className="mt-3 text-sm text-gray-400">Give this to them only after you’ve donated, so they can confirm it.</p>
                 </div>

@@ -85,7 +85,7 @@ const STEPS = [
         heading: 'Recording the donation',
         lead: 'The requester records each donation with the donor’s PIN.',
         body: [
-            'Every donor has a private 4-digit PIN. After donating, they can give it to the requester, who enters it to mark the donation as completed in Vital.',
+            'Every offer gets its own private 4-digit PIN, shown only to the donor. After donating, they give it to the requester, who enters it to mark the donation as completed in Vital. It works only for that offer.',
             'When enough units have been confirmed, the request closes automatically, and Vital starts counting the donor’s recovery period.',
         ],
         figure: (

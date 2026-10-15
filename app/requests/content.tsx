@@ -18,6 +18,7 @@ import { useRouter } from 'next/navigation';
 import { Alert } from '@/components/ui/Alert';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
+import { pinForDonation, pinForMyOffer } from '@/lib/offer-pin';
 import type { BloodRequest } from '@/types';
 import { isBloodCompatible } from '@/lib/blood-compatibility';
 import { useRequests } from '@/context/RequestsContext';
@@ -29,7 +30,7 @@ import { EmptyState } from '@/components/EmptyState';
 import { BLOOD_GROUPS, formatBloodGroup } from '@/lib/blood-compatibility';
 
 export default function RequestsPage() {
-    const { user, refreshProfile } = useAuth();
+    const { user } = useAuth();
     const { requests: allRequests, myDonations, refreshRequests, loading: requestsLoading } = useRequests();
 
     // Local state for UI
@@ -83,12 +84,9 @@ export default function RequestsPage() {
     const [confirmModal, setConfirmModal] = useState<{ isOpen: boolean; request: BloodRequest | null }>({ isOpen: false, request: null });
     const [deferralModalOpen, setDeferralModalOpen] = useState(false);
     const [readinessModalOpen, setReadinessModalOpen] = useState(false);
-    const [createPinModal, setCreatePinModal] = useState<{ isOpen: boolean; request: BloodRequest | null }>({ isOpen: false, request: null });
-    const [newPin, setNewPin] = useState('');
-    // The request just offered on. Kept separately because confirmModal is
-    // cleared before the readiness modal, which still needs it to show the PIN.
-    const [offeredRequest, setOfferedRequest] = useState<BloodRequest | null>(null);
-    const [creatingPin, setCreatingPin] = useState(false);
+    // The offer just made (request + its PIN). Kept separately because
+    // confirmModal is cleared before the readiness modal, which still needs it.
+    const [offered, setOffered] = useState<{ request: BloodRequest; pin: string | null } | null>(null);
 
     // Removed redundant refreshProfile declaration
 
@@ -136,70 +134,39 @@ export default function RequestsPage() {
         const request = selectedRequest;
         if (!request || !user) return;
 
-        // Check if user has a PIN
-        if (!user.donor_pin) {
-            setCreatePinModal({ isOpen: true, request });
-        } else {
-            setConfirmModal({ isOpen: true, request });
-        }
+        setConfirmModal({ isOpen: true, request });
     };
 
-    const handlePendingClick = (request: BloodRequest) => {
-        // Re-open the PIN/Success modal for this request
-        if (!user || !user.donor_pin) return;
-        setOtpModal({
-            isOpen: true,
-            pin: user.donor_pin,
-            hospitalName: request.hospital_name
-        });
-    };
-
-    const handleCreatePin = async () => {
-        if (!user || newPin.length !== 4) return;
-        setCreatingPin(true);
-        try {
-            const { error: updateError } = await supabase
-                .from('donor_secrets')
-                .upsert({ user_id: user.id, pin: newPin, updated_at: new Date().toISOString() });
-
-            if (updateError) throw updateError;
-
-            await refreshProfile(); // Refresh profile to get the new PIN in context
-
-            setCreatePinModal({ isOpen: false, request: null });
-            if (createPinModal.request) {
-                setConfirmModal({ isOpen: true, request: createPinModal.request });
-            }
-        } catch (err: any) {
-            console.error('Error creating PIN');
-            setError(err.message || 'Failed to create PIN');
-        } finally {
-            setCreatingPin(false);
+    const handlePendingClick = async (request: BloodRequest) => {
+        // Re-open the PIN modal for this offer
+        if (!user) return;
+        const pin = await pinForMyOffer(request.id, user.id);
+        if (!pin) {
+            setError('We couldn’t load the PIN for this offer. Open My donations to see it.');
+            return;
         }
+        setOtpModal({ isOpen: true, pin, hospitalName: request.hospital_name });
     };
 
     const handleConfirmDonation = async () => {
         if (!confirmModal.request || !user) return;
 
         try {
-            if (!user.donor_pin) {
-                setError('Your donor PIN wasn’t found. Please refresh and try again.');
-                return;
-            }
-
-            // The PIN is never sent with the offer; the requester confirms it
-            // server-side via verify_donation().
-            const { error: donationError } = await supabase
+            // The database gives the offer its own random PIN; the requester
+            // confirms it server-side via verify_donation().
+            const { data: offer, error: donationError } = await supabase
                 .from('donations')
                 .insert({
                     request_id: confirmModal.request.id,
                     donor_id: user.id,
                     status: 'pending'
-                });
+                })
+                .select('id')
+                .single();
 
             if (donationError) throw donationError;
 
-            setOfferedRequest(confirmModal.request);
+            setOffered({ request: confirmModal.request, pin: await pinForDonation(offer.id) });
             setConfirmModal({ isOpen: false, request: null });
 
             // Trigger global refresh to update "Offer Sent" and Analytics
@@ -207,7 +174,6 @@ export default function RequestsPage() {
 
             // NBTC: Show Readiness Modal before PIN
             setReadinessModalOpen(true);
-            // setOtpModal({ isOpen: true, pin, hospitalName: confirmModal.request.hospital_name });
         } catch (err: any) {
             console.error('Donation error');
             setError(err.message || 'Failed to process donation request');
@@ -336,47 +302,6 @@ export default function RequestsPage() {
                 </div>
             )}
 
-            {/* Create PIN Modal */}
-            <Modal
-                isOpen={createPinModal.isOpen}
-                onClose={() => setCreatePinModal({ isOpen: false, request: null })}
-                title="Create your donor PIN"
-            >
-                <div className="space-y-4">
-                    <p className="leading-relaxed text-gray-600">
-                        The person who posted the request enters this PIN to mark your donation as completed in Vital. You use the same PIN
-                        for every donation, so choose one you will remember.
-                    </p>
-
-                    <Input
-                        label="4-digit PIN"
-                        inputMode="numeric"
-                        autoComplete="off"
-                        placeholder="••••"
-                        value={newPin}
-                        onChange={(e) => {
-                            const val = e.target.value.replace(/\D/g, '').slice(0, 4);
-                            setNewPin(val);
-                        }}
-                        maxLength={4}
-                        className="h-14 text-center font-mono text-2xl tracking-[0.5em]"
-                    />
-
-                    <div className="pt-2">
-                        <Button
-                            variant="ink"
-                            size="lg"
-                            className="w-full"
-                            onClick={handleCreatePin}
-                            disabled={newPin.length !== 4 || creatingPin}
-                            isLoading={creatingPin}
-                        >
-                            Save PIN and continue
-                        </Button>
-                    </div>
-                </div>
-            </Modal>
-
             {/* Confirmation Details Modal */}
             <Modal
                 isOpen={confirmModal.isOpen}
@@ -439,7 +364,7 @@ export default function RequestsPage() {
             <Modal
                 isOpen={otpModal.isOpen}
                 onClose={() => setOtpModal({ ...otpModal, isOpen: false })}
-                title="Your donor PIN"
+                title="Your PIN for this offer"
             >
                 <div className="space-y-6">
                     <div className="rounded-lg bg-gray-950 px-6 py-8 text-center">
@@ -452,7 +377,7 @@ export default function RequestsPage() {
                         <ol className="mt-2 list-decimal space-y-1.5 pl-5 text-gray-700 marker:text-gray-400">
                             <li>Call the contact person. Their number is in My donations.</li>
                             <li>If you both go ahead, donate at the hospital or blood bank.</li>
-                            <li>After donating, share this PIN so they can mark the donation as completed in Vital.</li>
+                            <li>After donating, share this PIN so they can mark the donation as completed in Vital. It works only for this offer.</li>
                         </ol>
                     </div>
 
@@ -480,14 +405,14 @@ export default function RequestsPage() {
                 isOpen={readinessModalOpen}
                 onClose={() => {
                     setReadinessModalOpen(false);
-                    if (user?.donor_pin && offeredRequest) {
+                    if (offered?.pin) {
                         setOtpModal({
                             isOpen: true,
-                            pin: user.donor_pin,
-                            hospitalName: offeredRequest.hospital_name
+                            pin: offered.pin,
+                            hospitalName: offered.request.hospital_name
                         });
                     }
-                    setOfferedRequest(null);
+                    setOffered(null);
                 }}
             />
         </div>

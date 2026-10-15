@@ -138,8 +138,8 @@ async function makeOffer(from: string, requestId: string) {
     const { url } = await createContactLink(donationId as string, 'donor', DONOR_LINK_MINUTES);
     await reply(from, [
         `Thank you, ${firstName(donor.full_name)}. Your offer is recorded.`,
-        `Open this link to see the contact person’s number and your donor PIN. It works for ${DONOR_LINK_MINUTES} minutes:\n${url}`,
-        'Call them to arrange the donation. After you donate, give them your PIN so they can confirm it on Vital.',
+        `Open this link to see the contact person’s number and the PIN for this offer. It works for ${DONOR_LINK_MINUTES} minutes:\n${url}`,
+        'Call them to arrange the donation. After you donate, give them this PIN so they can confirm it on Vital. It works only for this offer.',
         'Reply LINK any time for a new link.',
     ].join('\n\n'), { userId: donor.id, requestId: req.id, donationId: donationId as string });
 
@@ -313,7 +313,7 @@ async function resendLink(from: string) {
             .eq('donor_id', id as string).eq('status', 'pending').order('created_at', { ascending: false }).limit(1).maybeSingle();
         if (offer && await openRequest(offer.request_id)) {
             const { url } = await createContactLink(offer.id, 'donor', DONOR_LINK_MINUTES);
-            return reply(from, `Here’s a new link to the contact details and your PIN. It works for ${DONOR_LINK_MINUTES} minutes:\n${url}`, { userId: id as string, donationId: offer.id });
+            return reply(from, `Here’s a new link to the contact details and the PIN for this offer. It works for ${DONOR_LINK_MINUTES} minutes:\n${url}`, { userId: id as string, donationId: offer.id });
         }
     }
     // Requester: the newest pending offer on a request with this contact number.

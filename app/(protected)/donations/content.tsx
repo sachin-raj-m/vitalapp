@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/Badge';
 import { useAuth } from '@/context/AuthContext';
 import { useRequests } from '@/context/RequestsContext';
 import { supabase } from '@/lib/supabase';
+import { pinsForDonations } from '@/lib/offer-pin';
 import { Button } from '@/components/ui/Button';
 import { Alert } from '@/components/ui/Alert';
 import { Skeleton } from '@/components/ui/Skeleton';
@@ -54,6 +55,8 @@ export default function DonationsPage() {
     const [donationToWithdraw, setDonationToWithdraw] = useState<string | null>(null);
     const [isWithdrawing, setIsWithdrawing] = useState(false);
     const [filter, setFilter] = useState<Filter>('all');
+    // Each pending offer's own PIN, by donation id.
+    const [pins, setPins] = useState<Record<string, string>>({});
 
     useEffect(() => {
         if (!user) return;
@@ -94,6 +97,7 @@ export default function DonationsPage() {
                     live.map(r => supabase.rpc('get_request_contact', { p_request_id: r.request!.id }).then(({ data }) => [r.id, data?.[0]] as const))
                 );
                 const phoneByDonation = new Map(contacts.map(([id, c]) => [id, c?.contact_phone as string | undefined]));
+                setPins(await pinsForDonations(rows.filter(r => r.status === 'pending').map(r => r.id)).catch(() => ({})));
 
                 setDonations(rows.map(r => (
                     phoneByDonation.has(r.id) && r.request
@@ -141,7 +145,7 @@ export default function DonationsPage() {
             <header>
                 <h1 className="display text-4xl sm:text-[2.75rem]">My donations</h1>
                 <p className="mt-3 max-w-lg text-gray-600">
-                    Requests you have offered to donate for. Show your PIN at the hospital so they can confirm your donation.
+                    Requests you have offered to donate for. Each offer has its own PIN: give it to the contact person after you donate so they can confirm it.
                 </p>
             </header>
 
@@ -191,7 +195,7 @@ export default function DonationsPage() {
                     <EmptyState
                         icon={HeartPulse}
                         title={filter === 'all' ? 'No offers yet' : 'No donations in this view'}
-                        description={filter === 'all' ? 'When you offer to donate for a request, it will appear here with the contact details and your PIN.' : 'Try a different filter.'}
+                        description={filter === 'all' ? 'When you offer to donate for a request, it will appear here with the contact details and the PIN for that offer.' : 'Try a different filter.'}
                         actionLabel={filter === 'all' ? 'See open requests' : undefined}
                         onAction={() => { window.location.href = '/requests'; }}
                     />
@@ -230,10 +234,10 @@ export default function DonationsPage() {
                                                             </a>
                                                         )}
                                                     </div>
-                                                    {user?.donor_pin && (
+                                                    {pins[donation.id] && (
                                                         <div className="sm:text-right">
-                                                            <p className="text-sm text-gray-500">Your PIN</p>
-                                                            <p className="mt-0.5 font-mono text-2xl tracking-[0.3em] text-gray-900">{user.donor_pin}</p>
+                                                            <p className="text-sm text-gray-500">PIN for this offer</p>
+                                                            <p className="mt-0.5 font-mono text-2xl tracking-[0.3em] text-gray-900">{pins[donation.id]}</p>
                                                         </div>
                                                     )}
                                                 </div>

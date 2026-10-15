@@ -33,7 +33,7 @@ export default function PrivacyPage() {
                                 <li>blood group;</li>
                                 <li>city, district, state and PIN codes (current and permanent);</li>
                                 <li>when you’re usually free, the date you last donated, and your own declaration that you’re fit to donate;</li>
-                                <li>a 4-digit donor PIN you choose.</li>
+                                <li>a random 4-digit PIN that Vital creates for each offer you make.</li>
                             </ul>
                             <p><strong>When you post a request:</strong> the patient’s blood group, units needed, hospital, its location on a map, the date needed, a contact name and phone number, and any note you add.</p>
                             <p><strong>When you use the app:</strong> your offers to donate and whether they were confirmed; push-notification tokens for devices where you turn alerts on; and a log of key actions (such as creating or deleting a request) for security.</p>
@@ -63,7 +63,7 @@ export default function PrivacyPage() {
                                 <li><strong>A requester whose request you offer on:</strong> your name and phone number, so they can reach you. Nobody else.</li>
                                 <li><strong>You, when you offer on a request:</strong> that request’s contact name and phone number.</li>
                                 <li><strong>Your public donor card:</strong> off by default. If you turn it on, anyone with the link sees your name, blood group, donor number and donation count.</li>
-                                <li><strong>Your donor PIN:</strong> only you. The requester types it in and our server checks it; they never see it.</li>
+                                <li><strong>The PIN for each offer:</strong> only you. The requester types it in and our server checks it; they never see it. It works only for that offer.</li>
                                 <li><strong>Vital administrators:</strong> account and request details, to run and protect the service.</li>
                             </ul>
                             <p>We never sell your data or share it for advertising.</p>

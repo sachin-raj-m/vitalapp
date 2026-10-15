@@ -30,8 +30,6 @@ export interface User {
    */
   location: StoredLocation | null;
   role?: 'user' | 'admin' | string;
-  /** Loaded from donor_secrets for the signed-in user only; never cached. */
-  donor_pin?: string;
   donor_number?: number;
   consent_agreed?: boolean | null;
   consent_at?: string | null;

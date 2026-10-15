@@ -170,7 +170,7 @@ export default async function RequestDetailsPage({ params }: Props) {
                             </Link>
                         ) : hasOffered ? (
                             <Link href="/donations" className="inline-flex h-11 items-center rounded-md bg-gray-900 px-5 text-sm font-medium text-gray-50 hover:bg-gray-800">
-                                You have offered · View your PIN
+                                You have offered · View the PIN
                             </Link>
                         ) : incompatible ? (
                             <p className="text-sm text-gray-500">

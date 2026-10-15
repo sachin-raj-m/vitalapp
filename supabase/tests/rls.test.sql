@@ -270,13 +270,16 @@ SELECT tests.is(tests.val($q$SELECT status FROM public.blood_requests WHERE id =
 SELECT tests.throws($q$SELECT public.verify_donation('dddddddd-0000-4000-8000-000000000001', '4719', 1)$q$,
   'no longer pending', 'verify_donation: cannot verify the same offer twice');
 
--- Eve makes a fresh offer on R1 (persists), requester verifies it with Eve's PIN.
+-- Eve makes a fresh offer on R1 (persists), requester verifies it with that offer's PIN.
 SELECT tests.login('unrelated');
 INSERT INTO public.donations (id, request_id, donor_id, status)
 VALUES ('dddddddd-0000-4000-8000-000000000004', 'aaaaaaaa-0000-4000-8000-000000000001', auth.uid(), 'pending');
 SELECT tests.is(tests.val($q$SELECT contact_phone FROM public.get_request_contact('aaaaaaaa-0000-4000-8000-000000000001')$q$),
   '0000000101', 'contact: visible again after a new offer');
 
+-- The offer got a random PIN; fix it so the steps below are repeatable.
+SELECT tests.login('postgres');
+UPDATE public.donation_pins SET pin = '1234' WHERE donation_id = 'dddddddd-0000-4000-8000-000000000004';
 SELECT tests.login('requester');
 SELECT tests.is(public.verify_donation('dddddddd-0000-4000-8000-000000000004', '4719', 1)->>'error',
   'pin_mismatch', 'verify_donation: another donor''s PIN does not work');
@@ -681,8 +684,8 @@ SELECT tests.is(public.create_offer_for(tests.uid('fresh'), 'aaaaaaaa-0000-4000-
   'wa: offering twice returns the same offer');
 SELECT tests.is(tests.val($q$SELECT source FROM public.donations WHERE id = current_setting('tests.offer')::uuid$q$), 'whatsapp',
   'wa: offer is marked as from WhatsApp');
-SELECT tests.ok(tests.val(format($q$SELECT pin FROM public.donor_secrets WHERE user_id = %L$q$, tests.uid('fresh'))) ~ '^[0-9]{4}$',
-  'wa: a donor without a PIN gets one');
+SELECT tests.ok(tests.val($q$SELECT pin FROM public.donation_pins WHERE donation_id = current_setting('tests.offer')::uuid$q$) ~ '^[0-9]{4}$',
+  'wa: the WhatsApp offer gets its own PIN');
 SELECT tests.throws(format($q$SELECT public.create_offer_for(%L, 'aaaaaaaa-0000-4000-8000-000000000101')$q$, tests.uid('requester')),
   '42501', 'wa: a non-donor cannot offer');
 SELECT tests.throws(format($q$SELECT public.create_offer_for(%L, 'aaaaaaaa-0000-4000-8000-000000000004')$q$, tests.uid('fresh')),
@@ -691,10 +694,10 @@ SELECT tests.throws(format($q$SELECT public.create_offer_for(%L, 'aaaaaaaa-0000-
 SELECT tests.throws(format($q$SELECT public.verify_donation_for(%L, %L, '0000', 1)$q$, tests.uid('fresh'), current_setting('tests.offer')),
   '42501', 'wa: only the request owner can confirm');
 SELECT tests.is(public.verify_donation_for(tests.uid('requester'), current_setting('tests.offer')::uuid,
-  CASE WHEN (SELECT pin FROM public.donor_secrets WHERE user_id = tests.uid('fresh')) = '0000' THEN '1111' ELSE '0000' END, 1)->>'error',
+  CASE WHEN (SELECT pin FROM public.donation_pins WHERE donation_id = current_setting('tests.offer')::uuid) = '0000' THEN '1111' ELSE '0000' END, 1)->>'error',
   'pin_mismatch', 'wa: wrong PIN is counted, not raised');
 SELECT tests.is(public.verify_donation_for(tests.uid('requester'), current_setting('tests.offer')::uuid,
-  (SELECT pin FROM public.donor_secrets WHERE user_id = tests.uid('fresh')), 1)->>'total_collected',
+  (SELECT pin FROM public.donation_pins WHERE donation_id = current_setting('tests.offer')::uuid), 1)->>'total_collected',
   '1', 'wa: right PIN completes the donation');
 SELECT tests.login('postgres');
 

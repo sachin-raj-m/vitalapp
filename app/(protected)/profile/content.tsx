@@ -307,7 +307,7 @@ export default function ProfilePage() {
                 description="This permanently deletes your Vital account and everything tied to it:"
                 items={[
                     'Your profile and public donor card',
-                    'Your donor PIN',
+                    'The PINs for your offers',
                     'Blood requests you posted, with their contact details',
                     'Your donation offers and history',
                     'Your notifications',

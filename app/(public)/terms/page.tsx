@@ -51,7 +51,7 @@ export default function TermsPage() {
                             <li>You must be 18–65, weigh at least 45 kg, and answer the health questions honestly. Your answers are your own declaration.</li>
                             <li>Only offer when you meet the checklist that day, and withdraw your offer if things change.</li>
                             <li>Whether and how you contact a requester, and whether you donate, is your own decision.</li>
-                            <li>Keep your donor PIN to yourself. Share it with the requester only after you’ve donated.</li>
+                            <li>Keep the PIN for your offer to yourself. Share it with the requester only after you’ve donated.</li>
                             <li>The hospital or blood bank makes the final decision on whether you can donate.</li>
                         </ul>
                     ),

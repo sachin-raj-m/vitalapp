@@ -49,7 +49,7 @@ export async function contactDetails(link: ContactLinkRow, summary: ContactSumma
         const [{ data: r }, { data: c }, { data: s }] = await Promise.all([
             admin.from('blood_requests').select('contact_name').eq('id', d!.request_id).single(),
             admin.from('request_contacts').select('contact_phone').eq('request_id', d!.request_id).maybeSingle(),
-            admin.from('donor_secrets').select('pin').eq('user_id', d!.donor_id).maybeSingle(),
+            admin.from('donation_pins').select('pin').eq('donation_id', link.donation_id).maybeSingle(),
         ]);
         return { ...summary, name: r?.contact_name || 'The contact person', phone: c?.contact_phone ?? null, pin: s?.pin ?? null };
     }
