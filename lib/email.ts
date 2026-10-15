@@ -4,11 +4,14 @@ interface SendEmailParams {
     to: string;
     subject: string;
     html: string;
+    /** Security codes the person asked for: sent even where EMAIL_DISABLED is set (staging). */
+    essential?: boolean;
 }
 
-export const sendEmail = async ({ to, subject, html }: SendEmailParams) => {
-    // Staging: never send real email (EMAIL_DISABLED=true in the dev branch's Vercel env).
-    if (process.env.EMAIL_DISABLED === 'true') {
+export const sendEmail = async ({ to, subject, html, essential }: SendEmailParams) => {
+    // Staging: never send real email (EMAIL_DISABLED=true), except codes the
+    // person is waiting for on screen.
+    if (process.env.EMAIL_DISABLED === 'true' && !essential) {
         console.info(`Email disabled; not sending "${subject}"`);
         return { skipped: true };
     }

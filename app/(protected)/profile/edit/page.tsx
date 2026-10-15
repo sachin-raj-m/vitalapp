@@ -71,7 +71,6 @@ export default function ProfileEditPage() {
             present_zip: editForm.present_zip,
             is_public_profile: editForm.is_public_profile,
             whatsapp_alerts: editForm.whatsapp_alerts,
-            ...(editForm.blood_group ? { blood_group: editForm.blood_group } : {}),
         });
     };
 
@@ -164,6 +163,54 @@ export default function ProfileEditPage() {
         }
     };
 
+    // Blood group: one change after registration, confirmed with an emailed code
+    // (app/api/profile/blood-group; the database refuses direct changes).
+    const [bgCodeOpen, setBgCodeOpen] = useState(false);
+    const [bgCode, setBgCode] = useState('');
+    const [bgSentTo, setBgSentTo] = useState('');
+    const [bgBusy, setBgBusy] = useState(false);
+    const [bgError, setBgError] = useState('');
+    const bloodGroupLocked = !!user?.blood_group_changed_at;
+    const bloodGroupPending = !!editForm.blood_group && editForm.blood_group !== user?.blood_group;
+
+    const bloodGroupCall = async (payload: Record<string, unknown>) => {
+        const res = await authedFetch('/api/profile/blood-group', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+        });
+        const body = await res.json().catch(() => null);
+        if (!res.ok) throw new Error(body?.error || 'Something went wrong. Please try again.');
+        return body;
+    };
+
+    const startBloodGroupChange = async () => {
+        setBgError(''); setError(''); setBgBusy(true);
+        try {
+            const body = await bloodGroupCall({ action: 'start', bloodGroup: editForm.blood_group });
+            setBgSentTo(body.to); setBgCode(''); setBgCodeOpen(true);
+        } catch (err: any) {
+            setError(err.message);
+        } finally {
+            setBgBusy(false);
+        }
+    };
+
+    const confirmBloodGroupChange = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setBgError(''); setBgBusy(true);
+        try {
+            await bloodGroupCall({ action: 'confirm', code: bgCode });
+            await refreshProfile();
+            setBgCodeOpen(false);
+            setSuccess(`Your blood group is now ${formatBloodGroup(editForm.blood_group)}.`);
+        } catch (err: any) {
+            setBgError(err.message);
+        } finally {
+            setBgBusy(false);
+        }
+    };
+
     const phoneChanged = editForm.phone.trim() !== (user?.phone || '').trim();
     const needsVerify = WHATSAPP_LIVE && !phoneChanged && !!user?.phone && !user?.phone_verified_at && !!waNumber(user.phone);
 
@@ -225,9 +272,17 @@ export default function ProfileEditPage() {
                 </div>)}
 
                 {user?.is_donor && section('Donating', 'Pause any time, for example while travelling or unwell.', <>
+                    {bloodGroupLocked ? (
+                    <div>
+                        <span className="block text-gray-900">Blood group: <strong>{formatBloodGroup(user?.blood_group)}</strong></span>
+                        <span className="mt-0.5 block text-sm text-gray-500">
+                            You changed it on {new Date(user!.blood_group_changed_at!).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}. It can be changed only once; if it’s still wrong, contact Vital.
+                        </span>
+                    </div>
+                    ) : (
                     <div>
                         <span id="settings-blood-group" className="block text-gray-900">Blood group</span>
-                        <span className="mt-0.5 block text-sm text-gray-500">Decides which requests you’re alerted to. Change it only if it was entered wrongly.</span>
+                        <span className="mt-0.5 block text-sm text-gray-500">Decides which requests you’re alerted to. You can change it <strong>once</strong>, only if it was entered wrongly; we’ll email you a code to confirm.</span>
                         <div className="mt-3 grid grid-cols-4 gap-1.5" role="radiogroup" aria-labelledby="settings-blood-group">
                             {BLOOD_GROUPS.map(g => (
                                 <button
@@ -242,7 +297,18 @@ export default function ProfileEditPage() {
                                 </button>
                             ))}
                         </div>
+                        {bloodGroupPending && (
+                            <div className="mt-3 flex flex-wrap items-center gap-3">
+                                <Button type="button" variant="ink" size="sm" onClick={startBloodGroupChange} isLoading={bgBusy && !bgCodeOpen}>
+                                    Change to {formatBloodGroup(editForm.blood_group)}
+                                </Button>
+                                <button type="button" className="text-sm text-gray-600 underline underline-offset-4" onClick={() => setEditForm({ ...editForm, blood_group: (user?.blood_group as BloodGroup) || '' })}>
+                                    Keep {formatBloodGroup(user?.blood_group)}
+                                </button>
+                            </div>
+                        )}
                     </div>
+                    )}
                     {toggle(editForm.is_available, v => setEditForm({ ...editForm, is_available: v }), 'Available to donate',
                         'When off, you get no alerts at all, on any channel, until you turn it back on.')}
                 </>)}
@@ -280,6 +346,34 @@ export default function ProfileEditPage() {
                 </div>
                 <div className="md:col-span-2"><SecuritySettings /></div>
             </section>
+
+            <Modal
+                isOpen={bgCodeOpen}
+                onClose={() => { setBgCodeOpen(false); setBgCode(''); setBgError(''); }}
+                title="Confirm your blood group change"
+            >
+                <form onSubmit={confirmBloodGroupChange} className="space-y-5">
+                    <p className="leading-relaxed text-gray-600">
+                        We emailed a 6-digit code to <span className="text-gray-900">{bgSentTo}</span>. Enter it to change your blood group
+                        from <strong>{formatBloodGroup(user?.blood_group)}</strong> to <strong>{formatBloodGroup(editForm.blood_group)}</strong>.
+                        This is your one change.
+                    </p>
+                    {bgError && <Alert variant="error">{bgError}</Alert>}
+                    <Input
+                        label="Code"
+                        inputMode="numeric"
+                        autoComplete="one-time-code"
+                        value={bgCode}
+                        onChange={(e) => setBgCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                        placeholder="000000"
+                        className="h-14 text-center font-mono text-2xl tracking-[0.4em]"
+                    />
+                    <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                        <Button type="button" variant="secondary" onClick={() => { setBgCodeOpen(false); setBgCode(''); }}>Cancel</Button>
+                        <Button type="submit" variant="ink" isLoading={bgBusy} disabled={bgCode.length < 6}>Confirm change</Button>
+                    </div>
+                </form>
+            </Modal>
 
             <Modal
                 isOpen={isVerifying}

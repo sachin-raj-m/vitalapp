@@ -36,6 +36,7 @@ export interface User {
   consent_version?: string | null;
   whatsapp_alerts?: boolean;
   phone_verified_at?: string | null;
+  blood_group_changed_at?: string | null;
   created_at: string;
 }
 

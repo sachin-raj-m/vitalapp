@@ -715,4 +715,33 @@ SELECT tests.ok(tests.val(format($q$SELECT phone_verified_at IS NOT NULL FROM pu
   'phone: the server can mark a number verified');
 SELECT tests.login('postgres');
 
+
+-- ---------------------------------------------------------------------------
+-- 16. Blood group changes (20261015000100)
+-- ---------------------------------------------------------------------------
+SELECT tests.login('postgres');
+UPDATE public.profiles SET blood_group = NULL WHERE id = tests.uid('requester');
+SELECT tests.login('requester');
+SELECT tests.allowed($q$UPDATE public.profiles SET blood_group = 'B+' WHERE id = auth.uid()$q$, 1,
+  'blood group: can be set the first time (registration)');
+SELECT tests.login('postgres');
+UPDATE public.profiles SET blood_group = 'B+' WHERE id = tests.uid('requester');
+SELECT tests.login('requester');
+SELECT tests.throws($q$UPDATE public.profiles SET blood_group = 'O-' WHERE id = auth.uid()$q$,
+  '23514', 'blood group: users cannot change it directly');
+SELECT tests.allowed($q$UPDATE public.profiles SET blood_group = 'B+', city = 'Testville' WHERE id = auth.uid()$q$, 1,
+  'blood group: saving the same value with other fields is fine');
+UPDATE public.profiles SET blood_group_changed_at = now() - interval '1 day', blood_group_previous = 'AB-' WHERE id = auth.uid();
+SELECT tests.is(tests.val($q$SELECT coalesce(blood_group_changed_at::text, 'null') || '|' || coalesce(blood_group_previous, 'null') FROM public.profiles WHERE id = auth.uid()$q$),
+  'null|null', 'blood group: users cannot set the change record');
+SELECT tests.denied($q$SELECT * FROM public.verification_codes$q$, 'blood group: users cannot read pending codes');
+SELECT tests.login('service');
+UPDATE public.profiles SET blood_group_previous = blood_group, blood_group = 'O-', blood_group_changed_at = now() WHERE id = tests.uid('requester');
+SELECT tests.is(tests.val(format($q$SELECT blood_group || '|' || blood_group_previous FROM public.profiles WHERE id = %L$q$, tests.uid('requester'))),
+  'O-|B+', 'blood group: the server can apply a verified change');
+SELECT tests.login('admin');
+SELECT tests.allowed(format($q$UPDATE public.profiles SET blood_group = 'B+' WHERE id = %L$q$, tests.uid('requester')), 1,
+  'blood group: an admin can correct it');
+SELECT tests.login('postgres');
+
 \o

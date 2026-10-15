@@ -256,3 +256,28 @@ export const getDonorThankYouEmailHtml = ({ name, place, referralLink }: { name:
 </html>
     `;
 };
+
+/** A 6-digit code to confirm a blood group change. */
+export const getBloodGroupCodeEmailHtml = ({ name, code, from, to, minutes }: { name: string; code: string; from: string; to: string; minutes: number }) => `
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Your Vital code</title></head>
+<body style="margin: 0; padding: 0; background-color: #fafaf9; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;">
+  <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%"><tr><td align="center" style="padding: 40px 16px;">
+    <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 520px; background-color: #ffffff; border: 1px solid #e7e5e4; border-radius: 12px;">
+      <tr><td style="padding: 32px;">
+        <p style="margin: 0 0 16px 0; color: #1f2937; font-size: 16px; line-height: 26px;">Hi ${escapeHtml(name)},</p>
+        <p style="margin: 0 0 16px 0; color: #1f2937; font-size: 16px; line-height: 26px;">
+          Use this code to change your blood group on Vital from <strong>${escapeHtml(from)}</strong> to <strong>${escapeHtml(to)}</strong>.
+          You can change it only once, so please make sure it's right.
+        </p>
+        <p style="margin: 24px 0; font-family: Menlo, Consolas, monospace; font-size: 32px; letter-spacing: 8px; color: #111827;">${escapeHtml(code)}</p>
+        <p style="margin: 0; color: #6b7280; font-size: 13px; line-height: 20px;">
+          The code works for ${minutes} minutes. If you didn't ask for this, ignore this email; nothing will change.
+        </p>
+      </td></tr>
+    </table>
+  </td></tr></table>
+</body>
+</html>
+`;
