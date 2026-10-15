@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Modal } from '@/components/ui/Modal';
@@ -17,6 +17,7 @@ import { WHATSAPP_LIVE } from '@/lib/features';
 import { BLOOD_GROUPS, formatBloodGroup } from '@/lib/blood-compatibility';
 import type { BloodGroup } from '@/types';
 import { MATCH_RADIUS_KM } from '@/lib/geo';
+import { DonorLocationPicker } from '@/components/DonorLocationPicker';
 
 export default function ProfileEditPage() {
     const router = useRouter();
@@ -41,8 +42,12 @@ export default function ProfileEditPage() {
     const [otp, setOtp] = useState('');
     const [pendingPhone, setPendingPhone] = useState('');
 
+    // Fill the form once per account: later profile reloads (after saving the
+    // location or the blood group) must not wipe edits that aren't saved yet.
+    const formFilledFor = useRef<string | null>(null);
     useEffect(() => {
-        if (user) {
+        if (user && formFilledFor.current !== user.id) {
+            formFilledFor.current = user.id;
             setEditForm({
                 full_name: user.full_name || '',
                 phone: user.phone || '',
@@ -57,10 +62,11 @@ export default function ProfileEditPage() {
     }, [user]);
 
     // After a save that changed the PIN code, re-derive the map position on the
-    // server. Fire-and-forget: a failure only means ranking by PIN area.
+    // server (it keeps a location the donor set precisely if it's still within
+    // the new PIN area). Fire-and-forget: a failure only means ranking by PIN area.
     const refreshLocationIfPinChanged = (previousZip: string | null | undefined) => {
         if ((previousZip || '').trim() === editForm.present_zip.trim()) return;
-        authedFetch('/api/profile/location', { method: 'POST', keepalive: true }).catch(() => {});
+        authedFetch('/api/profile/location', { method: 'POST', keepalive: true, body: JSON.stringify({ mode: 'pin' }) }).catch(() => {});
     };
 
     // Everything except the phone number, which has its own flow below.
@@ -267,10 +273,16 @@ export default function ProfileEditPage() {
                     </div>
                 </>)}
 
-                {section('Location', `Your current PIN code places you on the map, so we can show you donors within ${MATCH_RADIUS_KM} km and alert you to requests near you.`, <div id="location" className="grid scroll-mt-24 gap-4 sm:grid-cols-2">
-                    <Input label="Current PIN code" inputMode="numeric" value={editForm.present_zip} onChange={(e) => setEditForm({ ...editForm, present_zip: e.target.value })} required />
-                    <Input label="Permanent PIN code" inputMode="numeric" value={editForm.permanent_zip} onChange={(e) => setEditForm({ ...editForm, permanent_zip: e.target.value })} required />
-                </div>)}
+                {section('Location', `Used to show you donors within ${MATCH_RADIUS_KM} km and to alert you to requests near you.`, <>
+                    <div id="location" className="grid scroll-mt-24 gap-4 sm:grid-cols-2">
+                        <Input label="Current PIN code" inputMode="numeric" value={editForm.present_zip} onChange={(e) => setEditForm({ ...editForm, present_zip: e.target.value })} required />
+                        <Input label="Permanent PIN code" inputMode="numeric" value={editForm.permanent_zip} onChange={(e) => setEditForm({ ...editForm, permanent_zip: e.target.value })} required />
+                    </div>
+                    <div id="alert-location" className="scroll-mt-24">
+                        <h3 className="mb-1 text-[13px] font-medium text-gray-800">Where we alert you from</h3>
+                        <DonorLocationPicker mode="save" value={user?.location} onSaved={() => { refreshProfile({ silent: true }).catch(() => {}); }} />
+                    </div>
+                </>)}
 
                 {user?.is_donor && section('Donating', 'Pause any time, for example while travelling or unwell.', <>
                     {bloodGroupLocked ? (

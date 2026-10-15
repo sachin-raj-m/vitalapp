@@ -14,6 +14,7 @@ import { DashboardSkeleton } from '@/components/skeletons/DashboardSkeleton';
 import { EmptyState } from '@/components/EmptyState';
 import { useRequests } from '@/context/RequestsContext';
 import { NotificationBanner } from '@/components/NotificationBanner';
+import { LocationNudge } from '@/components/LocationNudge';
 import { fetchUserStats, calculateEligibility, describePoints, type UserStats } from '@/lib/stats';
 
 const greeting = () => {
@@ -56,6 +57,7 @@ export default function DashboardPage() {
     return (
         <div className="space-y-10">
             <NotificationBanner />
+            <LocationNudge />
 
             <header>
                 <p className="text-sm font-medium text-red-700">{format(new Date(), 'EEEE, d MMMM')}</p>

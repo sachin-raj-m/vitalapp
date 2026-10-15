@@ -22,6 +22,7 @@ import DonorCard from '@/components/DonorCard';
 import { InviteDonors } from '@/components/InviteDonors';
 import { toast } from 'sonner';
 import { TypeToConfirmModal } from '@/components/ui/TypeToConfirmModal';
+import { LocationNudge } from '@/components/LocationNudge';
 
 export default function ProfilePage() {
     const router = useRouter();
@@ -209,6 +210,8 @@ export default function ProfilePage() {
                     <Settings className="h-3.5 w-3.5" /> Settings
                 </Link>
             </header>
+
+            <LocationNudge />
 
             <section className="grid gap-10 lg:grid-cols-[minmax(0,28rem)_1fr] lg:gap-14">
                 <div>

@@ -17,7 +17,8 @@ interface AuthContextType extends AuthState {
   signOut: () => Promise<void>;
   updateProfile: (data: Partial<User>) => Promise<void>;
   signInWithGoogle: () => Promise<void>;
-  refreshProfile: () => Promise<void>;
+  /** Reloads the profile. silent: no global loading state (the page stays as it is). */
+  refreshProfile: (options?: { silent?: boolean }) => Promise<void>;
   forceResetAuth: () => Promise<void>;
 }
 
@@ -458,10 +459,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const refreshProfile = async () => {
+  const refreshProfile = async (options: { silent?: boolean } = {}) => {
     try {
       // A refresh already in flight will return the latest data.
       if (isRefreshing.current) {
+        return;
+      }
+
+      if (options.silent) {
+        if (state.user?.id) await fetchUserProfile(state.user.id, { silent: true, force: true });
         return;
       }
 

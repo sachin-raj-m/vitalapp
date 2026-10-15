@@ -1,3 +1,5 @@
+import type { StoredLocation } from '@/lib/location';
+
 export type BloodGroup = 'A+' | 'A-' | 'B+' | 'B-' | 'AB+' | 'AB-' | 'O+' | 'O-';
 
 export type UrgencyLevel = 'Low' | 'Medium' | 'High';
@@ -22,11 +24,11 @@ export interface User {
   next_eligible_date?: string; // New NBTC Field
   availability?: string[];
   has_medical_conditions?: boolean;
-  location: {
-    latitude: number;
-    longitude: number;
-    address: string;
-  };
+  /**
+   * Private to the owner (see lib/location.ts for the stored shape). May be
+   * null, or the old {0,0} placeholder: check it with usableLocation().
+   */
+  location: StoredLocation | null;
   role?: 'user' | 'admin' | string;
   /** Loaded from donor_secrets for the signed-in user only; never cached. */
   donor_pin?: string;
@@ -55,6 +57,10 @@ export interface BloodRequest {
   location: {
     latitude: number;
     longitude: number;
+    address?: string;
+    /** How the poster placed the pin: searched, tapped on the map, or their device. */
+    source?: 'search' | 'map' | 'gps';
+    accuracy_m?: number;
   };
   city?: string;
   zipcode?: string;
