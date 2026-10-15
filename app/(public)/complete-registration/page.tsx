@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Input, Select } from '@/components/ui/Input';
 import { Alert } from '@/components/ui/Alert';
@@ -16,7 +16,9 @@ import { toast } from 'sonner';
 import Link from 'next/link';
 import { PRIVACY_VERSION, earliestConsentAt } from '@/lib/legal';
 import { takeReferral } from '@/lib/referrals';
-import { waNumber } from '@/lib/phone';
+import { PHONE_TAKEN, formatWaNumber, isPhoneTakenError, waNumber } from '@/lib/phone';
+import { WHATSAPP_VERIFY_NUMBER } from '@/lib/features';
+import { WhatsAppVerify } from '@/components/WhatsAppVerify';
 
 interface PendingRegistration {
     userId: string;
@@ -70,9 +72,13 @@ export default function CompleteRegistration() {
     });
     const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
     const [nbtcEligible, setNbtcEligible] = useState<boolean>(true);
+    // Set once the form is submitted, so reloading the profile afterwards
+    // doesn't re-run the checks below and skip the verify step.
+    const submitted = useRef(false);
 
     useEffect(() => {
         const init = async () => {
+            if (submitted.current) return;
             try {
                 if (!user) {
                     router.push('/login');
@@ -147,6 +153,7 @@ export default function CompleteRegistration() {
         e.preventDefault();
         if (!validateForm() || !pendingData) return;
 
+        submitted.current = true;
         setStatus('creating_profile');
         setProgress(50);
 
@@ -213,6 +220,12 @@ export default function CompleteRegistration() {
                     { onConflict: 'id' }
                 );
 
+            if (isPhoneTakenError(profileError)) {
+                // Another account has verified this number: back to the form.
+                setFieldErrors({ phone: `${PHONE_TAKEN} Sign in to that account, or use your own number.` });
+                setStatus('form');
+                return;
+            }
             if (profileError) throw profileError;
 
             // Credit whoever invited this donor, if they came from a referral link.
@@ -247,12 +260,18 @@ export default function CompleteRegistration() {
             await refreshProfile();
 
             setProgress(100);
-            setStatus('completed');
             localStorage.removeItem('pendingRegistration');
             localStorage.removeItem('pendingConsent');
             toast.success('You’re on the network', {
                 description: 'We’ll alert you when someone nearby needs your blood group.'
             });
+            // Offer to verify the number now. Optional: skipping leaves it
+            // unverified, and the banner asks again later.
+            if (WHATSAPP_VERIFY_NUMBER && waNumber(formData.phone)) {
+                setStatus('verify_phone');
+                return;
+            }
+            setStatus('completed');
             setTimeout(() => router.push('/dashboard'), 1500);
 
         } catch (err: any) {
@@ -303,6 +322,29 @@ export default function CompleteRegistration() {
         );
     }
 
+    if (status === 'verify_phone') {
+        return (
+            <div className="mx-auto flex min-h-[60vh] max-w-md flex-col justify-center px-5">
+                <p className="text-sm text-gray-500">One more step (optional)</p>
+                <p className="display mt-2 text-3xl sm:text-4xl">Verify your mobile number</p>
+                <p className="mt-4 leading-relaxed text-gray-600">
+                    Send one WhatsApp message from {formatWaNumber(waNumber(formData.phone)!)} to confirm it’s yours.
+                    Verified numbers can’t be used by another account.
+                </p>
+                <div className="mt-8">
+                    <WhatsAppVerify onVerified={async () => {
+                        await refreshProfile();
+                        toast.success('Your number is verified');
+                        router.push('/dashboard');
+                    }} />
+                </div>
+                <button type="button" onClick={() => router.push('/dashboard')} className="mt-8 self-start text-sm text-gray-600 underline underline-offset-4 hover:text-gray-900">
+                    Skip for now
+                </button>
+            </div>
+        );
+    }
+
     if (status === 'error') {
         return (
             <div className="mx-auto flex min-h-[60vh] max-w-md flex-col justify-center px-5">
@@ -344,7 +386,7 @@ export default function CompleteRegistration() {
                             error={fieldErrors.gender}
                         />
                     </div>
-                    <Input label="Mobile number" type="tel" value={formData.phone} onChange={e => set('phone', e.target.value)} required autoComplete="tel" placeholder="+91 98765 43210" error={fieldErrors.phone} />
+                    <Input label="Mobile number" type="tel" value={formData.phone} onChange={e => set('phone', e.target.value)} required autoComplete="tel" placeholder="+91 98765 43210" error={fieldErrors.phone} helperText={WHATSAPP_VERIFY_NUMBER ? 'You can verify it on WhatsApp on the next screen. Each number can belong to only one Vital account.' : 'Each number can belong to only one Vital account.'} />
                     {checkbox(
                         formData.whatsappAlerts,
                         v => set('whatsappAlerts', v),

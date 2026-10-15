@@ -13,7 +13,8 @@ import { ArrowLeft } from 'lucide-react';
 import { SecuritySettings } from '@/app/(protected)/profile/SecuritySettings';
 import { PushNotificationManager } from '@/components/PushNotificationManager';
 import { formatWaNumber, waNumber } from '@/lib/phone';
-import { WHATSAPP_LIVE } from '@/lib/features';
+import { WHATSAPP_LIVE, WHATSAPP_VERIFY_NUMBER } from '@/lib/features';
+import { WhatsAppVerify } from '@/components/WhatsAppVerify';
 import { BLOOD_GROUPS, formatBloodGroup } from '@/lib/blood-compatibility';
 import type { BloodGroup } from '@/types';
 
@@ -122,6 +123,12 @@ export default function ProfileEditPage() {
                     return;
                 }
                 await refreshProfile();
+                if (WHATSAPP_VERIFY_NUMBER && waNumber(editForm.phone)) {
+                    // Stay here so the new number can be verified straight away.
+                    setSuccess('Your changes have been saved. Now verify your new number on WhatsApp below.');
+                    setIsLoading(false);
+                    return;
+                }
             }
             finish('Your changes have been saved.');
         } catch (err: any) {
@@ -212,7 +219,20 @@ export default function ProfileEditPage() {
     };
 
     const phoneChanged = editForm.phone.trim() !== (user?.phone || '').trim();
-    const needsVerify = WHATSAPP_LIVE && !phoneChanged && !!user?.phone && !user?.phone_verified_at && !!waNumber(user.phone);
+    const unverified = !phoneChanged && !!user?.phone && !user?.phone_verified_at && !!waNumber(user.phone);
+    // Preferred: the person messages Vital ("VERIFY <code>"), which needs no
+    // template. Otherwise the older code-by-template flow, once WhatsApp is live.
+    const verifyByMessage = unverified && !!WHATSAPP_VERIFY_NUMBER;
+    const verifyByTemplate = unverified && !WHATSAPP_VERIFY_NUMBER && WHATSAPP_LIVE;
+    const phoneHint = WHATSAPP_VERIFY_NUMBER || WHATSAPP_LIVE
+        ? 'Verify your mobile number with one WhatsApp message. Each number can belong to only one Vital account.'
+        : 'Use a mobile number you have WhatsApp on. Each number can belong to only one Vital account.';
+
+    const onPhoneVerified = async () => {
+        await refreshProfile();
+        setError('');
+        setSuccess('Your number is verified.');
+    };
 
     const section = (title: string, hint: string, children: React.ReactNode) => (
         <section className="grid gap-6 border-t border-gray-200 py-8 md:grid-cols-3 md:gap-10">
@@ -251,11 +271,24 @@ export default function ProfileEditPage() {
             {success && <Alert variant="success" className="mb-6">{success}</Alert>}
 
             <form onSubmit={handleSave}>
-                {section('Personal details', WHATSAPP_LIVE ? 'A new phone number is confirmed with a code sent to it on WhatsApp.' : 'Use a mobile number you have WhatsApp on.', <>
+                {section('Personal details', phoneHint, <>
                     <Input label="Full name" value={editForm.full_name} onChange={(e) => setEditForm({ ...editForm, full_name: e.target.value })} required autoComplete="name" />
-                    <div>
+                    <div id="phone" className="scroll-mt-24">
+                        {user?.phone_released_at && !user.phone && (
+                            <Alert variant="warning" className="mb-3">
+                                Another Vital account verified the number you had here, so it was removed from this account. Enter your own mobile number.
+                            </Alert>
+                        )}
                         <Input label="Phone" type="tel" value={editForm.phone} onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })} required autoComplete="tel" />
-                        {needsVerify && (
+                        {!phoneChanged && !!user?.phone_verified_at && (
+                            <p className="mt-1.5 text-sm text-success-700">Verified on WhatsApp.</p>
+                        )}
+                        {verifyByMessage && (
+                            <div className="mt-3">
+                                <WhatsAppVerify onVerified={onPhoneVerified} size="sm" intro={<p className="text-gray-600">Not verified yet. It takes one WhatsApp message.</p>} />
+                            </div>
+                        )}
+                        {verifyByTemplate && (
                             <p className="mt-1.5 text-sm text-gray-600">
                                 Not confirmed yet.{' '}
                                 <button type="button" onClick={() => startPhoneVerification(user!.phone).catch(err => setError(err.message))} className="text-gray-900 underline underline-offset-4">
