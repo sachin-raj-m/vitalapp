@@ -12,8 +12,9 @@
   Definitions (keep in step with the app):
 
     members                 Accounts with a completed registration: full_name,
-                            phone, city and district all filled in. Same rule as
-                            isRegistrationComplete() in lib/auth-helpers.ts.
+                            city and district all filled in. Same rule as
+                            isRegistrationComplete() in lib/auth-helpers.ts (not
+                            the phone, which can be released to another account).
     donors                  Profiles registered as donors with a blood group
                             (is_donor AND blood_group IS NOT NULL). Unchanged.
     available_donors        Of those donors, the ones currently marked available
@@ -45,7 +46,6 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
     SELECT
       count(*) FILTER (
         WHERE nullif(btrim(full_name), '') IS NOT NULL
-          AND nullif(btrim(phone), '') IS NOT NULL
           AND nullif(btrim(city), '') IS NOT NULL
           AND nullif(btrim(district), '') IS NOT NULL
       ) AS members,

@@ -1,87 +1,95 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState } from 'react';
+import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
-import { Alert } from '@/components/ui/Alert';
 import { Button } from '@/components/ui/Button';
 import { supabase } from '@/lib/supabase';
 import { Mail, Phone, X } from 'lucide-react';
-import { WHATSAPP_LIVE } from '@/lib/features';
+import { WHATSAPP_LIVE, WHATSAPP_VERIFY_NUMBER } from '@/lib/features';
 import { waNumber } from '@/lib/phone';
-import { TurnstileField, type TurnstileHandle } from '@/components/TurnstileField';
+import { contactVerification } from '@/lib/verification';
+import { ConfirmEmailCode } from '@/components/auth/ConfirmEmailCode';
+import { WhatsAppVerify } from '@/components/WhatsAppVerify';
 
+/**
+ * "Pending verification": what's missing (email, mobile number) and how to fix
+ * it, right here. The phone is optional and only asked for when there's a way
+ * to verify it (lib/features.ts).
+ */
 export const VerificationBanner = () => {
-    const { session, user } = useAuth();
+    const { session, user, refreshProfile } = useAuth();
     const [isVisible, setIsVisible] = useState(true);
-    const [loading, setLoading] = useState<'email' | 'phone' | null>(null);
-    const [sent, setSent] = useState<'email' | 'phone' | null>(null);
-    const [error, setError] = useState<string>('');
-    const captcha = useRef<TurnstileHandle>(null);
+    const [emailOpen, setEmailOpen] = useState(false);
+    const [done, setDone] = useState('');
 
     if (!session?.user || !isVisible) return null;
 
-    const emailVerified = session.user.email_confirmed_at;
-    // Phones are confirmed with a WhatsApp code (there's no SMS), so only ask
-    // once WhatsApp is live, and only for a number WhatsApp can reach.
-    const needsPhoneVerification = WHATSAPP_LIVE && !!user?.phone && !user.phone_verified_at && !!waNumber(user.phone);
+    const status = contactVerification(user, session.user.email_confirmed_at);
+    const canVerifyPhone = WHATSAPP_VERIFY_NUMBER || WHATSAPP_LIVE;
+    const phoneReachable = !!waNumber(user?.phone);
+    // Ask about the phone only once the profile is loaded and there's a way to verify it.
+    const askPhone = !!user && !status.phone && (status.phoneMissing || (canVerifyPhone && phoneReachable));
+    const askEmail = !status.email;
 
-    if (emailVerified && !needsPhoneVerification) return null;
+    if (!askEmail && !askPhone) {
+        return done ? (
+            <div className="rounded-md border-l-2 border-success-500 bg-success-50 px-4 py-3 text-sm text-success-800">{done}</div>
+        ) : null;
+    }
 
-    const handleVerifyEmail = async () => {
-        setLoading('email');
-        setError('');
-        try {
-            const { error } = await supabase.auth.resend({
-                type: 'signup',
-                email: session.user.email!,
-                options: {
-                    emailRedirectTo: `${window.location.origin}/dashboard`,
-                    captchaToken: await captcha.current?.getToken(),
-                }
-            });
-            if (error) throw error;
-            setSent('email');
-        } catch (err: any) {
-            console.error('Error sending verification email');
-            setError(err.message || 'Couldn’t send the verification email. Please try again.');
-        } finally {
-            setLoading(null);
-            captcha.current?.reset(); // tokens work once
-        }
-    };
-
-    const handleVerifyPhone = async () => {
-        // Redirect to profile edit page where user can update and verify phone
-        window.location.href = '/profile/edit';
-    };
-
-    const message = !emailVerified && needsPhoneVerification
-        ? 'Please verify your email address and phone number.'
-        : !emailVerified
-            ? 'Please verify your email address.'
-            : 'Please verify your phone number.';
+    const missing = [askEmail && 'confirm your email', askPhone && (status.phoneMissing ? 'add your mobile number' : 'verify your mobile number')].filter(Boolean).join(' and ');
 
     return (
-        <div className="flex flex-col gap-3 rounded-md border-l-2 border-warning-500 bg-warning-50 px-4 py-3 text-sm sm:flex-row sm:items-center">
-            <div className="flex-1 text-warning-800">
-                <p>{message}</p>
-                {error && <p className="mt-1 text-[13px] text-red-700">{error}</p>}
-                {sent === 'email' && <p className="mt-1 text-[13px] text-success-700">Verification email sent. Check your inbox.</p>}
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-                {!emailVerified && sent !== 'email' && <TurnstileField ref={captcha} />}
-                {!emailVerified && sent !== 'email' && (
-                    <Button size="sm" variant="secondary" onClick={handleVerifyEmail} isLoading={loading === 'email'} leftIcon={<Mail className="h-3.5 w-3.5" />}>
-                        Send verification email
-                    </Button>
-                )}
-                {needsPhoneVerification && (
-                    <Button size="sm" variant="secondary" onClick={handleVerifyPhone} leftIcon={<Phone className="h-3.5 w-3.5" />}>
-                        Confirm on WhatsApp
-                    </Button>
-                )}
+        <div className="space-y-3 rounded-md border-l-2 border-warning-500 bg-warning-50 px-4 py-3 text-sm">
+            <div className="flex items-start gap-3">
+                <div className="flex-1 text-warning-800">
+                    <p><span className="font-medium">Your account is pending verification.</span> Please {missing}.</p>
+                    {askPhone && status.phoneMissing && user?.phone_released_at && (
+                        <p className="mt-1 text-[13px]">Another Vital account verified the number you had, so it was removed from yours.</p>
+                    )}
+                    {done && <p className="mt-1 text-[13px] text-success-700">{done}</p>}
+                </div>
                 <button onClick={() => setIsVisible(false)} className="rounded p-1 text-warning-600 hover:text-warning-800" aria-label="Dismiss">
                     <X className="h-4 w-4" />
                 </button>
             </div>
+
+            <div className="flex flex-wrap items-start gap-2">
+                {askEmail && !emailOpen && (
+                    <Button size="sm" variant="secondary" onClick={() => setEmailOpen(true)} leftIcon={<Mail className="h-3.5 w-3.5" />}>
+                        Confirm email
+                    </Button>
+                )}
+                {askPhone && status.phoneMissing && (
+                    <Link href="/profile/edit#phone" className="inline-flex h-8 items-center gap-1.5 rounded-md border border-gray-300 bg-white px-3 text-[13px] text-gray-900 hover:border-gray-900">
+                        <Phone className="h-3.5 w-3.5" /> Add mobile number
+                    </Link>
+                )}
+                {askPhone && !status.phoneMissing && WHATSAPP_VERIFY_NUMBER && (
+                    <WhatsAppVerify size="sm" onVerified={async () => { await refreshProfile(); setDone('Your number is verified.'); }} />
+                )}
+                {askPhone && !status.phoneMissing && !WHATSAPP_VERIFY_NUMBER && (
+                    <Link href="/profile/edit#phone" className="inline-flex h-8 items-center gap-1.5 rounded-md border border-gray-300 bg-white px-3 text-[13px] text-gray-900 hover:border-gray-900">
+                        <Phone className="h-3.5 w-3.5" /> Confirm on WhatsApp
+                    </Link>
+                )}
+            </div>
+
+            {askEmail && emailOpen && session.user.email && (
+                <div className="max-w-md rounded-md border border-gray-200 bg-white p-4">
+                    <ConfirmEmailCode
+                        email={session.user.email}
+                        sentOnMount={false}
+                        backLabel="Close"
+                        onBack={() => setEmailOpen(false)}
+                        onVerified={async () => {
+                            await supabase.auth.refreshSession();
+                            await refreshProfile();
+                            setEmailOpen(false);
+                            setDone('Your email is confirmed.');
+                        }}
+                    />
+                </div>
+            )}
         </div>
     );
 };

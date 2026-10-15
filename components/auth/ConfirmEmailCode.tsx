@@ -20,12 +20,14 @@ export function ConfirmEmailCode({
     onVerified,
     onBack,
     sentOnMount = true,
+    backLabel = 'Use a different email',
 }: {
     email: string;
     onVerified: (user: User) => void | Promise<void>;
     onBack: () => void;
     /** False when arriving from sign-in: no code has been sent in this visit yet. */
     sentOnMount?: boolean;
+    backLabel?: string;
 }) {
     const [code, setCode] = useState('');
     const [error, setError] = useState('');
@@ -97,7 +99,7 @@ export function ConfirmEmailCode({
             <TurnstileField ref={captcha} />
             <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
                 <button type="button" onClick={onBack} className="text-gray-600 underline underline-offset-4 hover:text-gray-900">
-                    Use a different email
+                    {backLabel}
                 </button>
                 <button
                     type="button"

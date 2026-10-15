@@ -5,6 +5,7 @@ import { formatBloodGroup } from '@/lib/blood-compatibility';
 import { createContactLink } from '@/lib/contact-links';
 import { onDonationConfirmed } from '@/lib/donation-events';
 import { TEMPLATES, sendButtons, sendTemplate, sendText, waNumber } from '@/lib/whatsapp';
+import { PHONE_CODE_MAX_ATTEMPTS, PHONE_PURPOSE, parseVerifyMessage, phoneCodeHash } from '@/lib/phone-verification';
 
 /**
  * Replies to people messaging Vital's WhatsApp number. Inputs are button taps
@@ -16,6 +17,8 @@ import { TEMPLATES, sendButtons, sendTemplate, sendText, waNumber } from '@/lib/
  *   Follow-up         [Yes] -> "type the PIN" -> verify_donation_for()
  *                     [Not yet] -> asked again later; [No] -> request link
  *   Text              STOP / START / LINK / a 4-digit PIN / anything else -> help
+ *                     VERIFY <6-digit code> -> verifies the sender's number
+ *                     (the code comes from registration or Settings)
  *
  * Every action re-checks the database: a payload only names a request or
  * offer, and the sender's number must belong to the right person.
@@ -38,6 +41,8 @@ const HELP = [
     'Reply STOP to stop alerts, START to turn them back on, or LINK for a fresh contact link.',
     `For anything else, visit ${SITE_URL.replace(/^https?:\/\//, '')}`,
 ].join('\n\n');
+
+const VERIFY_HELP = `That code isn’t right or has expired. In Settings on ${SITE_URL.replace(/^https?:\/\//, '')}, tap “Verify on WhatsApp” for a new one and send it from the number on your profile.`;
 
 const firstName = (full?: string | null) => (full || '').trim().split(/\s+/)[0] || 'there';
 
@@ -67,6 +72,9 @@ export async function handleInbound(msg: Inbound) {
     if (word === 'STOP' || word === 'UNSUBSCRIBE') return setAlerts(from, false);
     if (word === 'START' || word === 'SUBSCRIBE') return setAlerts(from, true);
     if (word === 'LINK') return resendLink(from);
+    const verifyCode = parseVerifyMessage(text);
+    if (verifyCode) return verifyNumber(from, verifyCode);
+    if (/^VERIFY\b/.test(word)) return reply(from, VERIFY_HELP);
     if (/^\d{4}$/.test(text)) return checkPin(from, text);
     return reply(from, HELP);
 }
@@ -320,4 +328,39 @@ async function resendLink(from: string) {
         }
     }
     return reply(from, 'There’s no open offer on this number right now.');
+}
+
+/**
+ * "VERIFY 123456". Codes are looked up by the number they were made for, so a
+ * code only works when sent from the number on that profile; confirm_phone_for()
+ * re-checks the profile's current number and releases it from other accounts.
+ */
+async function verifyNumber(from: string, code: string) {
+    const admin = serviceClient();
+    const { data: rows } = await admin.from('verification_codes')
+        .select('user_id, code_hash, attempts, expires_at')
+        .eq('purpose', PHONE_PURPOSE)
+        .eq('payload->>wa', from);
+    const live = (rows ?? []).filter(r => Date.parse(r.expires_at) > Date.now() && r.attempts < PHONE_CODE_MAX_ATTEMPTS);
+    const match = live.find(r => phoneCodeHash(r.user_id, code) === r.code_hash);
+    if (!match) {
+        await Promise.all(live.map(r => admin.from('verification_codes')
+            .update({ attempts: r.attempts + 1 }).eq('user_id', r.user_id).eq('purpose', PHONE_PURPOSE)));
+        return reply(from, VERIFY_HELP);
+    }
+
+    const { data: result, error } = await admin.rpc('confirm_phone_for', { p_user: match.user_id, p_wa: from });
+    if (error) {
+        console.error('Phone verification failed', error.message);
+        return reply(from, 'Sorry, we couldn’t verify your number just now. Please try again in a minute.', { userId: match.user_id });
+    }
+    switch (result as string) {
+        case 'verified':
+        case 'already_verified':
+            return reply(from, 'Your number is verified. Thank you! You can go back to Vital now.', { userId: match.user_id });
+        case 'taken':
+            return reply(from, 'This number is already registered to another Vital account. Sign in to that account, or contact Vital if the number is yours.', { userId: match.user_id });
+        default:
+            return reply(from, 'The number on your Vital profile isn’t this one. Check it in Settings, then tap “Verify on WhatsApp” again.', { userId: match.user_id });
+    }
 }

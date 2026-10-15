@@ -16,10 +16,12 @@ export async function isRegistrationComplete(userId: string): Promise<boolean> {
 
 
 
+        // Not the phone: it can be removed later when another account verifies
+        // the same number (see migration 20261017000100). Settings then asks
+        // for a new one instead of sending the person through registration again.
         const isComplete = !!(
             profile &&
             profile.full_name &&
-            profile.phone &&
             profile.city &&
             profile.district
         );
