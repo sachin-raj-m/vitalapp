@@ -14,6 +14,7 @@ import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { ConfirmationModal } from '@/components/ui/ConfirmationModal';
 import { isRequestOpen } from '@/lib/requests';
+import { contactVerification } from '@/lib/verification';
 
 interface Profile {
     id: string;
@@ -21,10 +22,13 @@ interface Profile {
     email: string;
     role: string;
     is_donor: boolean;
+    /** The admin's own review ("trusted donor"); not email/phone verification. */
     verification_status: string;
     created_at: string;
     blood_group?: string;
     phone?: string;
+    email_verified_at?: string | null;
+    phone_verified_at?: string | null;
 }
 
 interface Request {
@@ -122,7 +126,8 @@ export default function AdminDashboard() {
             setStats({
                 users: allUsers.length,
                 donors: allUsers.filter(u => u.is_donor).length,
-                pending: allUsers.filter(u => u.verification_status === 'pending' && u.is_donor).length,
+                // Pending verification = email not confirmed or phone not verified (lib/verification.ts).
+                pending: allUsers.filter(u => u.is_donor && contactVerification(u).pending).length,
                 // Same rule as the public site: active and not past its needed-by date.
                 requests: allRequests.filter(r => isRequestOpen(r)).length
             });
@@ -141,7 +146,6 @@ export default function AdminDashboard() {
 
             // Optimistic update
             setUsers(prev => prev.map(u => u.id === userId ? { ...u, verification_status: status } : u));
-            setStats(prev => ({ ...prev, pending: prev.pending - 1 }));
         } catch (err: any) {
             setError(err.message);
         } finally {
@@ -253,7 +257,7 @@ export default function AdminDashboard() {
         u.email?.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
-    const pendingDonors = users.filter(u => u.verification_status === 'pending' && u.is_donor);
+    const pendingDonors = users.filter(u => u.is_donor && contactVerification(u).pending);
 
     const downloadCSV = (data: any[], filename: string) => {
         if (!data.length) return;
@@ -307,7 +311,7 @@ export default function AdminDashboard() {
                         <div className="p-3 bg-gray-100 rounded-full text-gray-900"><Shield size={24} /></div>
                         <div>
                             <div className="text-2xl font-bold">{stats.pending}</div>
-                            <div className="text-sm text-gray-500">Pending Verify</div>
+                            <div className="text-sm text-gray-500">Donors pending verification</div>
                         </div>
                     </CardBody>
                 </Card>
@@ -455,11 +459,24 @@ export default function AdminDashboard() {
                                                 </span>
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap">
-                                                {user.is_donor ? (
-                                                    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${user.verification_status === 'verified' ? 'bg-success-100 text-success-800' : 'bg-warning-100 text-warning-800'}`}>
-                                                        {user.verification_status === 'verified' ? 'Verified Donor' : 'Pending Verified'}
-                                                    </span>
-                                                ) : <span className="text-gray-500 text-xs">Recipient</span>}
+                                                {(() => {
+                                                    const v = contactVerification(user);
+                                                    const badge = (ok: boolean, label: string) => (
+                                                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${ok ? 'bg-success-100 text-success-800' : 'bg-warning-100 text-warning-800'}`}>
+                                                            {label} {ok ? 'verified' : 'pending'}
+                                                        </span>
+                                                    );
+                                                    return (
+                                                        <div className="flex flex-wrap items-center gap-1">
+                                                            {badge(v.email, 'Email')}
+                                                            {badge(v.phone, 'Phone')}
+                                                            {user.is_donor && user.verification_status === 'verified' && (
+                                                                <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">Reviewed</span>
+                                                            )}
+                                                            {!user.is_donor && <span className="text-gray-500 text-xs">Recipient</span>}
+                                                        </div>
+                                                    );
+                                                })()}
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                                                 <Button
@@ -600,7 +617,7 @@ export default function AdminDashboard() {
                             </div>
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Verification Status</label>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Admin review</label>
                                     <select
                                         value={selectedUser.verification_status || 'pending'}
                                         onChange={(e) => setSelectedUser({ ...selectedUser, verification_status: e.target.value })}

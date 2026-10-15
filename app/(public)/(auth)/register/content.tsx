@@ -158,6 +158,12 @@ export default function RegisterPage() {
                 footer={<>Already registered? <Link href="/login" className={authLinkClass}>Sign in</Link></>}
             >
                 <ConfirmEmailCode email={pendingEmail} onVerified={finishSignUp} onBack={() => setPendingEmail(null)} />
+                {/* Supabase doesn't say whether the address is taken (so nobody can
+                    look up who is registered); one account per email still holds. */}
+                <p className="mt-6 text-[13px] leading-relaxed text-gray-500">
+                    Each email can have only one Vital account. If you’ve registered with this email before, no code is sent:{' '}
+                    <Link href="/login" className={authLinkClass}>sign in</Link> instead, or reset your password from there.
+                </p>
             </AuthFrame>
         );
     }
