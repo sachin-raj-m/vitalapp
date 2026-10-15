@@ -11,6 +11,7 @@ import { LiveRequests } from '@/components/landing/LiveRequests';
 import { CountUp } from '@/components/landing/CountUp';
 import { HeartbeatLine } from '@/components/landing/HeartbeatLine';
 import { Reveal } from '@/components/landing/Reveal';
+import { MATCH_RADIUS_KM } from '@/lib/geo';
 
 interface NetworkStats {
     donors: number | null;
@@ -28,7 +29,7 @@ const STEPS = [
     },
     {
         title: 'Compatible donors nearby see it',
-        body: 'Registered donors in the same city whose blood can be given to the patient get a notification and an email.',
+        body: `Available donors within ${MATCH_RADIUS_KM} km whose blood can be given to the patient are alerted.`,
     },
     {
         title: 'The two sides talk directly',
@@ -124,7 +125,7 @@ export default function HomePage() {
                     <div className="mt-9 max-w-xl animate-fade-up [animation-delay:120ms] lg:mt-11">
                         <p className="text-lg leading-relaxed text-gray-700 lg:text-xl">
                             Vital is a free platform where families post blood requests and voluntary
-                            donors in the same city, with a compatible blood group, can see them and
+                            donors nearby, with a compatible blood group, can see them and
                             choose to help.
                         </p>
                         <div className="mt-8 flex flex-col gap-3 sm:flex-row">
@@ -282,7 +283,7 @@ export default function HomePage() {
                             If you are able to give blood, please register.
                         </h2>
                         <p className="mt-5 max-w-xl text-lg leading-relaxed text-white">
-                            You will only be notified when a patient in your city needs a blood group
+                            You will only be notified when a patient near you needs a blood group
                             you can give. Whether you respond is always your choice.
                         </p>
                         <div className="mt-10 flex flex-col gap-3 sm:flex-row">

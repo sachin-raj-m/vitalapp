@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
 import { PLATFORM_DISCLAIMER_LONG } from '@/lib/legal';
 import { pageMetadata } from '@/lib/seo';
+import { MATCH_RADIUS_KM } from '@/lib/geo';
 
 export const metadata = pageMetadata({
     path: '/how-it-works',
@@ -38,8 +39,8 @@ const STEPS = [
         heading: 'Alerting matching donors',
         lead: 'Donors whose listed blood group matches are alerted.',
         body: [
-            'Vital looks for registered donors in the same city whose listed blood group is compatible with the request. For a B+ patient, for example, that includes O−, O+, B− and B+ donors. Blood groups are entered by donors themselves.',
-            'Those donors receive a push notification and an email. Each donor decides for themselves whether to respond.',
+            `Vital looks for available donors within ${MATCH_RADIUS_KM} km of the hospital whose listed blood group is compatible with the request. For a B+ patient, for example, that includes O−, O+, B− and B+ donors. Blood groups are entered by donors themselves.`,
+            'Those donors are alerted by notification and message. Donors who have not added a location yet are matched by city instead and get an email. Each donor decides for themselves whether to respond.',
         ],
         figure: (
             <div role="img" aria-label="For a B+ patient: O−, O+, B− and B+ donors match; A−, A+, AB− and AB+ do not." className="grid grid-cols-4 gap-px overflow-hidden rounded-md bg-gray-200 font-serif text-3xl font-medium">
@@ -140,7 +141,7 @@ export default function HowItWorksPage() {
                     </h2>
                     <p className="mt-5 max-w-xl text-lg leading-relaxed text-gray-400">
                         If you are between 18 and 65 and in good health, you can register. You will be alerted
-                        to requests in your city that match your blood group, and you decide whether to respond.
+                        to requests within about {MATCH_RADIUS_KM} km of you that match your blood group, and you decide whether to respond.
                     </p>
                     <Link
                         href="/register"

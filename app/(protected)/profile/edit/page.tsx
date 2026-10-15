@@ -16,6 +16,7 @@ import { formatWaNumber, waNumber } from '@/lib/phone';
 import { WHATSAPP_LIVE } from '@/lib/features';
 import { BLOOD_GROUPS, formatBloodGroup } from '@/lib/blood-compatibility';
 import type { BloodGroup } from '@/types';
+import { MATCH_RADIUS_KM } from '@/lib/geo';
 
 export default function ProfileEditPage() {
     const router = useRouter();
@@ -266,7 +267,7 @@ export default function ProfileEditPage() {
                     </div>
                 </>)}
 
-                {section('Location', 'Used to show you donors and requests nearby.', <div className="grid gap-4 sm:grid-cols-2">
+                {section('Location', `Your current PIN code places you on the map, so we can show you donors within ${MATCH_RADIUS_KM} km and alert you to requests near you.`, <div id="location" className="grid scroll-mt-24 gap-4 sm:grid-cols-2">
                     <Input label="Current PIN code" inputMode="numeric" value={editForm.present_zip} onChange={(e) => setEditForm({ ...editForm, present_zip: e.target.value })} required />
                     <Input label="Permanent PIN code" inputMode="numeric" value={editForm.permanent_zip} onChange={(e) => setEditForm({ ...editForm, permanent_zip: e.target.value })} required />
                 </div>)}

@@ -18,6 +18,7 @@ import { toast } from 'sonner';
 import { consentStamp, earliestConsentAt, hasRecordedConsent, type ConsentFields } from '@/lib/legal';
 import { waNumber } from '@/lib/phone';
 import { TurnstileField, type TurnstileHandle } from '@/components/TurnstileField';
+import { MATCH_RADIUS_KM } from '@/lib/geo';
 
 const Map = dynamic(() => import('@/components/Map'), {
     ssr: false,
@@ -255,7 +256,7 @@ export default function CreateRequestPage() {
             });
 
             toast.success('Request posted', {
-                description: `Compatible donors in ${formData.city} are being notified. You can share the request to reach more people.`
+                description: `Compatible donors within ${MATCH_RADIUS_KM} km are being notified. You can share the request to reach more people.`
             });
 
             router.push(requestId ? `/requests/${requestId}` : '/requests');
@@ -304,8 +305,8 @@ export default function CreateRequestPage() {
             <header className="pb-8">
                 <h1 className="display text-4xl sm:text-[2.75rem]">Request blood</h1>
                 <p className="mt-3 max-w-xl leading-relaxed text-gray-600">
-                    When you post a request, registered donors in the same city whose listed blood group is compatible
-                    are alerted by push notification and email. You will also get a link you can share.
+                    When you post a request, available donors within {MATCH_RADIUS_KM} km of the hospital whose listed blood group
+                    is compatible are alerted. Donors who haven’t added a location yet are emailed if they are in the same city. You will also get a link you can share.
                 </p>
             </header>
 

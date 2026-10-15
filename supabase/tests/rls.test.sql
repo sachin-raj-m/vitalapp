@@ -110,8 +110,10 @@ SELECT tests.is(tests.val($q$SELECT contact_phone FROM public.get_request_contac
 -- Masking for signed-in users
 SELECT tests.is(tests.val($q$SELECT display_name FROM public.nearby_donors() WHERE id = '22222222-2222-4222-8222-222222222222'$q$),
   'Dev D.', 'user: nearby_donors() masks private donor name');
+-- The viewer is not in their own list (20261017000300); public-profile masking
+-- is checked from another viewer in radius.test.sql.
 SELECT tests.is(tests.val($q$SELECT string_agg(display_name, ',' ORDER BY display_name) FROM public.nearby_donors()$q$),
-  'Dev D.,Eve U.', 'user: nearby_donors() masks every name, public profiles too');
+  'Dev D.', 'user: nearby_donors() lists other nearby donors, masked, not the viewer');
 SELECT tests.is(tests.val($q$SELECT to_jsonb(n) ->> 'area_code' FROM public.nearby_donors() n WHERE id = '22222222-2222-4222-8222-222222222222'$q$),
   '999', 'user: nearby_donors() exposes only the 3-digit area code');
 SELECT tests.is(tests.rows($q$SELECT 1 FROM public.nearby_donors() n WHERE to_jsonb(n)::text LIKE '%999002%' OR to_jsonb(n)::text LIKE '%0000000002%'$q$),
