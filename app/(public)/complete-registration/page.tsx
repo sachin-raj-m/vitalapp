@@ -17,6 +17,7 @@ import Link from 'next/link';
 import { PRIVACY_VERSION, earliestConsentAt } from '@/lib/legal';
 import { takeReferral } from '@/lib/referrals';
 import { waNumber } from '@/lib/phone';
+import { MATCH_RADIUS_KM } from '@/lib/geo';
 
 interface PendingRegistration {
     userId: string;
@@ -319,7 +320,7 @@ export default function CompleteRegistration() {
                 <p className="text-sm text-gray-500">Step 2 of 2</p>
                 <h1 className="display mt-2 text-4xl sm:text-[2.75rem]">Complete your profile</h1>
                 <p className="mt-3 max-w-xl leading-relaxed text-gray-600">
-                    We use these details to notify you only when your blood group is needed in your city.
+                    We use these details to notify you only when your blood group is needed near you (within about {MATCH_RADIUS_KM} km).
                 </p>
             </header>
 
