@@ -76,6 +76,8 @@ export default function CompleteRegistration() {
     const [nbtcEligible, setNbtcEligible] = useState<boolean>(true);
     // A point from the device or the map, saved once the profile exists.
     const [pickedPoint, setPickedPoint] = useState<PickedPoint | null>(null);
+    // A blood group saved earlier can't be changed here (only once, from Settings).
+    const [savedBloodGroup, setSavedBloodGroup] = useState<BloodGroup | null>(null);
     // Set once the form is submitted, so reloading the profile afterwards
     // doesn't re-run the checks below and skip the verify step.
     const submitted = useRef(false);
@@ -109,6 +111,31 @@ export default function CompleteRegistration() {
                     setPendingData(data);
                     if (data.phone) {
                         setFormData(prev => ({ ...prev, phone: data.phone }));
+                    }
+                    // Accounts that registered before some fields were asked:
+                    // start from what's already saved, so they only add what's missing.
+                    const { data: saved } = await supabase
+                        .from('profiles')
+                        .select('full_name, phone, dob, gender, blood_group, city, district, state, permanent_zip, present_zip, availability, whatsapp_alerts')
+                        .eq('id', user.id)
+                        .maybeSingle();
+                    if (saved) {
+                        setFormData(prev => ({
+                            ...prev,
+                            fullName: saved.full_name || prev.fullName,
+                            phone: saved.phone || prev.phone,
+                            dob: saved.dob || prev.dob,
+                            gender: saved.gender || prev.gender,
+                            bloodGroup: (saved.blood_group as BloodGroup) || prev.bloodGroup,
+                            city: saved.city || prev.city,
+                            district: saved.district || prev.district,
+                            state: saved.state || prev.state,
+                            permanentZip: saved.permanent_zip || prev.permanentZip,
+                            presentZip: saved.present_zip || prev.presentZip,
+                            availability: saved.availability?.length ? saved.availability : prev.availability,
+                            whatsappAlerts: saved.whatsapp_alerts ?? prev.whatsappAlerts,
+                        }));
+                        if (saved.blood_group) setSavedBloodGroup(saved.blood_group as BloodGroup);
                     }
                     setStatus('form');
                 } catch (err) {
@@ -408,16 +435,19 @@ export default function CompleteRegistration() {
                     )}
                 </>)}
 
-                {section('Blood group', 'If you are not sure, check a recent blood test report or ask a blood bank.', <>
-                    <div className="grid grid-cols-4 gap-1.5" role="radiogroup" aria-label="Blood group">
+                {section('Blood group', savedBloodGroup
+                    ? 'Already saved on your profile. If it’s wrong, you can change it once from Settings after this step.'
+                    : 'If you are not sure, check a recent blood test report or ask a blood bank.', <>
+                    <div className="grid grid-cols-4 gap-1.5" role="radiogroup" aria-label="Blood group" aria-disabled={!!savedBloodGroup}>
                         {BLOOD_GROUPS.map(g => (
                             <button
                                 key={g}
                                 type="button"
                                 role="radio"
                                 aria-checked={formData.bloodGroup === g}
+                                disabled={!!savedBloodGroup && g !== savedBloodGroup}
                                 onClick={() => set('bloodGroup', g)}
-                                className={`h-14 rounded-md border font-serif text-3xl transition-colors ${formData.bloodGroup === g ? 'border-gray-900 bg-gray-900 text-white' : 'border-gray-300 bg-white text-gray-900 hover:border-gray-400'}`}
+                                className={`h-14 rounded-md border font-serif text-3xl transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${formData.bloodGroup === g ? 'border-gray-900 bg-gray-900 text-white' : 'border-gray-300 bg-white text-gray-900 hover:border-gray-400'}`}
                             >
                                 {formatBloodGroup(g)}
                             </button>
