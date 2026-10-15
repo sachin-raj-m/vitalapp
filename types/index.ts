@@ -36,6 +36,12 @@ export interface User {
   consent_version?: string | null;
   whatsapp_alerts?: boolean;
   phone_verified_at?: string | null;
+  /** Set when another account verified this profile's number and it was removed here. */
+  phone_released_at?: string | null;
+  /** Mirrors the sign-in account's email confirmation (set by the database). */
+  email_verified_at?: string | null;
+  /** Admin's own review of the donor; separate from email/phone verification. */
+  verification_status?: string | null;
   blood_group_changed_at?: string | null;
   created_at: string;
 }
