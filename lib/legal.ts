@@ -3,7 +3,7 @@
  * each user's consent so you can tell which version they agreed to.
  */
 export const PRIVACY_VERSION = '2026-10-06';
-export const LEGAL_UPDATED = '7 October 2026';
+export const LEGAL_UPDATED = '15 October 2026';
 export const GRIEVANCE_EMAIL = 'sachin@vitalapp.in';
 
 /** One-line platform position. Keep wording identical wherever it appears. */

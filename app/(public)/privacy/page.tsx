@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { LegalPage } from '@/components/legal/LegalPage';
 import { GRIEVANCE_EMAIL, LEGAL_UPDATED } from '@/lib/legal';
+import { MATCH_RADIUS_KM } from '@/lib/geo';
 import { pageMetadata } from '@/lib/seo';
 
 export const metadata = pageMetadata({
@@ -36,7 +37,8 @@ export default function PrivacyPage() {
                                 <li>a random 4-digit PIN that Vital creates for each offer you make.</li>
                             </ul>
                             <p><strong>When you post a request:</strong> the patient’s blood group, units needed, hospital, its location on a map, the date needed, a contact name and phone number, and any note you add.</p>
-                            <p><strong>When you use the app:</strong> your offers to donate and whether they were confirmed; push-notification tokens for devices where you turn alerts on; and a log of key actions (such as creating or deleting a request) for security.</p>
+                            <p><strong>Where we alert you from:</strong> a point on the map, from your PIN code, from your device when you tap “Use my current location”, or where you place yourself on the map. We store that point and how it was set.</p>
+                            <p><strong>When you use the app:</strong> your offers to donate and whether they were confirmed; whether your email and mobile number are verified; your WhatsApp alert choice and the WhatsApp messages we send you or receive from you; push-notification tokens for devices where you turn alerts on; and a log of key actions (such as creating or deleting a request) for security.</p>
                             <p>Your location is never tracked in the background. The “Use my location” buttons read your position once, when you tap them.</p>
                         </>
                     ),
@@ -45,10 +47,11 @@ export default function PrivacyPage() {
                     heading: 'Why we use it',
                     body: (
                         <ul>
-                            <li>To alert you to requests in your city that match the blood group you entered.</li>
+                            <li>To alert you to requests within {MATCH_RADIUS_KM} km of your point that your blood group can donate to. If you haven’t set a point, we may email you about requests in your city.</li>
                             <li>To show a donor and a requester each other’s contact details once the donor offers on that request.</li>
                             <li>To show a reminder of when you may be able to donate again (90 days for men, 120 for women), based on dates you enter.</li>
-                            <li>To mark a donation as completed in Vital when the requester enters your PIN.</li>
+                            <li>To mark a donation as completed in Vital when the requester enters the PIN for your offer.</li>
+                            <li>To check that your email address and mobile number are yours, and that each belongs to only one account.</li>
                             <li>To run the service and look into misuse.</li>
                         </ul>
                     ),
@@ -59,7 +62,7 @@ export default function PrivacyPage() {
                         <>
                             <ul>
                                 <li><strong>Anyone:</strong> open requests (blood group, units, hospital, city, date, contact name and note). Never the contact’s phone number.</li>
-                                <li><strong>Signed-in users, on “Donors nearby”:</strong> your first name and last initial, blood group, PIN code, and a location rounded to about 1 km. Never your phone, email or exact address.</li>
+                                <li><strong>Signed-in users within about {MATCH_RADIUS_KM} km, on “Donors near you”:</strong> your first name and last initial, blood group, PIN code, a location rounded to about 1 km, and roughly how far away you are. Never your phone, email or exact address.</li>
                                 <li><strong>A requester whose request you offer on:</strong> your name and phone number, so they can reach you. Nobody else.</li>
                                 <li><strong>You, when you offer on a request:</strong> that request’s contact name and phone number.</li>
                                 <li><strong>Your public donor card:</strong> off by default. If you turn it on, anyone with the link sees your name, blood group, donor number and donation count.</li>
@@ -80,7 +83,10 @@ export default function PrivacyPage() {
                                 <li><strong>Vercel</strong> hosts the website.</li>
                                 <li>Our <strong>email provider</strong> sends alert, welcome and password-reset emails.</li>
                                 <li><strong>Google</strong>, only if you choose “Continue with Google”.</li>
-                                <li><strong>OpenStreetMap</strong> turns a PIN code into an approximate map position (Nominatim) and serves the map images.</li>
+                                <li><strong>WhatsApp (Meta)</strong> delivers alerts and replies if you turn on WhatsApp alerts, and receives the code you send to verify your number.</li>
+                                <li><strong>Cloudflare Turnstile</strong> checks that sign-ins and sign-ups come from a person, not a bot.</li>
+                                <li><strong>Sentry</strong> records app errors so we can fix them, with personal details removed.</li>
+                                <li><strong>OpenStreetMap</strong> turns PIN codes and hospital names into map positions, names the area near your point (Nominatim; we send it a position rounded to about 100 m), and serves the map images.</li>
                                 <li>Your browser’s push service (for example Google or Apple) delivers notifications you’ve turned on.</li>
                             </ul>
                             <p>Some of these providers may store data outside India.</p>
