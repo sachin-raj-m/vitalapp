@@ -14,6 +14,8 @@ import { SecuritySettings } from '@/app/(protected)/profile/SecuritySettings';
 import { PushNotificationManager } from '@/components/PushNotificationManager';
 import { formatWaNumber, waNumber } from '@/lib/phone';
 import { WHATSAPP_LIVE } from '@/lib/features';
+import { BLOOD_GROUPS, formatBloodGroup } from '@/lib/blood-compatibility';
+import type { BloodGroup } from '@/types';
 
 export default function ProfileEditPage() {
     const router = useRouter();
@@ -30,6 +32,7 @@ export default function ProfileEditPage() {
         present_zip: '',
         is_public_profile: false,
         whatsapp_alerts: false,
+        blood_group: '' as BloodGroup | '',
     });
 
     // OTP Verification State
@@ -47,6 +50,7 @@ export default function ProfileEditPage() {
                 present_zip: user.present_zip || '',
                 is_public_profile: user.is_public_profile || false,
                 whatsapp_alerts: user.whatsapp_alerts || false,
+                blood_group: (user.blood_group as BloodGroup) || '',
             });
         }
     }, [user]);
@@ -67,6 +71,7 @@ export default function ProfileEditPage() {
             present_zip: editForm.present_zip,
             is_public_profile: editForm.is_public_profile,
             whatsapp_alerts: editForm.whatsapp_alerts,
+            ...(editForm.blood_group ? { blood_group: editForm.blood_group } : {}),
         });
     };
 
@@ -220,6 +225,24 @@ export default function ProfileEditPage() {
                 </div>)}
 
                 {user?.is_donor && section('Donating', 'Pause any time, for example while travelling or unwell.', <>
+                    <div>
+                        <span id="settings-blood-group" className="block text-gray-900">Blood group</span>
+                        <span className="mt-0.5 block text-sm text-gray-500">Decides which requests you’re alerted to. Change it only if it was entered wrongly.</span>
+                        <div className="mt-3 grid grid-cols-4 gap-1.5" role="radiogroup" aria-labelledby="settings-blood-group">
+                            {BLOOD_GROUPS.map(g => (
+                                <button
+                                    key={g}
+                                    type="button"
+                                    role="radio"
+                                    aria-checked={editForm.blood_group === g}
+                                    onClick={() => setEditForm({ ...editForm, blood_group: g })}
+                                    className={`h-12 rounded-md border font-serif text-2xl transition-colors ${editForm.blood_group === g ? 'border-gray-900 bg-gray-900 text-white' : 'border-gray-300 bg-white text-gray-900 hover:border-gray-400'}`}
+                                >
+                                    {formatBloodGroup(g)}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
                     {toggle(editForm.is_available, v => setEditForm({ ...editForm, is_available: v }), 'Available to donate',
                         'When off, you get no alerts at all, on any channel, until you turn it back on.')}
                 </>)}
