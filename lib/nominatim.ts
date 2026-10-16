@@ -13,7 +13,21 @@ import { insideIndia } from '@/lib/location';
 const USER_AGENT = 'Vital/1.0 (https://vitalapp.in; sachin@vitalapp.in)';
 const BASE = 'https://nominatim.openstreetmap.org';
 
-export class UpstreamError extends Error {}
+/** Why a geocoder call failed: our 1/s slot was taken, the service refused us (403/429), it was too slow, or it was down. */
+export type UpstreamReason = 'busy' | 'refused' | 'timeout' | 'unreachable' | 'status';
+
+export class UpstreamError extends Error {
+    constructor(message: string, readonly reason: UpstreamReason = 'status') {
+        super(message);
+    }
+}
+
+export interface CallOptions {
+    /** Abort the HTTP request after this long (default 8 s). */
+    timeoutMs?: number;
+    /** How many times to try for the app-wide 1/s slot, ~1.1 s apart (default 4). */
+    slotAttempts?: number;
+}
 
 export interface Place {
     latitude: number;
@@ -30,27 +44,31 @@ export interface Place {
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-async function nominatimSlot(): Promise<boolean> {
-    for (let attempt = 0; attempt < 4; attempt++) {
+async function nominatimSlot(attempts: number): Promise<boolean> {
+    for (let attempt = 0; attempt < attempts; attempt++) {
         if (await rateLimit('nominatim:global', 1, 1)) return true;
-        await sleep(1100);
+        if (attempt < attempts - 1) await sleep(1100);
     }
     return false;
 }
 
-async function call(path: string): Promise<unknown> {
-    if (!(await nominatimSlot())) throw new UpstreamError('geocoder busy');
+async function call(path: string, { timeoutMs = 8000, slotAttempts = 4 }: CallOptions = {}): Promise<unknown> {
+    if (!(await nominatimSlot(Math.max(1, slotAttempts)))) throw new UpstreamError('geocoder busy', 'busy');
     let response: Response;
     try {
         response = await fetch(`${BASE}${path}`, {
             headers: { 'User-Agent': USER_AGENT, 'Accept-Language': 'en' },
-            signal: AbortSignal.timeout(8000),
+            signal: AbortSignal.timeout(timeoutMs),
             next: { revalidate: 60 * 60 * 24 * 30 },
         });
-    } catch {
-        throw new UpstreamError('geocoder unreachable');
+    } catch (error) {
+        const timedOut = error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError');
+        throw new UpstreamError(timedOut ? 'geocoder timeout' : 'geocoder unreachable', timedOut ? 'timeout' : 'unreachable');
     }
-    if (!response.ok) throw new UpstreamError(`geocoder status ${response.status}`);
+    if (!response.ok) {
+        const refused = response.status === 403 || response.status === 429;
+        throw new UpstreamError(`geocoder status ${response.status}`, refused ? 'refused' : 'status');
+    }
     return response.json().catch(() => null);
 }
 
@@ -87,22 +105,22 @@ function toPlace(raw: Raw): Place | null {
 }
 
 /** Forward search inside India. `params` is a ready query string (q=…, postalcode=…, city=…). */
-export async function searchPlaces(params: string, limit = 1): Promise<Place[]> {
+export async function searchPlaces(params: string, limit = 1, options?: CallOptions): Promise<Place[]> {
     const n = Math.min(Math.max(Math.trunc(limit), 1), 5);
-    const data = await call(`/search?format=jsonv2&addressdetails=1&countrycodes=in&limit=${n}&${params}`);
+    const data = await call(`/search?format=jsonv2&addressdetails=1&countrycodes=in&limit=${n}&${params}`, options);
     if (!Array.isArray(data)) return [];
-    return data.map(d => toPlace(d as Raw)).filter((p): p is Place => p !== null);
+    return data.filter(d => d && typeof d === 'object').map(d => toPlace(d as Raw)).filter((p): p is Place => p !== null);
 }
 
 /**
  * The locality around a point. Coordinates are rounded to 3 dp (~100 m)
  * before they leave our server, so OSM never receives a donor's exact spot.
  */
-export async function reversePlace(latitude: number, longitude: number): Promise<Place | null> {
+export async function reversePlace(latitude: number, longitude: number, options?: CallOptions): Promise<Place | null> {
     if (!insideIndia(latitude, longitude)) return null;
     const lat = latitude.toFixed(3);
     const lon = longitude.toFixed(3);
-    const data = await call(`/reverse?format=jsonv2&addressdetails=1&zoom=16&lat=${lat}&lon=${lon}`);
+    const data = await call(`/reverse?format=jsonv2&addressdetails=1&zoom=16&lat=${lat}&lon=${lon}`, options);
     if (!data || typeof data !== 'object' || 'error' in data) return null;
     const place = toPlace(data as Raw);
     // Report the point that was asked about, not the matched feature's centre.
