@@ -110,7 +110,7 @@ const DISTRICT_ALIASES: Record<string, Record<string, string>> = {
         'Hospet': 'Vijayanagara', 'Chamrajnagar': 'Chamarajanagar', 'Yadagiri': 'Yadgir',
     },
     'Kerala': {
-        'Trivandrum': 'Thiruvananthapuram', 'Calicut': 'Kozhikode', 'Cochin': 'Ernakulam', 'Kochi': 'Ernakulam',
+        'Trivandrum': 'Thiruvananthapuram', 'TVM': 'Thiruvananthapuram', 'Thiruvanathapuram': 'Thiruvananthapuram', 'Calicut': 'Kozhikode', 'Cochin': 'Ernakulam', 'Kochi': 'Ernakulam',
         'Alleppey': 'Alappuzha', 'Quilon': 'Kollam', 'Trichur': 'Thrissur', 'Palghat': 'Palakkad',
         'Cannanore': 'Kannur', 'Kasargod': 'Kasaragod', 'Kasargode': 'Kasaragod', 'Wynad': 'Wayanad', 'Pathanamthita': 'Pathanamthitta',
     },
