@@ -1,5 +1,6 @@
 // Network totals for the public pages, from public.public_stats().
-// Definitions of each number: supabase/migrations/20261017000500_public_stats.sql.
+// Definitions of each number: supabase/migrations/20261017000500_public_stats.sql,
+// members and districts as redefined in 20261018000300_district_not_city.sql.
 
 import { createClient } from '@supabase/supabase-js';
 
@@ -10,7 +11,9 @@ export interface PublicStats {
     donors: number;
     /** Donors currently marked available (self-declared). */
     available_donors: number;
-    /** Distinct donor cities. */
+    /** Distinct donor districts (state + district). */
+    districts: number;
+    /** Old name for `districts` (same value since 20261018000300). */
     cities: number;
     /** Active and not past the needed-by date. */
     open: number;
@@ -28,7 +31,7 @@ export interface PublicStats {
 export const PUBLIC_STATS_REVALIDATE = 300;
 
 const KEYS: (keyof PublicStats)[] = [
-    'members', 'donors', 'available_donors', 'cities', 'open', 'fulfilled',
+    'members', 'donors', 'available_donors', 'districts', 'cities', 'open', 'fulfilled',
     'requests_with_donation', 'requests_helped', 'donations_completed', 'units_donated',
 ];
 
@@ -41,6 +44,8 @@ export function parsePublicStats(data: unknown): PublicStats | null {
         const n = Number(raw[k]);
         out[k] = Number.isFinite(n) && n > 0 ? Math.floor(n) : 0;
     }
+    // A database from before 20261018000300 only sends `cities`.
+    if (raw.districts === undefined) out.districts = out.cities;
     return out;
 }
 

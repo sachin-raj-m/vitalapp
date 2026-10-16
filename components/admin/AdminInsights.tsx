@@ -31,7 +31,8 @@ export interface Insights {
         no_email: number; phone_verified: number; phone_unverified: number; no_phone: number;
         whatsapp_opted_in: number; whatsapp_opted_in_donors: number;
         donors_by_blood_group: (Labelled & { count: number; available: number })[];
-        top_cities: (Labelled & { donors: number; accounts: number })[];
+        /** By profile district (and state); migration 20261018000300. */
+        top_districts: (Labelled & { state: string | null; donors: number; accounts: number })[];
     };
     requests: {
         total: number; open: number; expired_active: number; fulfilled: number; cancelled: number; other: number;
@@ -444,18 +445,20 @@ export function AdminInsights({ onRequestClosed }: { onRequestClosed?: (requestI
                 <Card>
                     <CardBody className="overflow-x-auto p-0 sm:p-0">
                         <table className="min-w-full text-sm">
-                            <caption className="px-4 pt-3 pb-2 text-left font-semibold text-gray-700">Top cities</caption>
+                            <caption className="px-4 pt-3 pb-2 text-left font-semibold text-gray-700">Top districts</caption>
                             <thead className="bg-gray-50 text-xs uppercase text-gray-600">
                                 <tr>
-                                    <th scope="col" className="px-4 py-2 text-left font-medium">City</th>
+                                    <th scope="col" className="px-4 py-2 text-left font-medium">District</th>
                                     <th scope="col" className="px-4 py-2 text-right font-medium">Donors</th>
                                     <th scope="col" className="px-4 py-2 text-right font-medium">Accounts</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100">
-                                {people.top_cities.map(c => (
-                                    <tr key={c.label}>
-                                        <th scope="row" className="px-4 py-2 text-left font-medium text-gray-900">{c.label}</th>
+                                {(people.top_districts ?? []).map(c => (
+                                    <tr key={`${c.label}|${c.state ?? ''}`}>
+                                        <th scope="row" className="px-4 py-2 text-left font-medium text-gray-900">
+                                            {c.label}{c.state && <span className="ml-1.5 font-normal text-gray-500">{c.state}</span>}
+                                        </th>
                                         <td className="px-4 py-2 text-right tabular-nums">{c.donors}</td>
                                         <td className="px-4 py-2 text-right tabular-nums">{c.accounts}</td>
                                     </tr>

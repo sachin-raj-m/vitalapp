@@ -12,6 +12,7 @@ export interface User {
   dob?: string;
   gender?: string;
   blood_group?: BloodGroup; // Optional
+  /** No longer asked: kept equal to the district on save (older profiles: typed). */
   city?: string;
   district?: string;
   state?: string;
@@ -68,6 +69,12 @@ export interface BloodRequest {
     accuracy_m?: number;
   };
   city?: string;
+  /**
+   * Listed district and state of the request (lib/india-regions), worked out
+   * by the server from its PIN code or city when donors are alerted. Null if unknown.
+   */
+  district?: string | null;
+  state?: string | null;
   zipcode?: string;
   date_needed?: string;
   status: 'active' | 'fulfilled' | 'cancelled';

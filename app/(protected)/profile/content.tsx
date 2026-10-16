@@ -257,7 +257,7 @@ export default function ProfilePage() {
                                 : formatBloodGroup(user?.blood_group))}
                             {row('Email', user?.email)}
                             {row('Phone', user?.phone)}
-                            {row('City', [user?.city, user?.present_zip].filter(Boolean).join(' · '))}
+                            {row('District', [[user?.district || user?.city, user?.state].filter(Boolean).join(', '), user?.present_zip].filter(Boolean).join(' · '))}
                             {row('Donations', isLoading ? '…' : `${stats?.total_donations ?? 0} verified · ${stats?.total_requests ?? 0} requests posted`)}
                         </dl>
                     </div>

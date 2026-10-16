@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/Button';
 import { Input, Textarea, Select } from '@/components/ui/Input';
 import { Alert } from '@/components/ui/Alert';
 import { supabase } from '@/lib/supabase';
-import { STATE_NAMES, matchState } from '@/lib/india-regions';
+import { STATE_NAMES, districtsOf, matchDistrict, matchState } from '@/lib/india-regions';
 import { Search, Users, Calculator, Send, AlertCircle, CheckCircle } from 'lucide-react';
 
 type TargetingMode = 'broadcast' | 'filter' | 'single';
@@ -26,8 +26,8 @@ export function AdminNotificationConsole() {
         gender: '',
         minAge: '',
         maxAge: '',
-        city: '',
-        state: ''
+        state: '',
+        district: ''
     });
 
     // Execution State
@@ -52,7 +52,16 @@ export function AdminNotificationConsole() {
                 setUserId(draft.userId || '');
                 setMode(draft.mode || 'single');
                 // A draft from before the State dropdown may hold a typed state.
-                if (draft.filters) setFilters({ ...draft.filters, state: matchState(draft.filters.state) });
+                // A draft from before the District dropdown may hold a typed city (dropped).
+                if (draft.filters) {
+                    const f = draft.filters;
+                    const state = matchState(f.state);
+                    setFilters({
+                        bloodGroup: f.bloodGroup || '', gender: f.gender || '',
+                        minAge: f.minAge || '', maxAge: f.maxAge || '',
+                        state, district: matchDistrict(state, f.district),
+                    });
+                }
             } catch (e) {
                 console.error('Failed to parse draft', e);
             }
@@ -73,8 +82,8 @@ export function AdminNotificationConsole() {
             if (mode === 'filter') {
                 if (filters.bloodGroup) query = query.eq('blood_group', filters.bloodGroup);
                 if (filters.gender) query = query.eq('gender', filters.gender);
-                if (filters.city) query = query.ilike('city', `%${filters.city}%`);
                 if (filters.state) query = query.ilike('state', `%${filters.state}%`);
+                if (filters.district) query = query.eq('district', filters.district);
 
                 if (filters.minAge || filters.maxAge) {
                     const year = new Date().getFullYear();
@@ -153,8 +162,8 @@ export function AdminNotificationConsole() {
                 if (mode === 'filter') {
                     if (filters.bloodGroup) query = query.eq('blood_group', filters.bloodGroup);
                     if (filters.gender) query = query.eq('gender', filters.gender);
-                    if (filters.city) query = query.ilike('city', `%${filters.city}%`);
                     if (filters.state) query = query.ilike('state', `%${filters.state}%`);
+                    if (filters.district) query = query.eq('district', filters.district);
                     if (filters.minAge || filters.maxAge) {
                         const year = new Date().getFullYear();
                         if (filters.minAge) query = query.lte('dob', `${year - parseInt(filters.minAge)}-12-31`);
@@ -364,17 +373,18 @@ export function AdminNotificationConsole() {
                                     placeholder="65"
                                 />
                             </div>
-                            <Input
-                                label="City"
-                                value={filters.city}
-                                onChange={e => setFilters(prev => ({ ...prev, city: e.target.value }))}
-                                placeholder="e.g. Kochi"
-                            />
                             <Select
                                 label="State"
                                 value={filters.state}
-                                onChange={e => setFilters(prev => ({ ...prev, state: e.target.value }))}
+                                onChange={e => setFilters(prev => ({ ...prev, state: e.target.value, district: '' }))}
                                 options={[{ value: '', label: 'Any state' }, ...STATE_NAMES.map(name => ({ value: name, label: name }))]}
+                            />
+                            <Select
+                                label="District"
+                                value={filters.district}
+                                disabled={!filters.state}
+                                onChange={e => setFilters(prev => ({ ...prev, district: e.target.value }))}
+                                options={[{ value: '', label: filters.state ? 'Any district' : 'Choose a state first' }, ...districtsOf(filters.state).map(name => ({ value: name, label: name }))]}
                             />
                             <div className="flex items-end">
                                 <Button

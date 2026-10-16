@@ -113,7 +113,7 @@ export function DonorLocationPicker({ value, mode, onSaved, onPick }: Props) {
             if (kind === 'pin' && !saved) {
                 setMessage({ tone: 'error', text: 'We couldn’t find your PIN code on the map. Place yourself on the map instead.' });
             } else if (kind === 'pin' && data?.reason === 'pin_not_found') {
-                setMessage({ tone: 'ok', text: `We couldn’t find your PIN code on the map, so we placed you at the centre of ${saved?.label || 'your city'}.` });
+                setMessage({ tone: 'ok', text: `We couldn’t find your PIN code on the map, so we placed you at the centre of ${saved?.label || 'your district'}.` });
             } else {
                 setMessage({ tone: 'ok', text: kind === 'pin' && saved?.label ? `Location saved: ${saved.label}.` : 'Location saved.' });
             }
@@ -146,7 +146,7 @@ export function DonorLocationPicker({ value, mode, onSaved, onPick }: Props) {
     } else {
         status = mode === 'defer'
             ? 'Optional. If you skip this, we place you at the centre of your PIN code area.'
-            : <span className="text-warning-800">No location yet, so you’re only matched by city. Add one to get alerts from hospitals near you.</span>;
+            : <span className="text-warning-800">No location yet, so you’re only matched by district. Add one to get alerts from hospitals near you.</span>;
     }
 
     return (

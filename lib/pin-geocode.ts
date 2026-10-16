@@ -2,7 +2,7 @@ import { searchPlaces, UpstreamError, type UpstreamReason } from '@/lib/nominati
 import { insideIndia } from '@/lib/location';
 
 /**
- * Server-only: the centre of an Indian PIN code area (or of a city), robust to
+ * Server-only: the centre of an Indian PIN code area (or of a district or city), robust to
  * one geocoder being slow, blocked or down.
  *
  * Order, most precise first:
@@ -142,6 +142,55 @@ async function indiaPost(zip: string, timeoutMs: number): Promise<{ district: st
     return office ? { district: str(office.District)!, state: str(office.State)! } : null;
 }
 
+/** The centre of `district` in `state` (Photon, then Nominatim), or null. */
+async function districtCentre(tries: Attempts, district: string, state: string | null): Promise<Area | null> {
+    const query = [district, state, 'India'].filter(Boolean).join(', ');
+    const found = (await tries.run('photon district', timeoutMs => photon(query, timeoutMs)))?.[0]
+        ?? (await tries.run('nominatim district', timeoutMs =>
+            searchPlaces(`q=${encodeURIComponent(query)}`, 1, { timeoutMs, slotAttempts: 2 })))?.[0];
+    return found
+        ? { latitude: found.latitude, longitude: found.longitude, precision: 'district', district, state, city: null }
+        : null;
+}
+
+// PIN -> India Post's district and state, kept as long as a found area.
+const regionCache = new Map<string, { at: number; value: { district: string; state: string } }>();
+function rememberRegion(zip: string, value: { district: string; state: string }) {
+    if (regionCache.size >= MAX_CACHE) regionCache.delete(regionCache.keys().next().value!);
+    regionCache.set(zip, { at: Date.now(), value });
+}
+
+/**
+ * The district and state PIN code `zip` (6 digits, validated by the caller)
+ * belongs to, as India Post lists them; no coordinates. null when the PIN
+ * doesn't exist or the directory can't be reached (one call, short timeout).
+ * Names are India Post's spelling: match them with lib/india-regions.
+ */
+export async function pinRegion(zip: string, timeoutMs = CALL_TIMEOUT_MS): Promise<{ district: string; state: string } | null> {
+    const hit = regionCache.get(zip);
+    if (hit && Date.now() - hit.at <= FOUND_TTL_MS) return hit.value;
+    try {
+        const post = await indiaPost(zip, timeoutMs);
+        if (post && post !== 'none') { rememberRegion(zip, post); return post; }
+    } catch (error) {
+        console.error('pin region: india post failed:', error instanceof Error ? error.message : error);
+    }
+    return null;
+}
+
+/** The centre of a district (a listed name, with its state if known). */
+export async function locateDistrict(district: string, state: string | null): Promise<AreaLookup> {
+    const key = `district:${(state ?? '').toLowerCase()}:${district.toLowerCase()}`;
+    const hit = cached(key);
+    if (hit) return hit;
+
+    const tries = new Attempts();
+    const area = await districtCentre(tries, district, state);
+    if (area) return remember(key, { status: 'found', area });
+    if (tries.anyFailed) return { status: 'unavailable', reason: tries.reason };
+    return remember(key, { status: 'not_found' });
+}
+
 /** The centre of PIN code `zip` (6 digits, validated by the caller). */
 export async function locatePin(zip: string): Promise<AreaLookup> {
     const key = `pin:${zip}`;
@@ -173,16 +222,9 @@ export async function locatePin(zip: string): Promise<AreaLookup> {
     const post = await tries.run('india post', timeoutMs => indiaPost(zip, timeoutMs));
     if (post === 'none') return remember(key, { status: 'not_found' });
     if (post) {
-        const query = `${post.district}, ${post.state}, India`;
-        const district = (await tries.run('photon district', timeoutMs => photon(query, timeoutMs)))?.[0]
-            ?? (await tries.run('nominatim district', timeoutMs =>
-                searchPlaces(`q=${encodeURIComponent(query)}`, 1, { timeoutMs, slotAttempts: 2 })))?.[0];
-        if (district) {
-            return remember(key, { status: 'found', area: {
-                latitude: district.latitude, longitude: district.longitude, precision: 'district',
-                district: post.district, state: post.state, city: null,
-            } });
-        }
+        rememberRegion(zip, post);
+        const area = await districtCentre(tries, post.district, post.state);
+        if (area) return remember(key, { status: 'found', area });
     }
 
     // Nothing found. If a service failed along the way we can't be sure the PIN

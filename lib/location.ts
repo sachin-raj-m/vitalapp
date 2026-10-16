@@ -44,7 +44,7 @@ export function usableLocation(value: unknown): StoredLocation | null {
     };
 }
 
-/** Set from the device or placed on a map, rather than a PIN code or city centre. */
+/** Set from the device or placed on a map, rather than a PIN code or district centre. */
 export function isPrecise(location: StoredLocation | null): boolean {
     return !!location && (location.source === 'gps' || location.source === 'manual');
 }
@@ -61,7 +61,7 @@ export function describeSource(source: LocationSource | undefined): string {
         case 'gps': return 'from your device';
         case 'manual': return 'placed by you on the map';
         case 'pin': return 'the centre of your PIN code area';
-        case 'city': return 'the centre of your city';
+        case 'city': return 'the centre of your district';
         default: return 'saved location';
     }
 }
