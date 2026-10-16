@@ -89,17 +89,33 @@ export function DonorLocationPicker({ value, mode, onSaved, onPick }: Props) {
         setMessage(null);
         setBusy(kind);
         try {
-            const res = await authedFetch('/api/profile/location', { method: 'POST', body: JSON.stringify(body) });
+            let res: Response;
+            try {
+                // The server gives up on the map services after ~20 s; don't hang longer than it.
+                res = await authedFetch('/api/profile/location', { method: 'POST', body: JSON.stringify(body), signal: AbortSignal.timeout(35000) });
+            } catch (err) {
+                throw new Error(err instanceof Error && err.name === 'TimeoutError'
+                    ? 'This is taking too long. Try again in a minute, or place yourself on the map instead.'
+                    : 'Couldn’t reach Vital. Check your internet connection and try again.');
+            }
             const data = await res.json().catch(() => null);
             if (res.status === 429) throw new Error('Too many changes. Please wait a minute and try again.');
+            if (res.status === 504) throw new Error('The map service took too long. Try again in a minute, or place yourself on the map instead.');
             if (!res.ok) throw new Error(data?.error || 'Could not save your location. Please try again.');
+            if (data?.reason === 'no_pin') {
+                // Nothing changed on the server.
+                setMessage({ tone: 'error', text: 'Add your PIN code to your profile and save it first.' });
+                return;
+            }
             const saved = usableLocation(data?.location);
             setDraft(null);
             setMapOpen(false);
             if (kind === 'pin' && !saved) {
-                setMessage({ tone: 'error', text: data?.reason === 'no_pin' ? 'Add your PIN code first.' : 'We couldn’t find your PIN code on the map. Place yourself on the map instead.' });
+                setMessage({ tone: 'error', text: 'We couldn’t find your PIN code on the map. Place yourself on the map instead.' });
+            } else if (kind === 'pin' && data?.reason === 'pin_not_found') {
+                setMessage({ tone: 'ok', text: `We couldn’t find your PIN code on the map, so we placed you at the centre of ${saved?.label || 'your city'}.` });
             } else {
-                setMessage({ tone: 'ok', text: 'Location saved.' });
+                setMessage({ tone: 'ok', text: kind === 'pin' && saved?.label ? `Location saved: ${saved.label}.` : 'Location saved.' });
             }
             onSaved?.(saved);
         } catch (err) {

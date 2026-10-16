@@ -75,6 +75,9 @@ export function distanceKm(aLat: number, aLng: number, bLat: number, bLng: numbe
     return 2 * 6371 * Math.asin(Math.sqrt(h));
 }
 
+/** An Indian PIN code: six digits, not starting with 0. */
+export const PIN_CODE = /^[1-9][0-9]{5}$/;
+
 /** Device positions rougher than this are refused (IP-based desktop guesses can be a whole city off). */
 export const MAX_GPS_ACCURACY_M = 5000;
 
