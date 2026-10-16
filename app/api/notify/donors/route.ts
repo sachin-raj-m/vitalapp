@@ -10,9 +10,15 @@ import type { BloodGroup } from '@/types'
 import { TEMPLATES, sendTemplate, waNumber, whatsappEnabled } from '@/lib/whatsapp'
 import { formatNeededBy, placeLabel } from '@/lib/share'
 import { MATCH_RADIUS_KM, hasUsableLocation } from '@/lib/geo'
+import { PIN_CODE } from '@/lib/location'
+import { pinRegion } from '@/lib/pin-geocode'
+import { matchDistrict, matchState, resolveRegion } from '@/lib/india-regions'
 
 // A donor gets at most this many WhatsApp alerts in 24 hours.
 const WHATSAPP_ALERTS_PER_DAY = 3
+
+// Sends can take a while, and the PIN code's district is looked up first (up to 4 s).
+export const maxDuration = 60
 
 /**
  * Exact, case-insensitive match pattern for ilike: escapes LIKE wildcards
@@ -20,6 +26,27 @@ const WHATSAPP_ALERTS_PER_DAY = 3
  */
 function exactIlikePattern(value: string) {
     return value.replace(/[\\%_*]/g, ch => `\\${ch}`)
+}
+
+/**
+ * The request's district and state, as listed in lib/india-regions: from its
+ * PIN code (India Post's directory, one short call), else from the typed city
+ * when that is a district's name or a known alias ("Trivandrum"), within the
+ * PIN's state if we got that far. Empty strings when it can't be told.
+ */
+async function requestRegion(zipcode: string | null, city: string | null): Promise<{ state: string; district: string }> {
+    const zip = (zipcode ?? '').replace(/\s/g, '')
+    let state = ''
+    if (PIN_CODE.test(zip)) {
+        const post = await pinRegion(zip, 4000)
+        if (post) {
+            const r = resolveRegion(post.state, post.district)
+            if (r.district) return r
+            state = r.state
+        }
+    }
+    if (state) return { state, district: matchDistrict(state, city) }
+    return resolveRegion(null, city)
 }
 
 type Donor = { id: string; full_name: string | null; email: string | null; phone: string | null; whatsapp_alerts: boolean | null }
@@ -33,14 +60,22 @@ type Donor = { id: string; full_name: string | null; email: string | null; phone
  *  - Donors with a usable location within MATCH_RADIUS_KM of the request's
  *    location ("radius" donors): WhatsApp (opted in, daily cap), else email,
  *    plus web push.
- *  - Donors with NO usable location in the request's city ("city fallback"
- *    donors): email only. Never WhatsApp or push: we cannot tell whether they
- *    are within the radius, but email is cheap and keeps them from being cut
- *    off until they set a location. Donors who do have a location outside the
- *    radius are not alerted at all, even in the same city.
- *  - Requests without valid coordinates: no radius audience; the city
- *    fallback covers every compatible donor in the city, by email and web
+ *  - Donors with NO usable location in the request's area ("area fallback",
+ *    reported as matchedCityFallback for compatibility): email only. Never
+ *    WhatsApp or push: we cannot tell whether they are within the radius, but
+ *    email is cheap and keeps them from being cut off until they set a
+ *    location. Donors who do have a location outside the radius are not
+ *    alerted at all, even in the same district.
+ *  - Requests without valid coordinates: no radius audience; the area
+ *    fallback covers every compatible donor in the area, by email and web
  *    push (both free), never WhatsApp.
+ *
+ * "The request's area" is its district, worked out here from the request's
+ * PIN code (or its typed city) and saved on blood_requests.district/state.
+ * Donors match when their profile district is that district (and their state,
+ * if set, is its state). Donors whose profile city equals the request's typed
+ * city also match, as before, so older profiles with a hand-typed district
+ * aren't dropped.
  */
 export async function POST(request: Request) {
     const { supabase, user } = await getVerifiedUser(request)
@@ -61,7 +96,7 @@ export async function POST(request: Request) {
     // Read as the caller so RLS confirms ownership.
     const { data: bloodRequest } = await supabase
         .from('blood_requests')
-        .select('id, user_id, blood_group, hospital_name, city, location, urgency_level, status, created_at, date_needed')
+        .select('id, user_id, blood_group, hospital_name, city, zipcode, location, urgency_level, status, created_at, date_needed')
         .eq('id', requestId)
         .maybeSingle()
 
@@ -97,30 +132,48 @@ export async function POST(request: Request) {
             radiusDonors = (data ?? []) as Donor[]
         }
 
-        // 2. City fallback, email only: compatible donors in the same city with
-        // no usable location (or everyone in the city when the request itself
-        // has no coordinates). Donors with a location are judged by distance
-        // alone, so they are dropped here.
-        let cityDonors: Donor[] = []
-        if (city) {
-            const { data, error } = await admin
-                .from('profiles')
-                .select('id, full_name, email, phone, whatsapp_alerts, location')
-                .in('blood_group', groups)
-                .eq('is_donor', true)
-                .eq('is_available', true)
-                .neq('id', user.id)
-                .ilike('city', exactIlikePattern(city))
-            if (error) throw error
-            const inRadius = new Set(radiusDonors.map(d => d.id))
-            cityDonors = (data ?? [])
-                .filter(d => !inRadius.has(d.id) && (!point || !hasUsableLocation(d.location)))
-                .map(d => ({ id: d.id, full_name: d.full_name, email: d.email, phone: d.phone, whatsapp_alerts: d.whatsapp_alerts }))
+        // 2. Area fallback, email only: compatible donors in the same district
+        // with no usable location (or everyone in the district when the request
+        // itself has no coordinates). Donors with a location are judged by
+        // distance alone, so they are dropped here.
+        const region = await requestRegion(bloodRequest.zipcode, city || null)
+        if (region.district) {
+            // Best effort: lets the admin pages count requests by district.
+            await admin.from('blood_requests').update({ district: region.district, state: region.state || null })
+                .eq('id', bloodRequest.id).then(() => {}, () => {})
         }
+        const sameArea = (column: 'district' | 'city', value: string) => admin
+            .from('profiles')
+            .select('id, full_name, email, phone, whatsapp_alerts, location, state')
+            .in('blood_group', groups)
+            .eq('is_donor', true)
+            .eq('is_available', true)
+            .neq('id', user.id)
+            .ilike(column, exactIlikePattern(value))
+        const [byDistrict, byCity] = await Promise.all([
+            region.district ? sameArea('district', region.district) : null,
+            city ? sameArea('city', city) : null,
+        ])
+        if (byDistrict?.error) throw byDistrict.error
+        if (byCity?.error) throw byCity.error
+        type AreaDonor = NonNullable<NonNullable<typeof byCity>['data']>[number]
+        const areaMatches = new Map<string, AreaDonor>()
+        // The same district name in another (recognised) state, e.g. Aurangabad,
+        // is another place; an unset or unrecognised state doesn't rule a donor out.
+        for (const d of byDistrict?.data ?? []) {
+            const donorState = matchState(d.state)
+            if (!region.state || !donorState || donorState === region.state) areaMatches.set(d.id, d)
+        }
+        for (const d of byCity?.data ?? []) areaMatches.set(d.id, d)
+        const inRadius = new Set(radiusDonors.map(d => d.id))
+        const cityDonors: Donor[] = [...areaMatches.values()]
+            .filter(d => !inRadius.has(d.id) && (!point || !hasUsableLocation(d.location)))
+            .map(d => ({ id: d.id, full_name: d.full_name, email: d.email, phone: d.phone, whatsapp_alerts: d.whatsapp_alerts }))
 
         const counts = {
             radiusKm: MATCH_RADIUS_KM,
             requestHasLocation: Boolean(point),
+            requestDistrict: region.district || null,
             matchedWithinRadius: radiusDonors.length,
             matchedCityFallback: cityDonors.length,
         }
@@ -157,7 +210,7 @@ export async function POST(request: Request) {
             }))
         }
 
-        // Email for radius donors not reached on WhatsApp, and for the city fallback.
+        // Email for radius donors not reached on WhatsApp, and for the area fallback.
         let emailsSent = 0
         let emailsSentCityFallback = 0
         const fallbackIds = new Set(cityDonors.map(d => d.id))
@@ -182,7 +235,7 @@ export async function POST(request: Request) {
         }
 
         // Web push: radius donors; for a request without coordinates, the
-        // city fallback instead (there is no radius audience then). Donors
+        // area fallback instead (there is no radius audience then). Donors
         // without a location never get push for a request that has one.
         let pushSent = 0
         const pushAudience = point ? radiusDonors : cityDonors

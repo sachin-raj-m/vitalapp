@@ -47,7 +47,7 @@ export default function PrivacyPage() {
                     heading: 'Why we use it',
                     body: (
                         <ul>
-                            <li>To alert you to requests within {MATCH_RADIUS_KM} km of your point that your blood group can donate to. If you haven’t set a point, we may email you about requests in your city.</li>
+                            <li>To alert you to requests within {MATCH_RADIUS_KM} km of your point that your blood group can donate to. If you haven’t set a point, we may email you about requests in your district.</li>
                             <li>To show a donor and a requester each other’s contact details once the donor offers on that request.</li>
                             <li>To show a reminder of when you may be able to donate again (90 days for men, 120 for women), based on dates you enter.</li>
                             <li>To mark a donation as completed in Vital when the requester enters the PIN for your offer.</li>

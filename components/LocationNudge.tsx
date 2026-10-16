@@ -10,7 +10,7 @@ const DISMISS_KEY = 'vital:location-nudge-dismissed';
 
 /**
  * Shown to donors with no usable location (none stored, or the old (0,0)
- * placeholder): without one they're only matched by city, not by distance.
+ * placeholder): without one they're only matched by district, not by distance.
  * Dismissing hides it for this browser session only.
  */
 export function LocationNudge({ className = '' }: { className?: string }) {
@@ -32,7 +32,7 @@ export function LocationNudge({ className = '' }: { className?: string }) {
             <div className="flex-1">
                 <h2 id="location-nudge-title" className="font-medium text-gray-900">Add your location to get alerts near you</h2>
                 <p className="mt-1 text-sm leading-relaxed text-gray-700">
-                    We don’t know where you are yet, so you’re only matched by city and may miss requests from hospitals close by.
+                    We don’t know where you are yet, so you’re only matched by district and may miss requests from hospitals close by.
                     It takes one tap, and no one else sees it exactly.
                 </p>
             </div>

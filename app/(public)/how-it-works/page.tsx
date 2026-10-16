@@ -46,7 +46,7 @@ const STEPS = [
         lead: 'Donors whose listed blood group matches are alerted.',
         body: [
             `Vital looks for available donors within ${MATCH_RADIUS_KM} km of the hospital whose listed blood group is compatible with the request. For a B+ patient, for example, that includes O−, O+, B− and B+ donors. Blood groups are entered by donors themselves.`,
-            'Those donors are alerted by notification and message. Donors who have not added a location yet are matched by city instead and get an email. Each donor decides for themselves whether to respond.',
+            'Those donors are alerted by notification and message. Donors who have not added a location yet are matched by district instead and get an email. Each donor decides for themselves whether to respond.',
         ],
         figure: (
             <div role="img" aria-label="For a B+ patient: O−, O+, B− and B+ donors match; A−, A+, AB− and AB+ do not." className="grid grid-cols-4 gap-px overflow-hidden rounded-md bg-gray-200 font-serif text-3xl font-medium">

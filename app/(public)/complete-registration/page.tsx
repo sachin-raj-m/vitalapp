@@ -37,7 +37,6 @@ interface CompleteRegistrationForm {
     phone: string;
     bloodGroup: BloodGroup | '';
     state: string;
-    city: string;
     district: string;
     permanentZip: string;
     presentZip: string;
@@ -63,7 +62,6 @@ export default function CompleteRegistration() {
         phone: '',
         bloodGroup: '',
         state: '',
-        city: '',
         district: '',
         permanentZip: '',
         presentZip: '',
@@ -121,7 +119,7 @@ export default function CompleteRegistration() {
                     // start from what's already saved, so they only add what's missing.
                     const { data: saved } = await supabase
                         .from('profiles')
-                        .select('full_name, phone, dob, gender, blood_group, city, district, state, permanent_zip, present_zip, availability, whatsapp_alerts')
+                        .select('full_name, phone, dob, gender, blood_group, district, state, permanent_zip, present_zip, availability, whatsapp_alerts')
                         .eq('id', user.id)
                         .maybeSingle();
                     if (saved) {
@@ -136,7 +134,6 @@ export default function CompleteRegistration() {
                             dob: saved.dob || prev.dob,
                             gender: saved.gender || prev.gender,
                             bloodGroup: (saved.blood_group as BloodGroup) || prev.bloodGroup,
-                            city: saved.city || prev.city,
                             district: region.district || prev.district,
                             state: region.state || prev.state,
                             permanentZip: saved.permanent_zip || prev.permanentZip,
@@ -174,7 +171,6 @@ export default function CompleteRegistration() {
         if (!formData.bloodGroup) errors.bloodGroup = 'Blood Group is required';
         if (!formData.state) errors.state = 'Choose your state';
         if (!formData.district || !districtsOf(formData.state).includes(formData.district)) errors.district = 'Choose your district';
-        if (!formData.city.trim()) errors.city = 'City is required';
         if (!formData.permanentZip.trim()) errors.permanentZip = 'Permanent Zip Code is required';
         if (!formData.presentZip.trim()) errors.presentZip = 'Present Zip Code is required';
 
@@ -234,7 +230,9 @@ export default function CompleteRegistration() {
                         dob: formData.dob,
                         gender: formData.gender,
                         blood_group: formData.bloodGroup || null,
-                        city: formData.city,
+                        // City isn't asked any more (the PIN code and district say
+                        // where): kept equal to the district for older readers.
+                        city: formData.district,
                         district: formData.district,
                         state: formData.state,
                         permanent_zip: formData.permanentZip,
@@ -277,7 +275,7 @@ export default function CompleteRegistration() {
 
             // Place the donor: the point they chose, else their PIN code centre
             // (both server-side). Waited for briefly so the dashboard shows it, but
-            // never blocks registration: without it we still match by city.
+            // never blocks registration: without it we still match by district.
             const saveLocation = async () => {
                 const post = (body: Record<string, unknown>) =>
                     authedFetch('/api/profile/location', { method: 'POST', keepalive: true, body: JSON.stringify(body) });
@@ -484,7 +482,6 @@ export default function CompleteRegistration() {
                         stateError={fieldErrors.state}
                         districtError={fieldErrors.district}
                     />
-                    <Input label="City" value={formData.city} onChange={e => set('city', e.target.value)} required autoComplete="address-level2" placeholder="e.g. Kochi" error={fieldErrors.city} />
                     <div className="grid gap-4 sm:grid-cols-2">
                         <Input label="Current PIN code" inputMode="numeric" value={formData.presentZip} onChange={e => set('presentZip', e.target.value)} required placeholder="e.g. 682011" error={fieldErrors.presentZip} />
                         <Input label="Permanent PIN code" inputMode="numeric" value={formData.permanentZip} onChange={e => set('permanentZip', e.target.value)} required placeholder="e.g. 682011" error={fieldErrors.permanentZip} />

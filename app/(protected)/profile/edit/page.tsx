@@ -40,7 +40,6 @@ export default function ProfileEditPage() {
         present_zip: '',
         state: '',
         district: '',
-        city: '',
         is_public_profile: false,
         whatsapp_alerts: false,
         blood_group: '' as BloodGroup | '',
@@ -56,7 +55,7 @@ export default function ProfileEditPage() {
     // e.g. before a WhatsApp START or verification). Once the person has edited
     // something, later reloads must not wipe those unsaved edits.
     const lastFilled = useRef<typeof editForm | null>(null);
-    const [locationErrors, setLocationErrors] = useState<{ state?: string; district?: string; city?: string }>({});
+    const [locationErrors, setLocationErrors] = useState<{ state?: string; district?: string }>({});
     useEffect(() => {
         if (!user) return;
         // A hand-typed state or district (from before the dropdowns) is shown
@@ -70,7 +69,6 @@ export default function ProfileEditPage() {
             present_zip: user.present_zip || '',
             state: region.state,
             district: region.district,
-            city: user.city || '',
             is_public_profile: user.is_public_profile || false,
             whatsapp_alerts: user.whatsapp_alerts || false,
             blood_group: (user.blood_group as BloodGroup) || '',
@@ -100,11 +98,11 @@ export default function ProfileEditPage() {
             is_available: editForm.is_available,
             permanent_zip: editForm.permanent_zip,
             present_zip: editForm.present_zip,
-            city: editForm.city.trim(),
             // Only names picked from the list are saved. An old typed value
             // that didn't match stays as it is until the person picks one.
+            // City isn't asked any more: kept equal to the district.
             ...(editForm.state ? { state: editForm.state } : {}),
-            ...(editForm.district ? { district: editForm.district } : {}),
+            ...(editForm.district ? { district: editForm.district, city: editForm.district } : {}),
             is_public_profile: editForm.is_public_profile,
             whatsapp_alerts: editForm.whatsapp_alerts,
         });
@@ -143,7 +141,6 @@ export default function ProfileEditPage() {
         const regionTouched = !!lastFilled.current
             && (editForm.state !== lastFilled.current.state || editForm.district !== lastFilled.current.district);
         const problems: typeof locationErrors = {};
-        if (!editForm.city.trim()) problems.city = 'City is required';
         if (regionTouched && !editForm.state) problems.state = 'Choose your state';
         if ((regionTouched || editForm.district) && !districtsOf(editForm.state).includes(editForm.district)) problems.district = 'Choose your district';
         setLocationErrors(problems);
@@ -426,7 +423,6 @@ export default function ProfileEditPage() {
                         stateError={locationErrors.state}
                         districtError={locationErrors.district}
                     />
-                    <Input label="City" value={editForm.city} onChange={(e) => { setEditForm({ ...editForm, city: e.target.value }); setLocationErrors(prev => ({ ...prev, city: undefined })); }} required autoComplete="address-level2" placeholder="e.g. Kochi" error={locationErrors.city} />
                     <div className="grid gap-4 sm:grid-cols-2">
                         <Input label="Current PIN code" inputMode="numeric" value={editForm.present_zip} onChange={(e) => setEditForm({ ...editForm, present_zip: e.target.value })} required />
                         <Input label="Permanent PIN code" inputMode="numeric" value={editForm.permanent_zip} onChange={(e) => setEditForm({ ...editForm, permanent_zip: e.target.value })} required />

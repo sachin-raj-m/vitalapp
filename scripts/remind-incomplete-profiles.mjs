@@ -1,7 +1,10 @@
 #!/usr/bin/env node
-// Emails people whose Vital profile isn't complete (no name, city or district:
+// Emails people whose Vital profile isn't complete (no name, state or district:
 // the rule in lib/auth-helpers.ts isRegistrationComplete) and asks them to
 // finish it. Only addresses that have been confirmed are emailed.
+// Run scripts/normalize-regions.ts --apply first: it fills in the state of
+// older profiles whose district names one listed district, which the app
+// counts as complete.
 //
 //   node --env-file=.env scripts/remind-incomplete-profiles.mjs              (dry run: counts only)
 //   node --env-file=.env scripts/remind-incomplete-profiles.mjs --test you@example.com
@@ -42,7 +45,7 @@ const html = (name) => {
       <tr><td style="padding: 36px 32px;">
         <p style="${p}">Hi ${escapeHtml(name || 'there')},</p>
         <p style="${p}">Thank you for signing up to Vital. Your profile isn't finished yet, so we can't alert you when someone near you needs blood.</p>
-        <p style="${p}">It takes about two minutes: your blood group, your city and district, your PIN code, and where we should alert you from. Your number is never shown to anyone until you offer to help.</p>
+        <p style="${p}">It takes about two minutes: your blood group, your state and district, your PIN code, and where we should alert you from. Your number is never shown to anyone until you offer to help.</p>
         <p style="margin: 8px 0 24px 0;">
           <a href="${SITE_URL}/login" style="background-color: #111827; color: #ffffff; display: inline-block; padding: 12px 22px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 15px;">Finish my profile</a>
         </p>
@@ -74,13 +77,13 @@ if (testTo) {
 
 const { data: profiles, error } = await supabase
     .from('profiles')
-    .select('id, email, full_name, city, district, email_verified_at');
+    .select('id, email, full_name, state, district, email_verified_at');
 if (error) {
     console.error('Could not read profiles:', error.message);
     process.exit(1);
 }
 
-const incomplete = profiles.filter(p => blank(p.full_name) || blank(p.city) || blank(p.district));
+const incomplete = profiles.filter(p => blank(p.full_name) || blank(p.state) || blank(p.district));
 const reachable = incomplete.filter(p => p.email && p.email_verified_at);
 console.log(`incomplete profiles: ${incomplete.length}, with a confirmed email: ${reachable.length}`);
 if (!apply) {

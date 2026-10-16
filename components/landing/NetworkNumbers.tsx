@@ -21,7 +21,7 @@ export function NetworkNumbers({ stats }: { stats: PublicStats }) {
             value: s.available_donors < s.donors ? s.available_donors : 0,
             label: plural(s.available_donors, 'Donor available now', 'Donors available now'),
         },
-        { key: 'cities', value: s.cities, label: plural(s.cities, 'City with donors', 'Cities with donors') },
+        { key: 'districts', value: s.districts, label: plural(s.districts, 'District with donors', 'Districts with donors') },
     ].filter(item => item.value > 0);
 
     const units = s.units_donated;

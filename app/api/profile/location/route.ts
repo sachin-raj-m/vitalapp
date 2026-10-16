@@ -2,7 +2,8 @@ import { NextResponse } from 'next/server';
 import { getVerifiedUser } from '@/lib/supabase-route';
 import { rateLimitAll, tooManyRequests } from '@/lib/rate-limit';
 import { reversePlace, type Place } from '@/lib/nominatim';
-import { locateCity, locatePin, type AreaLookup } from '@/lib/pin-geocode';
+import { locateCity, locateDistrict, locatePin, type AreaLookup } from '@/lib/pin-geocode';
+import { resolveRegion } from '@/lib/india-regions';
 import { distanceKm, insideIndia, usableLocation, isPrecise, MAX_GPS_ACCURACY_M, PIN_CODE } from '@/lib/location';
 
 /**
@@ -10,9 +11,12 @@ import { distanceKm, insideIndia, usableLocation, isPrecise, MAX_GPS_ACCURACY_M,
  *
  * Body (JSON, optional):
  *   {}                                   PIN code fallback (default): geocode the
- *   { mode: 'pin', replace?: boolean }   caller's saved present_zip (or city) to the
+ *   { mode: 'pin', replace?: boolean }   caller's saved present_zip to the
  *                                        area centre (lib/pin-geocode: Nominatim,
  *                                        then Photon, then India Post's district).
+ *                                        A PIN no geocoder knows falls back to the
+ *                                        centre of the profile's district (or, for
+ *                                        an older profile without one, its city).
  *                                        A point the donor set precisely is kept if
  *                                        it is within 15 km of the new PIN area, or
  *                                        if the PIN can't be found, unless replace
@@ -84,7 +88,7 @@ export async function POST(request: Request) {
     // RLS: the user's own client can only read and update their own row.
     const { data: profile, error: readError } = await supabase
         .from('profiles')
-        .select('present_zip, city, location')
+        .select('present_zip, city, district, state, location')
         .eq('id', user.id)
         .maybeSingle();
     if (readError || !profile) return NextResponse.json({ error: 'Profile not found' }, { status: 404 });
@@ -116,14 +120,21 @@ export async function POST(request: Request) {
         const zip = typeof profile.present_zip === 'string' ? profile.present_zip.replace(/\s/g, '') : '';
         const validZip = PIN_CODE.test(zip);
         const city = typeof profile.city === 'string' ? profile.city.trim().slice(0, MAX_CITY) : '';
-        if (!validZip && !city) {
+        // Listed names only: a hand-typed district isn't searched for.
+        const region = resolveRegion(profile.state, profile.district);
+        if (!validZip && !region.district && !city) {
             return NextResponse.json({ updated: false, reason: 'no_pin', error: 'Add your PIN code to your profile and save it first.' });
         }
 
-        // The PIN area first (several geocoders), then the city centre.
+        // The PIN area first (several geocoders), then the district centre
+        // (older profiles without a listed district: the city centre).
         let lookup: AreaLookup = { status: 'not_found' };
+        let fallback = false;
         if (validZip) lookup = await locatePin(zip);
-        if (lookup.status === 'not_found' && city) lookup = await locateCity(city);
+        if (lookup.status === 'not_found' && (region.district || city)) {
+            fallback = true;
+            lookup = region.district ? await locateDistrict(region.district, region.state || null) : await locateCity(city);
+        }
 
         if (lookup.status === 'unavailable') {
             // Outage: keep whatever is stored; ranking by PIN area still works.
@@ -157,18 +168,22 @@ export async function POST(request: Request) {
             kept = true;
             location = null;
         } else if (found) {
-            const label = found.precision === 'pin' ? `PIN ${zip} area`
+            // A PIN that wasn't found falls back to the district (or city)
+            // centre: stored as source 'city', a rough area rather than the PIN's.
+            const label = fallback
+                ? (found.precision === 'district' ? `${found.district} district` : (found.city ?? city))
+                : found.precision === 'pin' ? `PIN ${zip} area`
                 : found.precision === 'district' ? `${found.district} district (PIN ${zip})`
                 : (found.city ?? city);
             location = {
                 latitude: Math.round(found.latitude * 1000) / 1000,
                 longitude: Math.round(found.longitude * 1000) / 1000,
-                source: found.precision === 'city' ? 'city' : 'pin',
+                source: fallback || found.precision === 'city' ? 'city' : 'pin',
                 accuracy_m: found.precision === 'pin' ? 5000 : 15000,
                 label: label.slice(0, 120),
                 updated_at: nowIso(),
             };
-            pinNotFound = validZip && found.precision === 'city';
+            pinNotFound = validZip && fallback;
         } else {
             // Not found: clear any stale coordinates (e.g. from a previous PIN code).
             location = null;

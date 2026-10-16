@@ -408,7 +408,7 @@ export default function CreateRequestPage() {
                 <h1 className="display text-4xl sm:text-[2.75rem]">Request blood</h1>
                 <p className="mt-3 max-w-xl leading-relaxed text-gray-600">
                     When you post a request, available donors within {MATCH_RADIUS_KM} km of the hospital whose listed blood group
-                    is compatible are alerted. Donors who haven’t added a location yet are emailed if they are in the same city. You will also get a link you can share.
+                    is compatible are alerted. Donors who haven’t added a location yet are emailed if they are in the same district. You will also get a link you can share.
                 </p>
             </header>
 
@@ -555,7 +555,7 @@ export default function CreateRequestPage() {
                     </div>
                     <Input label="Address" value={formData.hospitalAddress} onChange={(e) => setFormData({ ...formData, hospitalAddress: e.target.value })} required />
                     <div className="grid gap-4 sm:grid-cols-2">
-                        <Input label="City" value={formData.city} onChange={(e) => setFormData({ ...formData, city: e.target.value })} required placeholder="e.g. Kochi" helperText="Filled from the pin; donors in this city are notified too." />
+                        <Input label="City" value={formData.city} onChange={(e) => setFormData({ ...formData, city: e.target.value })} required placeholder="e.g. Kochi" helperText="Filled from the pin. Donors in its district who haven’t set a location are emailed too." />
                         <Input label="PIN code" inputMode="numeric" maxLength={6} value={formData.zipcode} onChange={(e) => setFormData({ ...formData, zipcode: e.target.value.replace(/\D/g, '').slice(0, 6) })} required placeholder="e.g. 682011" />
                     </div>
                     {(cityMismatch || zipMismatch) && pinPlace && (

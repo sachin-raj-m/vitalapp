@@ -64,8 +64,11 @@ SELECT tests.is((SELECT j #>> '{people,whatsapp_opted_in}' FROM ai), '0', 'peopl
 SELECT tests.is((SELECT j #> '{people,donors_by_blood_group}' FROM ai),
   '[{"label": "B+", "count": 1, "available": 1}, {"label": "O-", "count": 1, "available": 1}]'::jsonb,
   'people: donors by blood group');
-SELECT tests.is((SELECT j #> '{people,top_cities,0}' FROM ai),
-  '{"label": "Testville", "donors": 2, "accounts": 3}'::jsonb, 'people: top city');
+-- By district since 20261018000300 (no fixture has one yet); top_cities is a copy.
+SELECT tests.is((SELECT j #> '{people,top_districts,0}' FROM ai),
+  '{"label": "Unknown", "state": null, "donors": 2, "accounts": 5}'::jsonb, 'people: top district');
+SELECT tests.is((SELECT j #> '{people,top_cities}' = j #> '{people,top_districts}' FROM ai), true,
+  'people: top_cities is kept as a copy of top_districts');
 
 -- Requests
 SELECT tests.is((SELECT j #>> '{requests,total}' FROM ai), '4', 'requests: 4 in total');
