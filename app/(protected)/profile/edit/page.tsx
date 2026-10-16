@@ -43,23 +43,31 @@ export default function ProfileEditPage() {
     const [otp, setOtp] = useState('');
     const [pendingPhone, setPendingPhone] = useState('');
 
-    // Fill the form once per account: later profile reloads (after saving the
-    // location or the blood group) must not wipe edits that aren't saved yet.
-    const formFilledFor = useRef<string | null>(null);
+    // Fill the form from the profile, and again whenever a newer copy arrives
+    // (the first one can be the browser's cached copy, older than the database:
+    // e.g. before a WhatsApp START or verification). Once the person has edited
+    // something, later reloads must not wipe those unsaved edits.
+    const lastFilled = useRef<typeof editForm | null>(null);
     useEffect(() => {
-        if (user && formFilledFor.current !== user.id) {
-            formFilledFor.current = user.id;
-            setEditForm({
-                full_name: user.full_name || '',
-                phone: user.phone || '',
-                is_available: user.is_available || false,
-                permanent_zip: user.permanent_zip || '',
-                present_zip: user.present_zip || '',
-                is_public_profile: user.is_public_profile || false,
-                whatsapp_alerts: user.whatsapp_alerts || false,
-                blood_group: (user.blood_group as BloodGroup) || '',
-            });
-        }
+        if (!user) return;
+        const fresh = {
+            full_name: user.full_name || '',
+            phone: user.phone || '',
+            is_available: user.is_available || false,
+            permanent_zip: user.permanent_zip || '',
+            present_zip: user.present_zip || '',
+            is_public_profile: user.is_public_profile || false,
+            whatsapp_alerts: user.whatsapp_alerts || false,
+            blood_group: (user.blood_group as BloodGroup) || '',
+        };
+        setEditForm(current => {
+            const same = (a: typeof current) => JSON.stringify(a) === JSON.stringify(current);
+            // Untouched, or already equal to the new copy (e.g. right after saving).
+            const untouched = !lastFilled.current || same(lastFilled.current) || same(fresh);
+            if (!untouched) return current;
+            lastFilled.current = fresh;
+            return fresh;
+        });
     }, [user]);
 
     // After a save that changed the PIN code, re-derive the map position on the
