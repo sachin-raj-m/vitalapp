@@ -21,6 +21,8 @@ import { DonorLocationPicker, type PickedPoint } from '@/components/DonorLocatio
 import { PHONE_TAKEN, formatWaNumber, isPhoneTakenError, waNumber } from '@/lib/phone';
 import { WHATSAPP_VERIFY_NUMBER } from '@/lib/features';
 import { WhatsAppVerify } from '@/components/WhatsAppVerify';
+import { StateDistrictSelect } from '@/components/StateDistrictSelect';
+import { districtsOf, resolveRegion } from '@/lib/india-regions';
 
 interface PendingRegistration {
     userId: string;
@@ -78,6 +80,9 @@ export default function CompleteRegistration() {
     const [pickedPoint, setPickedPoint] = useState<PickedPoint | null>(null);
     // A blood group saved earlier can't be changed here (only once, from Settings).
     const [savedBloodGroup, setSavedBloodGroup] = useState<BloodGroup | null>(null);
+    // A state or district typed by hand before the dropdowns, kept for the hint
+    // when it didn't match the list (the dropdown then starts empty).
+    const [typedRegion, setTypedRegion] = useState<{ state: string; district: string }>({ state: '', district: '' });
     // Set once the form is submitted, so reloading the profile afterwards
     // doesn't re-run the checks below and skip the verify step.
     const submitted = useRef(false);
@@ -120,6 +125,10 @@ export default function CompleteRegistration() {
                         .eq('id', user.id)
                         .maybeSingle();
                     if (saved) {
+                        // Older profiles have a hand-typed state and district:
+                        // preselect the listed names they match, else leave empty.
+                        const region = resolveRegion(saved.state, saved.district);
+                        setTypedRegion({ state: region.state ? '' : saved.state || '', district: region.district ? '' : saved.district || '' });
                         setFormData(prev => ({
                             ...prev,
                             fullName: saved.full_name || prev.fullName,
@@ -128,8 +137,8 @@ export default function CompleteRegistration() {
                             gender: saved.gender || prev.gender,
                             bloodGroup: (saved.blood_group as BloodGroup) || prev.bloodGroup,
                             city: saved.city || prev.city,
-                            district: saved.district || prev.district,
-                            state: saved.state || prev.state,
+                            district: region.district || prev.district,
+                            state: region.state || prev.state,
                             permanentZip: saved.permanent_zip || prev.permanentZip,
                             presentZip: saved.present_zip || prev.presentZip,
                             availability: saved.availability?.length ? saved.availability : prev.availability,
@@ -163,9 +172,9 @@ export default function CompleteRegistration() {
         if (!formData.dob) errors.dob = 'Date of birth is required';
         if (!formData.gender) errors.gender = 'Gender is required';
         if (!formData.bloodGroup) errors.bloodGroup = 'Blood Group is required';
-        if (!formData.state.trim()) errors.state = 'State is required';
+        if (!formData.state) errors.state = 'Choose your state';
+        if (!formData.district || !districtsOf(formData.state).includes(formData.district)) errors.district = 'Choose your district';
         if (!formData.city.trim()) errors.city = 'City is required';
-        if (!formData.district.trim()) errors.district = 'District is required';
         if (!formData.permanentZip.trim()) errors.permanentZip = 'Permanent Zip Code is required';
         if (!formData.presentZip.trim()) errors.presentZip = 'Present Zip Code is required';
 
@@ -465,11 +474,17 @@ export default function CompleteRegistration() {
                 </>)}
 
                 {section('Location', 'We alert you to requests near you, so this decides which alerts you receive.', <>
-                    <div className="grid gap-4 sm:grid-cols-2">
-                        <Input label="City" value={formData.city} onChange={e => set('city', e.target.value)} required placeholder="e.g. Kochi" error={fieldErrors.city} />
-                        <Input label="District" value={formData.district} onChange={e => set('district', e.target.value)} required placeholder="e.g. Ernakulam" error={fieldErrors.district} />
-                    </div>
-                    <Input label="State" value={formData.state} onChange={e => set('state', e.target.value)} required placeholder="e.g. Kerala" error={fieldErrors.state} />
+                    <StateDistrictSelect
+                        state={formData.state}
+                        district={formData.district}
+                        onChange={region => setFormData(prev => ({ ...prev, ...region }))}
+                        previousState={typedRegion.state}
+                        previousDistrict={typedRegion.district}
+                        required
+                        stateError={fieldErrors.state}
+                        districtError={fieldErrors.district}
+                    />
+                    <Input label="City" value={formData.city} onChange={e => set('city', e.target.value)} required autoComplete="address-level2" placeholder="e.g. Kochi" error={fieldErrors.city} />
                     <div className="grid gap-4 sm:grid-cols-2">
                         <Input label="Current PIN code" inputMode="numeric" value={formData.presentZip} onChange={e => set('presentZip', e.target.value)} required placeholder="e.g. 682011" error={fieldErrors.presentZip} />
                         <Input label="Permanent PIN code" inputMode="numeric" value={formData.permanentZip} onChange={e => set('permanentZip', e.target.value)} required placeholder="e.g. 682011" error={fieldErrors.permanentZip} />
