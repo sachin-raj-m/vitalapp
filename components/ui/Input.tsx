@@ -27,7 +27,7 @@ const FieldShell = ({ id, label, error, helperText, children }: FieldShellProps)
     )}
     {children}
     {error && <p id={`${id}-error`} className="text-[13px] text-red-700">{error}</p>}
-    {helperText && !error && <p className="text-[13px] text-gray-500">{helperText}</p>}
+    {helperText && !error && <p id={`${id}-help`} className="text-[13px] text-gray-500">{helperText}</p>}
   </div>
 );
 
@@ -71,6 +71,7 @@ export const Select: React.FC<SelectProps> = ({ label, error, helperText, option
         <select
           id={id}
           aria-invalid={!!error || undefined}
+          aria-describedby={error ? `${id}-error` : helperText ? `${id}-help` : undefined}
           className={cn(fieldBase, 'h-10 appearance-none pr-9', fieldState(error), className)}
           {...props}
         >

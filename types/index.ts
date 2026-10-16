@@ -14,6 +14,7 @@ export interface User {
   blood_group?: BloodGroup; // Optional
   city?: string;
   district?: string;
+  state?: string;
   permanent_zip?: string;
   present_zip?: string;
   is_donor: boolean;

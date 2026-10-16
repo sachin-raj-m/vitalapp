@@ -22,6 +22,8 @@ import { DonorLocationPicker } from '@/components/DonorLocationPicker';
 import { isPrecise, usableLocation } from '@/lib/location';
 import { contactVerification } from '@/lib/verification';
 import { cn } from '@/lib/cn';
+import { StateDistrictSelect } from '@/components/StateDistrictSelect';
+import { districtsOf, resolveRegion } from '@/lib/india-regions';
 
 export default function ProfileEditPage() {
     const router = useRouter();
@@ -36,6 +38,9 @@ export default function ProfileEditPage() {
         is_available: false,
         permanent_zip: '',
         present_zip: '',
+        state: '',
+        district: '',
+        city: '',
         is_public_profile: false,
         whatsapp_alerts: false,
         blood_group: '' as BloodGroup | '',
@@ -51,14 +56,21 @@ export default function ProfileEditPage() {
     // e.g. before a WhatsApp START or verification). Once the person has edited
     // something, later reloads must not wipe those unsaved edits.
     const lastFilled = useRef<typeof editForm | null>(null);
+    const [locationErrors, setLocationErrors] = useState<{ state?: string; district?: string; city?: string }>({});
     useEffect(() => {
         if (!user) return;
+        // A hand-typed state or district (from before the dropdowns) is shown
+        // as the listed name it matches, or left empty for the person to pick.
+        const region = resolveRegion(user.state, user.district);
         const fresh = {
             full_name: user.full_name || '',
             phone: user.phone || '',
             is_available: user.is_available || false,
             permanent_zip: user.permanent_zip || '',
             present_zip: user.present_zip || '',
+            state: region.state,
+            district: region.district,
+            city: user.city || '',
             is_public_profile: user.is_public_profile || false,
             whatsapp_alerts: user.whatsapp_alerts || false,
             blood_group: (user.blood_group as BloodGroup) || '',
@@ -88,6 +100,11 @@ export default function ProfileEditPage() {
             is_available: editForm.is_available,
             permanent_zip: editForm.permanent_zip,
             present_zip: editForm.present_zip,
+            city: editForm.city.trim(),
+            // Only names picked from the list are saved. An old typed value
+            // that didn't match stays as it is until the person picks one.
+            ...(editForm.state ? { state: editForm.state } : {}),
+            ...(editForm.district ? { district: editForm.district } : {}),
             is_public_profile: editForm.is_public_profile,
             whatsapp_alerts: editForm.whatsapp_alerts,
         });
@@ -122,6 +139,19 @@ export default function ProfileEditPage() {
         setError('');
         setSuccess('');
         const previousZip = user?.present_zip;
+
+        const regionTouched = !!lastFilled.current
+            && (editForm.state !== lastFilled.current.state || editForm.district !== lastFilled.current.district);
+        const problems: typeof locationErrors = {};
+        if (!editForm.city.trim()) problems.city = 'City is required';
+        if (regionTouched && !editForm.state) problems.state = 'Choose your state';
+        if ((regionTouched || editForm.district) && !districtsOf(editForm.state).includes(editForm.district)) problems.district = 'Choose your district';
+        setLocationErrors(problems);
+        if (Object.keys(problems).length) {
+            setError('Check your location details.');
+            document.getElementById('location')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            return;
+        }
 
         if (editForm.whatsapp_alerts && !waNumber(editForm.phone)) {
             setError('WhatsApp alerts need a 10-digit Indian mobile number. Update your phone number or turn WhatsApp alerts off.');
@@ -255,6 +285,7 @@ export default function ProfileEditPage() {
     // What's saved now (not the unsaved form), for the overview and badges.
     const contact = contactVerification(user, session?.user?.email_confirmed_at);
     const savedPoint = usableLocation(user?.location);
+    const savedRegion = resolveRegion(user?.state, user?.district);
     const savedWa = waNumber(user?.phone || '');
     const alertsVia: Status = !user?.is_donor
         ? { tone: 'off', text: 'Not a donor' }
@@ -280,7 +311,7 @@ export default function ProfileEditPage() {
     // Unsaved edits in the main form (blood group, location and push save on their own).
     const dirty = !!lastFilled.current && (Object.keys(editForm) as (keyof typeof editForm)[])
         .some(k => k !== 'blood_group' && editForm[k] !== lastFilled.current![k]);
-    const discard = () => { if (lastFilled.current) setEditForm({ ...lastFilled.current, blood_group: editForm.blood_group }); setError(''); };
+    const discard = () => { if (lastFilled.current) setEditForm({ ...lastFilled.current, blood_group: editForm.blood_group }); setError(''); setLocationErrors({}); };
 
     const section = (id: string, icon: React.ElementType, title: string, hint: string, children: React.ReactNode, status?: Status) => {
         const Icon = icon;
@@ -385,6 +416,17 @@ export default function ProfileEditPage() {
                 </>, contact.phoneMissing ? { tone: 'todo', text: 'Add your number' } : contact.phone ? { tone: 'ok', text: 'Verified' } : { tone: 'todo', text: 'Verify your number' })}
 
                 {section('location', MapPin, 'Location', `Used to show you donors within ${MATCH_RADIUS_KM} km and to alert you to requests near you.`, <>
+                    <StateDistrictSelect
+                        state={editForm.state}
+                        district={editForm.district}
+                        onChange={region => { setEditForm(prev => ({ ...prev, ...region })); setLocationErrors(prev => ({ ...prev, state: undefined, district: undefined })); }}
+                        previousState={savedRegion.state ? '' : user?.state}
+                        previousDistrict={savedRegion.district ? '' : user?.district}
+                        required
+                        stateError={locationErrors.state}
+                        districtError={locationErrors.district}
+                    />
+                    <Input label="City" value={editForm.city} onChange={(e) => { setEditForm({ ...editForm, city: e.target.value }); setLocationErrors(prev => ({ ...prev, city: undefined })); }} required autoComplete="address-level2" placeholder="e.g. Kochi" error={locationErrors.city} />
                     <div className="grid gap-4 sm:grid-cols-2">
                         <Input label="Current PIN code" inputMode="numeric" value={editForm.present_zip} onChange={(e) => setEditForm({ ...editForm, present_zip: e.target.value })} required />
                         <Input label="Permanent PIN code" inputMode="numeric" value={editForm.permanent_zip} onChange={(e) => setEditForm({ ...editForm, permanent_zip: e.target.value })} required />
@@ -393,7 +435,7 @@ export default function ProfileEditPage() {
                         <h3 className="mb-1 flex items-center text-[13px] font-medium text-gray-800">Where we alert you from {savesOnItsOwn}</h3>
                         <DonorLocationPicker mode="save" value={user?.location} onSaved={() => { refreshProfile({ silent: true }).catch(() => {}); }} />
                     </div>
-                </>, !savedPoint ? { tone: 'todo', text: 'Set your point' } : isPrecise(savedPoint) ? { tone: 'ok', text: 'Exact point' } : { tone: 'info', text: 'PIN code area' })}
+                </>, !savedRegion.district ? { tone: 'todo', text: 'Choose your district' } : !savedPoint ? { tone: 'todo', text: 'Set your point' } : isPrecise(savedPoint) ? { tone: 'ok', text: 'Exact point' } : { tone: 'info', text: 'PIN code area' })}
 
                 {user?.is_donor && section('donating', HeartPulse, 'Donating', 'Pause any time, for example while travelling or unwell.', <>
                     {bloodGroupLocked ? (

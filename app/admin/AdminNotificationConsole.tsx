@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/Button';
 import { Input, Textarea, Select } from '@/components/ui/Input';
 import { Alert } from '@/components/ui/Alert';
 import { supabase } from '@/lib/supabase';
+import { STATE_NAMES, matchState } from '@/lib/india-regions';
 import { Search, Users, Calculator, Send, AlertCircle, CheckCircle } from 'lucide-react';
 
 type TargetingMode = 'broadcast' | 'filter' | 'single';
@@ -50,7 +51,8 @@ export function AdminNotificationConsole() {
                 setUrl(draft.url || '/');
                 setUserId(draft.userId || '');
                 setMode(draft.mode || 'single');
-                if (draft.filters) setFilters(draft.filters);
+                // A draft from before the State dropdown may hold a typed state.
+                if (draft.filters) setFilters({ ...draft.filters, state: matchState(draft.filters.state) });
             } catch (e) {
                 console.error('Failed to parse draft', e);
             }
@@ -368,11 +370,11 @@ export function AdminNotificationConsole() {
                                 onChange={e => setFilters(prev => ({ ...prev, city: e.target.value }))}
                                 placeholder="e.g. Kochi"
                             />
-                            <Input
+                            <Select
                                 label="State"
                                 value={filters.state}
                                 onChange={e => setFilters(prev => ({ ...prev, state: e.target.value }))}
-                                placeholder="e.g. Kerala"
+                                options={[{ value: '', label: 'Any state' }, ...STATE_NAMES.map(name => ({ value: name, label: name }))]}
                             />
                             <div className="flex items-end">
                                 <Button
