@@ -32,7 +32,7 @@ export default function PrivacyPage() {
                             <ul>
                                 <li>name, mobile number, date of birth and gender;</li>
                                 <li>blood group;</li>
-                                <li>city, district, state and PIN codes (current and permanent);</li>
+                                <li>state, district and PIN codes (current and permanent);</li>
                                 <li>when you’re usually free, the date you last donated, and your own declaration that you’re fit to donate;</li>
                                 <li>a random 4-digit PIN that Vital creates for each offer you make.</li>
                             </ul>
