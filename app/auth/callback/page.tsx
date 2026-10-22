@@ -4,7 +4,7 @@ import React, { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { PageLoader } from '@/components/PageLoader';
 import { supabase } from '@/lib/supabase';
-import { cleanNext, pathAfterSignIn, takeNext } from '@/lib/auth-helpers';
+import { cleanNext, pathAfterSignIn, pathAfterSignUp, takeNext } from '@/lib/auth-helpers';
 import { safeInternalPath } from '@/lib/site';
 
 /**
@@ -12,6 +12,16 @@ import { safeInternalPath } from '@/lib/site';
  * comes from ?next= (Google's own button, password-reset links) or, for
  * Google's redirect flow, which can't carry it, from rememberNext().
  */
+/** Came from Google on the Join page (it leaves the consent just ticked there): offer the donor form. */
+const joining = () => {
+    try {
+        const pending = JSON.parse(localStorage.getItem('pendingConsent') || 'null');
+        return !!pending?.consent_at && Date.now() - Date.parse(pending.consent_at) < 30 * 60 * 1000;
+    } catch {
+        return false;
+    }
+};
+
 export default function AuthCallback() {
     const router = useRouter();
 
@@ -37,7 +47,9 @@ export default function AuthCallback() {
                     toLogin();
                     return;
                 }
-                router.replace(await pathAfterSignIn(session.user.id, session.user.user_metadata, next));
+                router.replace(joining()
+                    ? await pathAfterSignUp(session.user.id, next)
+                    : await pathAfterSignIn(session.user.id, session.user.user_metadata, next));
             } catch (error) {
                 console.error('Auth callback error:', error);
                 toLogin();
