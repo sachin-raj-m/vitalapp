@@ -10,7 +10,8 @@ import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { Alert } from '@/components/ui/Alert';
 import { supabase } from '@/lib/supabase';
-import { PLATFORM_DISCLAIMER, consentStamp } from '@/lib/legal';
+import { PLATFORM_DISCLAIMER, consentStamp, hasRecordedConsent } from '@/lib/legal';
+import { otpError } from '@/lib/auth-errors';
 import { ConfirmEmailCode } from '@/components/auth/ConfirmEmailCode';
 import type { User } from '@supabase/supabase-js';
 import { rememberReferral } from '@/lib/referrals';
@@ -18,29 +19,59 @@ import { TurnstileField, type TurnstileHandle } from '@/components/TurnstileFiel
 import { GoogleSignIn } from '@/components/auth/GoogleSignIn';
 import { WhatsAppSignIn } from '@/components/auth/WhatsAppSignIn';
 import { PHONE_SIGNIN } from '@/lib/features';
+import { useAuth } from '@/context/AuthContext';
+import { cleanNext, pathAfterSignUp, rememberNext, withRedirect } from '@/lib/auth-helpers';
 
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/**
+ * Joining as a donor: one consent box, then Google, WhatsApp (when switched
+ * on) or an email code. No password: the emailed code proves the address and
+ * signs the person in (a password can be added later in Settings). The same
+ * code signs in an existing account, so typing a registered email here isn't
+ * a dead end. Then the short donor form (/complete-registration).
+ *
+ * ?redirect= is where they were heading (e.g. offering to donate for a
+ * request); it is carried through the donor form. ?ref= is a referral code.
+ */
 export default function RegisterPage() {
     const router = useRouter();
-    const [formData, setFormData] = useState({
-        email: '',
-        password: '',
-    });
+    const { user, loading: authLoading } = useAuth();
+    const [email, setEmail] = useState('');
     const [error, setError] = useState('');
     const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
     const [isLoading, setIsLoading] = useState(false);
     const [isGoogleLoading, setIsGoogleLoading] = useState(false);
     const [agreed, setAgreed] = useState(false);
-    // Set once the account exists but the email still has to be confirmed with a code.
+    // Set once a code has been emailed.
     const [pendingEmail, setPendingEmail] = useState<string | null>(null);
+    const [next, setNext] = useState('');
     const captcha = useRef<TurnstileHandle>(null);
-    // Arrived from a referral link (/r/CODE): keep the code until registration completes.
+    const checkedSession = useRef(false);
+
     useEffect(() => {
-        rememberReferral(new URLSearchParams(window.location.search).get('ref'));
+        const params = new URLSearchParams(window.location.search);
+        // Arrived from a referral link (/r/CODE): keep the code until registration completes.
+        rememberReferral(params.get('ref'));
+        setNext(cleanNext(params.get('redirect')));
     }, []);
+
+    // Already signed in when the page opened: carry on instead of showing the form.
+    useEffect(() => {
+        if (authLoading || checkedSession.current) return;
+        checkedSession.current = true;
+        if (!user) return;
+        const redirect = cleanNext(new URLSearchParams(window.location.search).get('redirect'));
+        pathAfterSignUp(user.id, redirect).then(path => router.replace(path));
+    }, [authLoading, user, router]);
 
     const consentError = 'Tick the box to agree to the Terms and Privacy notice before continuing.';
     // Only here to request blood? That needs no account up front.
     const requestLink = <Link href="/requests/new" className={authLinkClass}>post a request without an account</Link>;
+    // Stored on the account when it is created (the database checks the consent).
+    const signUpData = () => ({ registration_completed: false, ...consentStamp() });
+    // Where the link in the email lands (the code entered here does the same).
+    const emailLanding = () => `${window.location.origin}${withRedirect('/complete-registration', next)}`;
 
     const handleGoogleSignUp = async () => {
         setError('');
@@ -52,8 +83,10 @@ export default function RegisterPage() {
         setIsGoogleLoading(true);
         try {
             // OAuth can't carry user metadata, so remember the consent locally;
-            // complete-registration records it against the account.
+            // complete-registration records it against the account. Google's
+            // redirect can't carry ?redirect= either.
             try { localStorage.setItem('pendingConsent', JSON.stringify(consentStamp())); } catch { /* storage unavailable */ }
+            rememberNext(next);
             const { error } = await supabase.auth.signInWithOAuth({
                 provider: 'google',
                 options: { redirectTo: `${window.location.origin}/auth/callback` },
@@ -65,109 +98,76 @@ export default function RegisterPage() {
         }
     };
 
-    // Runs once the person has a session (email confirmed).
-    const finishSignUp = async (user: User) => {
-        // A database trigger creates the profile row on signup; stamp the consent
-        // on it too (best effort; the sign-up metadata is the record).
-        await supabase.from('profiles').update(consentStamp()).eq('id', user.id);
+    // Runs once the person has a session (email code or WhatsApp code).
+    const finishSignUp = async (signedIn: User) => {
+        // The database copies the sign-up consent onto a new profile. An
+        // existing account signing in here has just ticked the box too: record
+        // it if there's nothing on record yet (best effort).
+        const { data: profile } = await supabase.from('profiles')
+            .select('consent_agreed, consent_at, consent_version').eq('id', signedIn.id).maybeSingle();
+        if (!hasRecordedConsent(profile)) {
+            await supabase.from('profiles').update(consentStamp()).eq('id', signedIn.id).then(() => {}, () => {});
+        }
         try {
-            localStorage.setItem('pendingRegistration', JSON.stringify({ userId: user.id, email: user.email }));
+            localStorage.setItem('pendingRegistration', JSON.stringify({ userId: signedIn.id, email: signedIn.email }));
         } catch { /* storage blocked */ }
-        // Welcome email goes to the signed-in user's own address (server-side).
-        authedFetch('/api/notify/welcome', { method: 'POST' }).catch(() => {});
-        router.push('/complete-registration');
-    };
-
-    const validateForm = () => {
-        const errors: Record<string, string> = {};
-
-        // Email validation
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!formData.email) {
-            errors.email = 'Email is required';
-        } else if (!emailRegex.test(formData.email)) {
-            errors.email = 'Please enter a valid email address';
-        }
-
-        // Password validation
-        if (!formData.password) {
-            errors.password = 'Password is required';
-        } else if (formData.password.length < 8) {
-            errors.password = 'Use at least 8 characters.';
-        }
-
-        if (!agreed) errors.consent = consentError;
-
-        setFieldErrors(errors);
-        return Object.keys(errors).length === 0;
+        // Welcome email to the signed-in user's own address (server-side; new accounts only).
+        if (signedIn.email) authedFetch('/api/notify/welcome', { method: 'POST' }).catch(() => {});
+        router.push(await pathAfterSignUp(signedIn.id, next));
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setError('');
-        setFieldErrors({});
-
-        if (!validateForm()) {
-            return;
-        }
+        const errors: Record<string, string> = {};
+        const address = email.trim();
+        if (!address) errors.email = 'Enter your email address.';
+        else if (!EMAIL_RE.test(address)) errors.email = 'That doesn’t look like an email address. Check it and try again.';
+        if (!agreed) errors.consent = consentError;
+        setFieldErrors(errors);
+        if (Object.keys(errors).length) return;
 
         setIsLoading(true);
-
-        try {
-            const consent = consentStamp();
-            const { data: authData, error: authError } = await supabase.auth.signUp({
-                email: formData.email,
-                password: formData.password,
-                options: {
-                    captchaToken: await captcha.current?.getToken(),
-                    data: {
-                        registration_completed: false,
-                        // Recorded server-side in auth.users at the moment of signup.
-                        ...consent,
-                    },
-                    emailRedirectTo: `${window.location.origin}/complete-registration`
-                }
-            });
-
-            if (authError) throw authError;
-
-            if (!authData.user) {
-                throw new Error('Failed to create account');
-            }
-
-            // Email confirmation is on, so there is no session yet: the account
-            // only works once the emailed code is entered. (For an address that
-            // is already registered Supabase also returns no session, so this
-            // screen doesn't reveal whether an account exists.)
-            if (!authData.session) {
-                setPendingEmail(formData.email);
-                return;
-            }
-            await finishSignUp(authData.user);
-
-        } catch (err: any) {
-            console.error('Registration error');
-            setError(friendlyAuthError(err?.message));
-            captcha.current?.reset(); // tokens work once
-        } finally {
-            setIsLoading(false);
+        // In case they open the link in the email instead of typing the code.
+        rememberNext(next);
+        const { error: otpErr } = await supabase.auth.signInWithOtp({
+            email: address,
+            options: {
+                captchaToken: await captcha.current?.getToken(),
+                shouldCreateUser: true,
+                // Checked by the Before User Created hook; copied onto the new profile.
+                data: signUpData(),
+                emailRedirectTo: emailLanding(),
+            },
+        });
+        captcha.current?.reset(); // tokens work once
+        setIsLoading(false);
+        if (otpErr) {
+            const problem = otpError(otpErr.message);
+            // A code went out a moment ago: let them enter that one.
+            if (problem.kind === 'wait') { setPendingEmail(address); return; }
+            if (problem.kind === 'invalid_address') { setFieldErrors({ email: problem.text }); return; }
+            setError(problem.text);
+            return;
         }
+        setPendingEmail(address);
     };
 
     if (pendingEmail) {
         return (
             <AuthFrame
-                title="Confirm your email"
-                subtitle="Enter the code we emailed you. This makes sure the account belongs to you."
-                footer={<>Already registered? <Link href="/login" className={authLinkClass}>Sign in</Link></>}
+                title="Check your email"
+                subtitle={<>Enter the 6-digit code we sent to <span className="text-gray-900">{pendingEmail}</span>. Then add your blood group and district, and you’re done.</>}
+                footer={<>Already registered with this email? The same code signs you in.</>}
             >
-                <ConfirmEmailCode email={pendingEmail} onVerified={finishSignUp} onBack={() => setPendingEmail(null)} />
-                {/* Supabase doesn't say whether the address is taken (so nobody can
-                    look up who is registered); one account per email still holds. */}
-                <p className="mt-6 text-[13px] leading-relaxed text-gray-500">
-                    Each email can have only one Vital account. If you’ve registered with this email before, no code is sent:{' '}
-                    <Link href="/login" className={authLinkClass}>sign in</Link> instead, or reset your password from there.
-                </p>
+                <ConfirmEmailCode
+                    email={pendingEmail}
+                    flow="email"
+                    createWith={signUpData()}
+                    redirectTo={emailLanding()}
+                    onVerified={finishSignUp}
+                    onBack={() => setPendingEmail(null)}
+                />
             </AuthFrame>
         );
     }
@@ -175,10 +175,8 @@ export default function RegisterPage() {
     return (
         <AuthFrame
             title="Join Vital"
-            subtitle={PHONE_SIGNIN
-                ? 'Create an account with your mobile number, Google or email. Then add your blood group and district, and you’re on the network.'
-                : 'Create an account with Google or email. Then add your blood group and district, and you’re on the network.'}
-            footer={<>Already registered? <Link href="/login" className={authLinkClass}>Sign in</Link></>}
+            subtitle={`Sign up with ${PHONE_SIGNIN ? 'Google, WhatsApp or email' : 'Google or email'}, then add your blood group and district. It takes about a minute.`}
+            footer={<>Already registered? <Link href={withRedirect('/login', next)} className={authLinkClass}>Sign in</Link></>}
         >
             {error && <Alert variant="error" className="mb-6">{error}</Alert>}
 
@@ -202,10 +200,11 @@ export default function RegisterPage() {
                     : !agreed && <p id="consent-hint" className="ml-7 mt-1.5 text-[13px] text-gray-500">Tick the box to continue. The buttons below stay off until you do.</p>}
             </div>
 
-            {/* A disabled fieldset disables the Google button until consent is ticked. */}
+            {/* A disabled fieldset disables every way in until consent is ticked. */}
             <fieldset disabled={!agreed} aria-describedby={!agreed ? 'consent-hint' : undefined} className="m-0 min-w-0 border-0 p-0">
                 <GoogleSignIn
                     disabled={!agreed}
+                    next={next}
                     onFallback={handleGoogleSignUp}
                     fallbackLoading={isGoogleLoading}
                     getCaptchaToken={async () => { const t = await captcha.current?.getToken(); captcha.current?.reset(); return t; }}
@@ -217,33 +216,27 @@ export default function RegisterPage() {
                 {PHONE_SIGNIN && (
                     <div className="mt-4">
                         {/* The box above is the consent; the account is created with it. */}
-                        <WhatsAppSignIn consented={agreed} onSignedIn={() => router.push('/complete-registration')} />
+                        <WhatsAppSignIn consented={agreed} onSignedIn={finishSignUp} />
                     </div>
                 )}
             </fieldset>
             <OrDivider />
 
+            {/* Typing is fine before the box is ticked; the button waits for it. */}
             <form onSubmit={handleSubmit} className="space-y-4" noValidate>
                 <Input
                     label="Email"
                     type="email"
-                    value={formData.email}
-                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    inputMode="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
                     required
                     autoComplete="email"
+                    autoCapitalize="none"
+                    spellCheck={false}
                     placeholder="you@example.com"
                     error={fieldErrors.email}
-                />
-                <Input
-                    label="Password"
-                    type="password"
-                    value={formData.password}
-                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                    required
-                    autoComplete="new-password"
-                    minLength={8}
-                    helperText="At least 8 characters."
-                    error={fieldErrors.password}
+                    helperText="We’ll email you a 6-digit code. No password needed."
                 />
                 <TurnstileField ref={captcha} />
                 <Button
@@ -253,9 +246,8 @@ export default function RegisterPage() {
                     className="w-full !mt-6"
                     isLoading={isLoading}
                     disabled={!agreed}
-                    aria-describedby={!agreed ? 'consent-hint' : undefined}
                 >
-                    Create account
+                    Continue with email
                 </Button>
             </form>
 
