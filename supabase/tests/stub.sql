@@ -29,7 +29,8 @@ CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA extensions;
 CREATE TABLE IF NOT EXISTS auth.users (
   id uuid PRIMARY KEY,
   email text,
-  phone text,
+  phone text UNIQUE,
+  phone_confirmed_at timestamptz,
   raw_user_meta_data jsonb DEFAULT '{}'::jsonb,
   raw_app_meta_data jsonb DEFAULT '{}'::jsonb,
   email_confirmed_at timestamptz,
