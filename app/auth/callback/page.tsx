@@ -4,7 +4,7 @@ import React, { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { PageLoader } from '@/components/PageLoader';
 import { supabase } from '@/lib/supabase';
-import { isRegistrationComplete } from '@/lib/auth-helpers';
+import { pathAfterSignIn } from '@/lib/auth-helpers';
 import { safeInternalPath } from '@/lib/site';
 
 export default function AuthCallback() {
@@ -20,22 +20,9 @@ export default function AuthCallback() {
                     return;
                 }
 
-                // Check if user has completed registration
-                const isComplete = await isRegistrationComplete(session.user.id);
-
-                if (!isComplete) {
-                    // Store basic info in localStorage for completing registration
-                    localStorage.setItem('pendingRegistration', JSON.stringify({
-                        userId: session.user.id,
-                        email: session.user.email,
-                        phone: session.user.phone || ''
-                    }));
-                    router.push('/complete-registration');
-                } else {
-                    // e.g. a password-reset link sends people to /profile/edit.
-                    const next = new URLSearchParams(window.location.search).get('next');
-                    router.push(safeInternalPath(next));
-                }
+                // e.g. a password-reset link sends people to /profile/edit.
+                const next = safeInternalPath(new URLSearchParams(window.location.search).get('next'), '');
+                router.push(await pathAfterSignIn(session.user.id, session.user.user_metadata, next));
             } catch (error) {
                 console.error('Auth callback error:', error);
                 router.push('/login');
