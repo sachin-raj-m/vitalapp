@@ -21,6 +21,8 @@ import { isPhoneTakenError, waNumber } from '@/lib/phone';
 import { MATCH_RADIUS_KM } from '@/lib/geo';
 import { describeAccuracy, getDevicePosition, insideIndia } from '@/lib/location';
 import { QuickVerify } from '@/components/auth/QuickVerify';
+import type { User } from '@supabase/supabase-js';
+import { PHONE_SIGNIN } from '@/lib/features';
 
 /** A place from /api/geocode (server-side Nominatim). */
 interface GeoPlace {
@@ -200,26 +202,44 @@ export default function CreateRequestPage() {
         if (scroll) window.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!formData.bloodGroup) return fail('Choose the blood group needed.');
-        if (!formData.hospitalName.trim()) return fail('Enter the hospital’s name.');
-        if (!hasLocation) return fail('Mark the hospital on the map (search for it, or tap the map) so nearby donors are alerted.');
-        if (!formData.city.trim() && !formData.zipcode.trim()) {
-            setAddressOpen(true);
-            return fail('Add the hospital’s town or PIN code (under the map).');
-        }
+    // What's still missing from the form, if anything (address: under the map).
+    const formProblem = (): { message: string; address?: boolean } | null => {
+        if (!formData.bloodGroup) return { message: 'Choose the blood group needed.' };
+        if (!formData.hospitalName.trim()) return { message: 'Enter the hospital’s name.' };
+        if (!hasLocation) return { message: 'Mark the hospital on the map (search for it, or tap the map) so nearby donors are alerted.' };
+        if (!formData.city.trim() && !formData.zipcode.trim()) return { message: 'Add the hospital’s town or PIN code (under the map).', address: true };
         if (formData.zipcode.trim() && !/^[1-9][0-9]{5}$/.test(formData.zipcode.trim())) {
-            setAddressOpen(true);
-            return fail('The PIN code should be 6 digits. Fix it or leave it empty.');
+            return { message: 'The PIN code should be 6 digits. Fix it or leave it empty.', address: true };
         }
-        if (!formData.contactName.trim() || !formData.contactPhone.trim()) return fail('Add the contact person’s name and phone number.');
+        if (!formData.contactName.trim() || !formData.contactPhone.trim()) return { message: 'Add the contact person’s name and phone number.' };
+        return null;
+    };
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        submit(userId);
+    };
+
+    // Verified just now: post straight away when the form is complete, so
+    // there's no second button to find. Otherwise they finish it and post.
+    const onVerified = (verified: User) => {
+        setVerifiedUserId(verified.id);
+        if (!formProblem()) submit(verified.id);
+        else toast.success('Verified', { description: 'Finish the form above, then post your request.' });
+    };
+
+    const submit = async (userId: string | null) => {
+        const problem = formProblem();
+        if (problem) {
+            if (problem.address) setAddressOpen(true);
+            return fail(problem.message);
+        }
         if (consentMissing) {
             setConsentError('Tick the box to agree to the Terms and Privacy notice.');
             return;
         }
         if (!userId) {
-            setError('Verify your email or WhatsApp below, then post.');
+            setError(PHONE_SIGNIN ? 'Verify your email or WhatsApp below, then post.' : 'Verify your email below, then post.');
             return;
         }
 
@@ -562,20 +582,21 @@ export default function CreateRequestPage() {
 
             {!user && section('Verify it’s you', 'One quick check, so requests are real. It also lets you manage this request later.', verifiedUserId ? (
                 <p className="flex items-center gap-2 text-sm text-success-700">
-                    <span className="h-2 w-2 rounded-full bg-success-500" /> Verified. You can post your request now.
+                    <span className="h-2 w-2 rounded-full bg-success-500" /> {isLoading ? 'Verified. Posting your request…' : 'Verified. You can post your request now.'}
                 </p>
             ) : (
                 <>
                     <p className="text-sm leading-relaxed text-gray-600">
-                        Get a code by email{' '}or on WhatsApp. Already registered?{' '}
-                        <Link href="/login?redirect=/requests/new" className={linkClass}>Sign in</Link>.
+                        Get a code by email{PHONE_SIGNIN ? ' or on WhatsApp' : ''}; it takes about 30 seconds, and your request is posted as soon as the code is in.
+                        {' '}Already registered? The same code signs you in, or{' '}
+                        <Link href="/login?redirect=/requests/new" className={linkClass}>sign in</Link>.
                     </p>
                     <QuickVerify
                         consented={agreed}
                         onNeedConsent={() => setConsentError('Tick the box above to agree before we send a code.')}
                         initialPhone={formData.contactPhone}
                         emailRedirectTo={typeof window !== 'undefined' ? `${window.location.origin}/requests/new` : undefined}
-                        onVerified={(u) => setVerifiedUserId(u.id)}
+                        onVerified={onVerified}
                     />
                 </>
             ))}

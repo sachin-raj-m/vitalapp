@@ -28,8 +28,10 @@ import { TemporaryDeferralModal } from '@/components/nbtc/TemporaryDeferralModal
 import { DonorReadinessModal } from '@/components/nbtc/DonorReadinessModal';
 import { EmptyState } from '@/components/EmptyState';
 import { BLOOD_GROUPS, formatBloodGroup } from '@/lib/blood-compatibility';
+import { withRedirect } from '@/lib/auth-helpers';
 
 export default function RequestsPage() {
+    const router = useRouter();
     const { user } = useAuth();
     const { requests: allRequests, myDonations, refreshRequests, loading: requestsLoading } = useRequests();
 
@@ -98,7 +100,8 @@ export default function RequestsPage() {
         }
 
         if (!user.blood_group) {
-            setError('Add your blood group to your profile before offering to donate.');
+            // Signed in but not a donor yet: the short donor form, then back to this offer.
+            router.push(withRedirect('/complete-registration', `/requests?offer=${request.id}`));
             return;
         }
 
@@ -128,6 +131,16 @@ export default function RequestsPage() {
         if (target) handleDonateClick(target);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [pendingOfferId, loading, allRequests]);
+
+    // Signed in from the dialog: carry on with the offer they started, once the
+    // profile has loaded (AuthContext fills `user` shortly after the session).
+    useEffect(() => {
+        if (!user || showAuthModal || !pendingRequestToDonate) return;
+        const request = pendingRequestToDonate;
+        setPendingRequestToDonate(null);
+        handleDonateClick(request);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [user, showAuthModal, pendingRequestToDonate]);
 
     const handleDeferralPassed = () => {
         setDeferralModalOpen(false);
@@ -350,14 +363,9 @@ export default function RequestsPage() {
                     setShowAuthModal(false);
                     setPendingRequestToDonate(null);
                 }}
-                onSuccess={() => {
-                    setShowAuthModal(false);
-                    if (pendingRequestToDonate) {
-                        // User logged in. Allow them to retry the donation action manually 
-                        // by clicking "I can donate" again, which is now cleaner UX than auto-triggering.
-                    }
-                }}
+                onSuccess={() => setShowAuthModal(false)}
                 message="Sign in to offer to donate"
+                next={pendingRequestToDonate ? `/requests?offer=${pendingRequestToDonate.id}` : undefined}
             />
 
             {/* PIN Success Modal */}

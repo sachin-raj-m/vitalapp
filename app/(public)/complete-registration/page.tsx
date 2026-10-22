@@ -10,11 +10,11 @@ import { authedFetch } from '@/lib/api';
 import { BLOOD_GROUPS, formatBloodGroup } from '@/lib/blood-compatibility';
 import type { BloodGroup } from '@/types';
 import { useAuth } from '@/context/AuthContext';
-import { isRegistrationComplete } from '@/lib/auth-helpers';
+import { cleanNext, isRegistrationComplete, rememberNext, takeNext } from '@/lib/auth-helpers';
 import { addDays } from 'date-fns';
 import { toast } from 'sonner';
 import Link from 'next/link';
-import { PRIVACY_VERSION, earliestConsentAt } from '@/lib/legal';
+import { PRIVACY_VERSION, earliestConsentAt, hasRecordedConsent } from '@/lib/legal';
 import { takeReferral } from '@/lib/referrals';
 import { MATCH_RADIUS_KM } from '@/lib/geo';
 import { DonorLocationPicker } from '@/components/DonorLocationPicker';
@@ -28,8 +28,10 @@ import { districtsOf, resolveRegion } from '@/lib/india-regions';
  * Becoming a donor, in two parts:
  *
  *   1. The minimum to be matched (required): name, mobile, blood group, state
- *      and district (PIN code optional), one eligibility confirmation and the
- *      consent to share details when offering. Completes registration
+ *      and district (PIN code optional), and one box confirming they can
+ *      donate and agree to share their details when they offer (it also
+ *      records agreement to the Terms and Privacy notice for accounts that
+ *      haven't given it yet, e.g. Google from the sign-in page). Completes registration
  *      (isRegistrationComplete: name + state + district).
  *   2. Optional details, right after or later from the dashboard
  *      (/complete-registration?step=more): last donation date, gender, date of
@@ -38,6 +40,9 @@ import { districtsOf, resolveRegion } from '@/lib/india-regions';
  *
  * Someone only here to request blood can skip to the request form; they are
  * not asked again (lib/auth-helpers.ts accountStage).
+ *
+ * ?redirect= (or rememberNext) is where they were heading, e.g. offering to
+ * donate for a request: they go there when done instead of the dashboard.
  */
 
 interface BasicsForm {
@@ -48,8 +53,8 @@ interface BasicsForm {
     district: string;
     presentZip: string;
     whatsappAlerts: boolean;
-    eligible: boolean;
-    consent: boolean;
+    /** Can donate, and agrees to share name and number when offering. */
+    ready: boolean;
 }
 
 interface MoreForm {
@@ -77,7 +82,7 @@ export default function CompleteRegistration() {
     const [status, setStatus] = useState<Status>('loading');
     const [form, setForm] = useState<BasicsForm>({
         fullName: '', phone: '', bloodGroup: '', state: '', district: '', presentZip: '',
-        whatsappAlerts: true, eligible: false, consent: false,
+        whatsappAlerts: true, ready: false,
     });
     const [more, setMore] = useState<MoreForm>({ lastDonationDate: '', gender: '', dob: '', availability: [], permanentZip: '' });
     const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
@@ -89,29 +94,38 @@ export default function CompleteRegistration() {
     // A state or district typed by hand before the dropdowns, for the hint.
     const [typedRegion, setTypedRegion] = useState<{ state: string; district: string }>({ state: '', district: '' });
     const [skipping, setSkipping] = useState(false);
+    // Agreed to the current Terms and Privacy notice already (when joining):
+    // the box below then doesn't ask again.
+    const [alreadyAgreed, setAlreadyAgreed] = useState(false);
     // Set once loaded or submitted, so later profile reloads don't reset the page.
     const started = useRef(false);
+    // Where to go when done (see the comment at the top).
+    const next = useRef('');
+    const done = () => router.push(next.current || '/dashboard');
 
     useEffect(() => {
         // Wait for auth to settle; `user` is null while loading.
         if (authLoading || started.current) return;
         const init = async () => {
+            const params = new URLSearchParams(window.location.search);
             if (!user) {
-                router.push('/login?redirect=/complete-registration');
+                rememberNext(params.get('redirect'));
+                router.replace('/login?redirect=/complete-registration');
                 return;
             }
             started.current = true;
-            const wantsMore = new URLSearchParams(window.location.search).get('step') === 'more';
+            next.current = cleanNext(params.get('redirect')) || takeNext();
+            const wantsMore = params.get('step') === 'more';
             const complete = await isRegistrationComplete(user.id);
             if (complete && !wantsMore) {
-                router.push('/dashboard');
+                router.replace(next.current || '/dashboard');
                 return;
             }
 
             // Start from what's already saved, so people only add what's missing.
             const { data: saved } = await supabase
                 .from('profiles')
-                .select('full_name, phone, phone_verified_at, dob, gender, blood_group, district, state, permanent_zip, present_zip, availability, whatsapp_alerts, next_eligible_date')
+                .select('full_name, phone, phone_verified_at, dob, gender, blood_group, district, state, permanent_zip, present_zip, availability, whatsapp_alerts, next_eligible_date, consent_agreed, consent_at, consent_version')
                 .eq('id', user.id)
                 .maybeSingle();
             const authPhone = session?.user?.phone ? waNumber(session.user.phone)?.slice(2) ?? '' : '';
@@ -138,9 +152,15 @@ export default function CompleteRegistration() {
                 if (saved.blood_group) setSavedBloodGroup(saved.blood_group as BloodGroup);
                 setPhoneVerified(!!saved.phone_verified_at && !!saved.phone);
                 setSavedNextEligible(saved.next_eligible_date || null);
+                if (hasRecordedConsent(saved) && saved.consent_version === PRIVACY_VERSION) setAlreadyAgreed(true);
             } else if (authPhone) {
                 setForm(prev => ({ ...prev, phone: authPhone }));
             }
+            // Ticked on the Join page just before continuing with Google.
+            try {
+                const pending = JSON.parse(localStorage.getItem('pendingConsent') || 'null');
+                if (pending?.consent_version === PRIVACY_VERSION && Date.now() - Date.parse(pending.consent_at) < 30 * 60 * 1000) setAlreadyAgreed(true);
+            } catch { /* storage blocked */ }
             setStatus(complete && wantsMore ? 'more' : 'form');
         };
         init().catch(err => {
@@ -162,8 +182,7 @@ export default function CompleteRegistration() {
         if (!form.state) errors.state = 'Choose your state';
         if (!form.district || !districtsOf(form.state).includes(form.district)) errors.district = 'Choose your district';
         if (form.presentZip.trim() && !/^[1-9][0-9]{5}$/.test(form.presentZip.trim())) errors.presentZip = 'Enter a 6-digit PIN code, or leave it empty';
-        if (!form.eligible) errors.eligible = 'Please confirm you meet the basic requirements. If you don’t, you can still request blood.';
-        if (!form.consent) errors.consent = 'Please agree to share your details when you offer to donate.';
+        if (!form.ready) errors.ready = 'Tick the box to confirm you can donate. If you can’t, you can still request blood.';
         setFieldErrors(errors);
         return Object.keys(errors).length === 0;
     };
@@ -307,14 +326,14 @@ export default function CompleteRegistration() {
             await refreshProfile({ silent: true });
             toast.success('Details saved');
         }
-        router.push('/dashboard');
+        done();
     };
 
     const skipAsRequester = async () => {
         setSkipping(true);
         // Remembered on the account so the donor form isn't shown again.
         await supabase.auth.updateUser({ data: { account_type: 'requester' } }).then(() => {}, () => {});
-        router.push('/requests/new');
+        router.push(next.current.startsWith('/requests') ? next.current : '/requests/new');
     };
 
     const checkbox = (name: string, checked: boolean, onChange: (v: boolean) => void, title: string, body: React.ReactNode, err?: string) => (
@@ -434,7 +453,7 @@ export default function CompleteRegistration() {
                     </>)}
 
                     <div className="flex flex-col-reverse gap-3 border-t border-gray-200 pt-6 sm:flex-row sm:justify-end">
-                        <Button type="button" variant="ghost" size="lg" onClick={() => router.push('/dashboard')}>Skip for now</Button>
+                        <Button type="button" variant="ghost" size="lg" onClick={done}>Skip for now</Button>
                         <Button type="submit" variant="primary" size="lg" isLoading={status === 'saving_more'}>Save and continue</Button>
                     </div>
                 </form>
@@ -449,6 +468,7 @@ export default function CompleteRegistration() {
                 <h1 className="display mt-2 text-4xl sm:text-[2.75rem]">Join as a donor</h1>
                 <p className="mt-3 max-w-xl leading-relaxed text-gray-600">
                     Just what we need to alert you when your blood group is needed near you (within about {MATCH_RADIUS_KM} km).
+                    It takes about a minute.
                 </p>
                 <p className="mt-3 text-sm text-gray-600">
                     Only here to request blood?{' '}
@@ -462,10 +482,21 @@ export default function CompleteRegistration() {
 
             <form onSubmit={handleSubmit} noValidate>
                 {section('You', 'Your name and number are shared with a requester only after you offer to donate.', <>
-                    <Input label="Full name" value={form.fullName} onChange={e => set('fullName', e.target.value)} required autoComplete="name" error={fieldErrors.fullName} />
+                    <Input
+                        label="Full name"
+                        value={form.fullName}
+                        onChange={e => set('fullName', e.target.value)}
+                        required
+                        autoComplete="name"
+                        autoCapitalize="words"
+                        // Start typing straight away, unless the name came from Google or an earlier request.
+                        autoFocus={!form.fullName}
+                        error={fieldErrors.fullName}
+                    />
                     <Input
                         label="Mobile number"
                         type="tel"
+                        inputMode="tel"
                         value={form.phone}
                         onChange={e => set('phone', e.target.value)}
                         required
@@ -519,6 +550,7 @@ export default function CompleteRegistration() {
                     <Input
                         label="PIN code (optional)"
                         inputMode="numeric"
+                        autoComplete="postal-code"
                         value={form.presentZip}
                         onChange={e => set('presentZip', e.target.value.replace(/\D/g, '').slice(0, 6))}
                         placeholder="e.g. 682011"
@@ -527,31 +559,25 @@ export default function CompleteRegistration() {
                     />
                 </>)}
 
-                {section('Before you join', 'Your own declarations. Vital does not check them; the hospital or blood bank decides who can donate.', <>
+                {section('Before you join', 'Your own declaration. Vital does not check it; the hospital or blood bank decides who can donate.', <>
                     {checkbox(
-                        'eligible',
-                        form.eligible,
-                        v => set('eligible', v),
-                        'I can donate blood',
+                        'ready',
+                        form.ready,
+                        v => set('ready', v),
+                        'I can donate, and I agree to share my details when I offer',
                         <>
-                            I’m 18 to 65, weigh at least 45 kg and am in good health, with no condition that rules out donating.{' '}
-                            <Link href="/safety-guidelines" target="_blank" className={linkClass}>Who can donate</Link>
+                            I’m 18 to 65, weigh at least 45 kg and am in good health (<Link href="/safety-guidelines" target="_blank" className={linkClass}>who can donate</Link>).
+                            My name and mobile number go to a requester only when I offer to donate.
+                            {alreadyAgreed ? <>
+                                {' '}As in the <Link href="/privacy" target="_blank" className={linkClass}>Privacy notice</Link> you agreed to,
+                                Vital only connects people; any contact or donation is my own decision.
+                            </> : <>
+                                {' '}I agree to the <Link href="/terms" target="_blank" className={linkClass}>Terms</Link> and have read the{' '}
+                                <Link href="/privacy" target="_blank" className={linkClass}>Privacy notice</Link>.
+                                {' '}Vital only connects people; any contact or donation is my own decision.
+                            </>}
                         </>,
-                        fieldErrors.eligible,
-                    )}
-                    {checkbox(
-                        'consent',
-                        form.consent,
-                        v => set('consent', v),
-                        'I agree to share my details when I offer',
-                        <>
-                            My name and mobile number go to a requester only when I offer to donate. I’ve read the{' '}
-                            <Link href="/privacy" target="_blank" className={linkClass}>Privacy notice</Link>
-                            {' '}and{' '}
-                            <Link href="/terms" target="_blank" className={linkClass}>Terms</Link>
-                            . Vital only connects people; any contact or donation is my own decision.
-                        </>,
-                        fieldErrors.consent,
+                        fieldErrors.ready,
                     )}
                 </>)}
 

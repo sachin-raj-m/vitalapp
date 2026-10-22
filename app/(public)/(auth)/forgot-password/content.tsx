@@ -65,9 +65,13 @@ export default function ForgotPasswordContent() {
             subtitle="Enter the email address you registered with and we will send you a link to set a new password."
             footer={<Link href="/login" className={authLinkClass}>Back to sign in</Link>}
         >
+            <p className="-mt-3 mb-6 text-sm leading-relaxed text-gray-600">
+                Just want to get in? On the <Link href="/login" className={authLinkClass}>sign-in page</Link>, choose
+                {' '}&ldquo;Email me a code&rdquo;: no password needed.
+            </p>
             {error && <Alert variant="error" className="mb-6">{error}</Alert>}
             <form onSubmit={handleSubmit} className="space-y-4">
-                <Input label="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="email" />
+                <Input label="Email" type="email" inputMode="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="email" autoCapitalize="none" spellCheck={false} autoFocus />
                 <TurnstileField ref={captcha} />
                 <Button type="submit" variant="ink" size="lg" className="w-full !mt-6" isLoading={isLoading}>
                     Send reset link

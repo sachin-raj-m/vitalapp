@@ -48,6 +48,10 @@ const sha256Hex = async (value: string) => {
     return Array.from(new Uint8Array(digest), b => b.toString(16).padStart(2, '0')).join('');
 };
 
+/** /auth/callback, carrying where to go next. Also the redirect flow's return address (with the origin). */
+export const authCallbackPath = (next?: string | null) =>
+    next ? `/auth/callback?next=${encodeURIComponent(next)}` : '/auth/callback';
+
 export function GoogleSignIn({
     onFallback,
     fallbackLoading,
@@ -55,6 +59,7 @@ export function GoogleSignIn({
     onError,
     onBeforeSignIn,
     disabled,
+    next,
 }: {
     /** The redirect flow, used when Google's own button isn't available. */
     onFallback: () => void;
@@ -66,14 +71,16 @@ export function GoogleSignIn({
     onBeforeSignIn?: () => void;
     /** Shown as an inactive button (e.g. until the consent box is ticked). */
     disabled?: boolean;
+    /** Where to go once signed in (passed to /auth/callback). */
+    next?: string;
 }) {
     const router = useRouter();
     const box = useRef<HTMLDivElement>(null);
     const [mode, setMode] = useState<'loading' | 'google' | 'fallback'>(CLIENT_ID ? 'loading' : 'fallback');
     const [busy, setBusy] = useState(false);
     // Latest callbacks without re-initialising Google's button.
-    const handlers = useRef({ getCaptchaToken, onError, onBeforeSignIn });
-    useEffect(() => { handlers.current = { getCaptchaToken, onError, onBeforeSignIn }; });
+    const handlers = useRef({ getCaptchaToken, onError, onBeforeSignIn, next });
+    useEffect(() => { handlers.current = { getCaptchaToken, onError, onBeforeSignIn, next }; });
 
     useEffect(() => {
         if (!CLIENT_ID || disabled) return;
@@ -102,7 +109,7 @@ export function GoogleSignIn({
                                 options: { captchaToken },
                             });
                             if (error) throw error;
-                            router.push('/auth/callback');
+                            router.push(authCallbackPath(handlers.current.next));
                         } catch (err) {
                             setBusy(false);
                             handlers.current.onError?.(err instanceof Error ? err.message : 'Google sign-in failed. Please try again.');

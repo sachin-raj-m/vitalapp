@@ -39,16 +39,12 @@ export async function middleware(request: NextRequest) {
     )
 
     // getUser() validates the JWT with Supabase and refreshes it when needed.
-    const { data: { user } } = await supabase.auth.getUser()
+    await supabase.auth.getUser()
 
-    // Signed in (cookie session): skip the auth pages.
-    const authPaths = ['/login', '/register', '/forgot-password']
-    if (user && authPaths.some(path => request.nextUrl.pathname.startsWith(path))) {
-        const redirect = NextResponse.redirect(new URL('/dashboard', request.url))
-        response.cookies.getAll().forEach(cookie => redirect.cookies.set(cookie))
-        return redirect
-    }
-
+    // No redirect away from /login or /register here: a leftover cookie session
+    // the browser client doesn't have would bounce /login -> /dashboard ->
+    // /login forever, and it would drop ?redirect=. The pages themselves send
+    // signed-in people on (lib/auth-helpers.ts pathAfterSignIn / pathAfterSignUp).
     return response
 }
 
