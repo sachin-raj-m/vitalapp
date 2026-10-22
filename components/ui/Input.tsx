@@ -46,7 +46,7 @@ export const Input: React.FC<InputProps> = ({ label, error, helperText, classNam
       <input
         id={id}
         aria-invalid={!!error || undefined}
-        aria-describedby={error ? `${id}-error` : undefined}
+        aria-describedby={error ? `${id}-error` : helperText ? `${id}-help` : undefined}
         className={cn(fieldBase, 'h-10', fieldState(error), className)}
         {...props}
       />

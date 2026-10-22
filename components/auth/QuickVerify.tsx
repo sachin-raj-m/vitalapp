@@ -11,6 +11,7 @@ import { otpError } from '@/lib/auth-errors';
 import { PHONE_SIGNIN } from '@/lib/features';
 import { TurnstileField, type TurnstileHandle } from '@/components/TurnstileField';
 import { WhatsAppSignIn } from '@/components/auth/WhatsAppSignIn';
+import { CODE_LENGTH, CodeInput } from '@/components/auth/CodeInput';
 
 const RESEND_SECONDS = 60;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -98,11 +99,12 @@ export function QuickVerify({
         setNotice(`We sent a 6-digit code to ${address}. It can take a minute to arrive.`);
     };
 
-    const confirm = async () => {
-        if (!sentTo) return;
+    // Runs as soon as the sixth digit is in, or from the button.
+    const confirm = async (token = code) => {
+        if (!sentTo || busy || token.length < CODE_LENGTH) return;
         setError('');
         setBusy(true);
-        const { data, error: verifyErr } = await supabase.auth.verifyOtp({ email: sentTo, token: code, type: 'email' });
+        const { data, error: verifyErr } = await supabase.auth.verifyOtp({ email: sentTo, token, type: 'email' });
         if (verifyErr || !data.user) {
             setBusy(false);
             setError(otpError(verifyErr?.message).kind === 'wait'
@@ -176,17 +178,11 @@ export function QuickVerify({
                         <>
                             <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
                                 <div className="flex-1">
-                                    <Input
-                                        label="Code from the email"
-                                        inputMode="numeric"
-                                        autoComplete="one-time-code"
-                                        value={code}
-                                        onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 8))}
-                                        onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); if (code.length >= 6) confirm(); } }}
-                                        className="font-mono tracking-[0.3em]"
-                                    />
+                                    <div onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); confirm(); } }}>
+                                        <CodeInput label="Code from the email" value={code} onChange={setCode} onComplete={confirm} />
+                                    </div>
                                 </div>
-                                <Button type="button" variant="ink" onClick={confirm} isLoading={busy} disabled={code.length < 6}>
+                                <Button type="button" variant="ink" onClick={() => confirm()} isLoading={busy} disabled={code.length < CODE_LENGTH}>
                                     Verify
                                 </Button>
                             </div>

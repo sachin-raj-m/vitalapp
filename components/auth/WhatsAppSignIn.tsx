@@ -13,6 +13,7 @@ import { formatWaNumber, waNumber } from '@/lib/phone';
 import { PHONE_SIGNIN, WHATSAPP_VERIFY_NUMBER } from '@/lib/features';
 import { otpError } from '@/lib/auth-errors';
 import { TurnstileField, type TurnstileHandle } from '@/components/TurnstileField';
+import { CODE_LENGTH, CodeInput } from '@/components/auth/CodeInput';
 
 const RESEND_SECONDS = 60;
 const linkClass = 'text-gray-900 underline decoration-gray-300 underline-offset-4 hover:decoration-gray-900';
@@ -54,12 +55,23 @@ export function WhatsAppSignIn({
     const [ownConsent, setOwnConsent] = useState(false);
     const [sends, setSends] = useState(0);
     const captcha = useRef<TurnstileHandle>(null);
+    const codeId = `wa-code-${React.useId().replace(/:/g, '')}`;
 
     useEffect(() => {
         if (cooldown <= 0) return;
         const t = setTimeout(() => setCooldown(c => c - 1), 1000);
         return () => clearTimeout(t);
     }, [cooldown]);
+
+    // Back from WhatsApp with the code: put the cursor in the code box.
+    useEffect(() => {
+        if (!sentTo) return;
+        const onReturn = () => {
+            if (document.visibilityState === 'visible') document.getElementById(codeId)?.focus({ preventScroll: true });
+        };
+        document.addEventListener('visibilitychange', onReturn);
+        return () => document.removeEventListener('visibilitychange', onReturn);
+    }, [sentTo, codeId]);
 
     if (!PHONE_SIGNIN) return null;
 
@@ -114,12 +126,12 @@ export function WhatsAppSignIn({
         setCooldown(RESEND_SECONDS);
     };
 
-    const verify = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!sentTo) return;
+    // Runs as soon as the sixth digit is in, or from the button.
+    const verify = async (token = code) => {
+        if (!sentTo || busy || token.length < CODE_LENGTH) return;
         setError('');
         setBusy(true);
-        const { data, error: verifyErr } = await supabase.auth.verifyOtp({ phone: `+${sentTo}`, token: code, type: 'sms' });
+        const { data, error: verifyErr } = await supabase.auth.verifyOtp({ phone: `+${sentTo}`, token, type: 'sms' });
         if (verifyErr || !data.user) {
             setBusy(false);
             setError('That code is incorrect or has expired. Check it, or ask for a new one.');
@@ -154,16 +166,10 @@ export function WhatsAppSignIn({
                     On a computer? Send LOGIN to +{WHATSAPP_VERIFY_NUMBER} from WhatsApp on your phone.
                 </p>
 
-                <form onSubmit={verify} className="space-y-3" noValidate>
-                    <Input
-                        label="2. Enter the code"
-                        inputMode="numeric"
-                        autoComplete="one-time-code"
-                        value={code}
-                        onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                        className="font-mono tracking-[0.3em]"
-                    />
-                    <Button type="submit" variant="primary" size="lg" className="w-full" isLoading={busy} disabled={code.length < 6}>
+                <form onSubmit={(e) => { e.preventDefault(); verify(); }} className="space-y-3" noValidate>
+                    {/* Not focused on its own: on a phone that would open the keyboard over the WhatsApp button. */}
+                    <CodeInput id={codeId} label="2. Enter the code" value={code} onChange={setCode} onComplete={verify} autoFocus={false} />
+                    <Button type="submit" variant="primary" size="lg" className="w-full" isLoading={busy} disabled={code.length < CODE_LENGTH}>
                         Continue
                     </Button>
                 </form>
