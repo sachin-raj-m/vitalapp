@@ -5,6 +5,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { MapPin, Search } from 'lucide-react';
+import { differenceInCalendarDays, format } from 'date-fns';
 import { BLOOD_GROUPS, formatBloodGroup } from '@/lib/blood-compatibility';
 import { Input, Textarea } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
@@ -16,10 +17,10 @@ import dynamic from 'next/dynamic';
 import { logActivity } from '@/lib/logger';
 import { toast } from 'sonner';
 import { consentStamp, earliestConsentAt, hasRecordedConsent, type ConsentFields } from '@/lib/legal';
-import { waNumber } from '@/lib/phone';
-import { TurnstileField, type TurnstileHandle } from '@/components/TurnstileField';
+import { isPhoneTakenError, waNumber } from '@/lib/phone';
 import { MATCH_RADIUS_KM } from '@/lib/geo';
 import { describeAccuracy, getDevicePosition, insideIndia } from '@/lib/location';
+import { QuickVerify } from '@/components/auth/QuickVerify';
 
 /** A place from /api/geocode (server-side Nominatim). */
 interface GeoPlace {
@@ -43,6 +44,13 @@ const sameName = (a: string, b: string) => {
 const round5 = (n: number) => Math.round(n * 1e5) / 1e5;
 /** Using the phone's position for the hospital only makes sense if it's this close. */
 const MAX_REQUEST_GPS_ACCURACY_M = 1000;
+const today = () => format(new Date(), 'yyyy-MM-dd');
+
+/** No separate question: needed today or tomorrow is urgent, within 3 days soon. */
+const urgencyFor = (dateNeeded: string): UrgencyLevel => {
+    const days = differenceInCalendarDays(new Date(dateNeeded), new Date());
+    return days <= 1 ? 'High' : days <= 3 ? 'Medium' : 'Low';
+};
 
 const Map = dynamic(() => import('@/components/Map'), {
     ssr: false,
@@ -51,6 +59,14 @@ const Map = dynamic(() => import('@/components/Map'), {
     )
 });
 
+const linkClass = 'text-gray-900 underline decoration-gray-300 underline-offset-4';
+
+/**
+ * Requesting blood. No account needed: the person fills in what a donor needs
+ * (blood group, units, hospital, needed by, contact), ticks one consent box
+ * and verifies once (email code, or WhatsApp when switched on). That signs
+ * them in as a requester; they are never sent through the donor form.
+ */
 export default function CreateRequestPage() {
     const router = useRouter();
     const { user, loading } = useAuth();
@@ -60,10 +76,9 @@ export default function CreateRequestPage() {
     const [formData, setFormData] = useState({
         bloodGroup: '' as BloodGroup,
         unitsNeeded: 1,
-        dateNeeded: '',
+        dateNeeded: today(),
         hospitalName: '',
         hospitalAddress: '',
-        urgencyLevel: '' as UrgencyLevel,
         notes: '',
         contactName: '',
         contactPhone: '',
@@ -79,14 +94,13 @@ export default function CreateRequestPage() {
         zipcode: ''
     });
 
-    // The hospital pin: where it came from, what's there, and the poster's check.
+    // The hospital pin: where it came from and what's there.
     const [pinPlace, setPinPlace] = useState<GeoPlace | null>(null);
-    const [pinConfirmed, setPinConfirmed] = useState(false);
     const [locating, setLocating] = useState(false);
-    const [hospitalQuery, setHospitalQuery] = useState('');
     const [searching, setSearching] = useState(false);
     const [searchResults, setSearchResults] = useState<GeoPlace[] | null>(null);
     const [searchError, setSearchError] = useState('');
+    const [addressOpen, setAddressOpen] = useState(false);
     const pinRequest = useRef(0);
 
     const setPin = (latitude: number, longitude: number, source: PinSource, accuracy: number | null = null, known?: GeoPlace) => {
@@ -94,7 +108,6 @@ export default function CreateRequestPage() {
             toast.error('Choose a place in India.');
             return;
         }
-        setPinConfirmed(false);
         setFormData(prev => ({ ...prev, location: { ...prev.location, latitude, longitude, source, accuracy_m: accuracy } }));
         const fill = (place: GeoPlace) => {
             setPinPlace(place);
@@ -112,17 +125,16 @@ export default function CreateRequestPage() {
         fetch(`/api/geocode?lat=${latitude.toFixed(5)}&lng=${longitude.toFixed(5)}`)
             .then(res => (res.ok ? res.json() : null))
             .then(body => { if (ticket === pinRequest.current && body?.place) fill(body.place as GeoPlace); })
-            .catch(() => { /* the check below is a convenience */ });
+            .catch(() => { /* the address fields stay editable */ });
     };
 
     const searchHospital = async () => {
-        const q = (hospitalQuery.trim() || [formData.hospitalName, formData.city].filter(Boolean).join(', ')).trim();
+        const q = [formData.hospitalName, formData.city].filter(s => s.trim()).join(', ').trim();
         setSearchError('');
         if (q.length < 3) {
-            setSearchError('Type the hospital’s name, and the city if you know it.');
+            setSearchError('Type the hospital’s name (and the town if you know it), then search.');
             return;
         }
-        if (!hospitalQuery.trim()) setHospitalQuery(q);
         setSearching(true);
         try {
             const res = await fetch(`/api/geocode?search=${encodeURIComponent(q)}`);
@@ -131,7 +143,7 @@ export default function CreateRequestPage() {
             const body = await res.json();
             const results: GeoPlace[] = Array.isArray(body?.results) ? body.results : [];
             setSearchResults(results);
-            if (results.length === 0) setSearchError('No match found. Try a shorter name or add the city, or tap the map to mark it.');
+            if (results.length === 0) setSearchError('No match found. Try a shorter name or add the town, or tap the map to mark it.');
         } catch (err) {
             setSearchError(err instanceof Error ? err.message : 'Search failed.');
             setSearchResults(null);
@@ -150,21 +162,14 @@ export default function CreateRequestPage() {
         }));
     }, [user]);
 
-    // People without an account verify with a one-time email code inside the form.
-    const [verifyEmail, setVerifyEmail] = useState('');
-    const [codeSent, setCodeSent] = useState(false);
-    const [code, setCode] = useState('');
-    const [verifyBusy, setVerifyBusy] = useState(false);
-    const captcha = useRef<TurnstileHandle>(null);
+    // One consent box for everyone who hasn't agreed yet: visitors (needed
+    // before a code is sent) and signed-in people without consent on record.
+    const [agreed, setAgreed] = useState(false);
+    const [consentError, setConsentError] = useState('');
     const [verifiedUserId, setVerifiedUserId] = useState<string | null>(null);
-    const [guestConsent, setGuestConsent] = useState(false);
     const userId = user?.id ?? verifiedUserId;
 
-    // Posting needs consent recorded on the profile (enforced in the database).
-    // Signed-in people who never gave it (older accounts, or Google sign-ins that
-    // skipped registration) tick a box here instead.
     const [profileConsent, setProfileConsent] = useState<ConsentFields | null | undefined>(undefined);
-    const [signedInConsent, setSignedInConsent] = useState(false);
     useEffect(() => {
         if (!user) return;
         let cancelled = false;
@@ -172,52 +177,10 @@ export default function CreateRequestPage() {
             .then(({ data }) => { if (!cancelled) setProfileConsent(data ?? null); });
         return () => { cancelled = true; };
     }, [user]);
-    const needsSignedInConsent = !!user && profileConsent !== undefined && !hasRecordedConsent(profileConsent);
-
-    const sendCode = async () => {
-        setError('');
-        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(verifyEmail)) {
-            setError('Enter a valid email address to get a code.');
-            return;
-        }
-        if (!guestConsent) {
-            setError('Tick the box to agree to the Terms and Privacy notice before we send a code.');
-            return;
-        }
-        setVerifyBusy(true);
-        const captchaToken = await captcha.current?.getToken();
-        const { error: otpError } = await supabase.auth.signInWithOtp({
-            email: verifyEmail,
-            options: {
-                captchaToken,
-                shouldCreateUser: true,
-                emailRedirectTo: `${window.location.origin}/requests/new`,
-                // Recorded in auth.users when the code creates a new account
-                // (the sign-up hook rejects email sign-ups without it).
-                data: consentStamp(),
-            },
-        });
-        setVerifyBusy(false);
-        captcha.current?.reset(); // tokens work once
-        if (otpError) {
-            setError(otpError.message);
-            return;
-        }
-        setCodeSent(true);
-        toast.success('Code sent', { description: `Check ${verifyEmail}. It may take a minute to arrive.` });
-    };
-
-    const confirmCode = async () => {
-        setError('');
-        setVerifyBusy(true);
-        const { data: otpData, error: otpError } = await supabase.auth.verifyOtp({ email: verifyEmail, token: code, type: 'email' });
-        setVerifyBusy(false);
-        if (otpError || !otpData.user) {
-            setError('That code is incorrect or has expired. Check it or request a new one.');
-            return;
-        }
-        setVerifiedUserId(otpData.user.id);
-    };
+    const signedInWithoutConsent = !!user && profileConsent !== undefined && !hasRecordedConsent(profileConsent);
+    // Shown until posting; stays visible (ticked) after a visitor verifies.
+    const showConsent = !user || signedInWithoutConsent || (!!verifiedUserId && agreed);
+    const consentMissing = (!userId || signedInWithoutConsent) && !agreed;
 
     if (loading) {
         return (
@@ -232,29 +195,31 @@ export default function CreateRequestPage() {
         && !sameName(formData.city, pinPlace.city ?? '') && !sameName(formData.city, pinPlace.district ?? '');
     const zipMismatch = !!pinPlace?.zipcode && /^[0-9]{6}$/.test(formData.zipcode.trim()) && pinPlace.zipcode !== formData.zipcode.trim();
 
+    const fail = (message: string, scroll = true) => {
+        setError(message);
+        if (scroll) window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (!formData.bloodGroup) return fail('Choose the blood group needed.');
+        if (!formData.hospitalName.trim()) return fail('Enter the hospital’s name.');
+        if (!hasLocation) return fail('Mark the hospital on the map (search for it, or tap the map) so nearby donors are alerted.');
+        if (!formData.city.trim() && !formData.zipcode.trim()) {
+            setAddressOpen(true);
+            return fail('Add the hospital’s town or PIN code (under the map).');
+        }
+        if (formData.zipcode.trim() && !/^[1-9][0-9]{5}$/.test(formData.zipcode.trim())) {
+            setAddressOpen(true);
+            return fail('The PIN code should be 6 digits. Fix it or leave it empty.');
+        }
+        if (!formData.contactName.trim() || !formData.contactPhone.trim()) return fail('Add the contact person’s name and phone number.');
+        if (consentMissing) {
+            setConsentError('Tick the box to agree to the Terms and Privacy notice.');
+            return;
+        }
         if (!userId) {
-            setError('Verify your email below before posting.');
-            return;
-        }
-        if (needsSignedInConsent && !signedInConsent) {
-            setError('Tick the box to agree to the Terms and Privacy notice before posting.');
-            return;
-        }
-        if (!hasLocation) {
-            setError('Mark the hospital on the map (search for it, or tap the map) so nearby donors are alerted.');
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-            return;
-        }
-        if (!pinConfirmed) {
-            setError('Check the pin is on the hospital, then tick the box under the map.');
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-            return;
-        }
-        if (!/^[1-9][0-9]{5}$/.test(formData.zipcode.trim())) {
-            setError('Enter the hospital’s 6-digit PIN code.');
-            window.scrollTo({ top: 0, behavior: 'smooth' });
+            setError('Verify your email or WhatsApp below, then post.');
             return;
         }
 
@@ -262,39 +227,31 @@ export default function CreateRequestPage() {
         setError('');
 
         try {
-            // First-time requesters need a profile row (requests reference it).
-            // They're marked as non-donors until they choose to register as one.
-            if (user && needsSignedInConsent) {
-                const { error: consentError } = await supabase.from('profiles').update(consentStamp()).eq('id', userId);
-                if (consentError) throw consentError;
-                setProfileConsent(consentStamp());
+            // Requesters need consent on their profile (enforced in the
+            // database), and a name and number so donors know who is asking.
+            // Never makes them a donor.
+            const { data: existing } = await supabase.from('profiles')
+                .select('full_name, phone, consent_agreed, consent_at, consent_version').eq('id', userId).maybeSingle();
+            const patch: Record<string, unknown> = {};
+            if (!hasRecordedConsent(existing)) {
+                const consent = consentStamp();
+                Object.assign(patch, consent, { consent_at: earliestConsentAt(existing, consent) ?? consent.consent_at });
             }
-            if (!user) {
-                const { data: existing } = await supabase.from('profiles').select('id, blood_group, consent_agreed, consent_at, consent_version').eq('id', userId).maybeSingle();
-                if (existing?.blood_group && !hasRecordedConsent(existing)) {
-                    // A registered account that signed in with a code: record the
-                    // consent ticked in the verify step.
-                    const { error: consentError } = await supabase.from('profiles').update(consentStamp()).eq('id', userId);
-                    if (consentError) throw consentError;
+            if (!existing?.full_name?.trim()) patch.full_name = formData.contactName.trim();
+            const withPhone = !existing?.phone?.trim() && !!waNumber(formData.contactPhone);
+            if (withPhone) patch.phone = formData.contactPhone.trim();
+            if (Object.keys(patch).length) {
+                let { error: profileError } = await supabase.from('profiles').upsert({ id: userId, ...patch }, { onConflict: 'id' });
+                if (isPhoneTakenError(profileError) && withPhone) {
+                    // Someone else's verified number: post the request without saving it on the profile.
+                    delete patch.phone;
+                    ({ error: profileError } = await supabase.from('profiles').upsert({ id: userId, ...patch }, { onConflict: 'id' }));
                 }
-                if (!existing?.blood_group) {
-                    // Consent was given explicitly in the verify step; keep an earlier
-                    // consent to the same Privacy notice version if there is one.
-                    const consent = consentStamp();
-                    const { error: profileError } = await supabase.from('profiles').upsert({
-                        id: userId,
-                        email: verifyEmail,
-                        full_name: formData.contactName,
-                        phone: formData.contactPhone,
-                        is_donor: false,
-                        is_available: false,
-                        ...consent,
-                        consent_at: earliestConsentAt(existing, consent) ?? consent.consent_at,
-                    }, { onConflict: 'id' });
-                    if (profileError) throw profileError;
-                }
+                if (profileError) throw profileError;
+                if (patch.consent_agreed) setProfileConsent(consentStamp());
             }
 
+            const address = formData.hospitalAddress.trim() || [formData.hospitalName.trim(), formData.city.trim()].filter(Boolean).join(', ');
             const { data, error: requestError } = await supabase
                 .from('blood_requests')
                 .insert({
@@ -302,15 +259,15 @@ export default function CreateRequestPage() {
                     blood_group: formData.bloodGroup,
                     units_needed: formData.unitsNeeded,
                     date_needed: formData.dateNeeded,
-                    hospital_name: formData.hospitalName,
-                    hospital_address: formData.hospitalAddress,
-                    urgency_level: formData.urgencyLevel,
+                    hospital_name: formData.hospitalName.trim(),
+                    hospital_address: address,
+                    urgency_level: urgencyFor(formData.dateNeeded),
                     notes: formData.notes,
-                    contact_name: formData.contactName,
+                    contact_name: formData.contactName.trim(),
                     location: {
                         latitude: round5(formData.location.latitude),
                         longitude: round5(formData.location.longitude),
-                        address: formData.hospitalAddress,
+                        address,
                         source: formData.location.source || 'map',
                         ...(formData.location.accuracy_m ? { accuracy_m: Math.round(formData.location.accuracy_m) } : {}),
                     },
@@ -318,7 +275,7 @@ export default function CreateRequestPage() {
                     zipcode: formData.zipcode.trim(),
                     status: 'active'
                 })
-                .select(); // Ensure the inserted data is returned
+                .select();
 
             if (requestError) throw requestError;
             const requestId = data?.[0]?.id;
@@ -329,7 +286,7 @@ export default function CreateRequestPage() {
                 .from('request_contacts')
                 .insert({
                     request_id: requestId,
-                    contact_phone: formData.contactPhone,
+                    contact_phone: formData.contactPhone.trim(),
                     whatsapp_updates: formData.whatsappUpdates && !!waNumber(formData.contactPhone),
                 });
             if (contactError) {
@@ -337,18 +294,12 @@ export default function CreateRequestPage() {
                 throw contactError;
             }
 
-
-
-            // ... inside component ...
-
-            // Trigger Push Notifications (Fire and Forget)
-            // The server loads the request itself and checks it belongs to us.
+            // Alert donors (fire and forget). The server loads the request itself and checks it belongs to us.
             authedFetch('/api/notify/donors', {
                 method: 'POST',
                 body: JSON.stringify({ requestId })
             }).catch(e => console.error('Notification trigger failed', e));
 
-            // Log Activity
             await logActivity({
                 userId,
                 action: 'CREATE_REQUEST',
@@ -407,15 +358,17 @@ export default function CreateRequestPage() {
             <header className="pb-8">
                 <h1 className="display text-4xl sm:text-[2.75rem]">Request blood</h1>
                 <p className="mt-3 max-w-xl leading-relaxed text-gray-600">
-                    When you post a request, available donors within {MATCH_RADIUS_KM} km of the hospital whose listed blood group
-                    is compatible are alerted. Donors who haven’t added a location yet are emailed if they are in the same district. You will also get a link you can share.
+                    No account needed. Available donors within {MATCH_RADIUS_KM} km of the hospital whose blood group is compatible
+                    are alerted, and you get a link to share.
                 </p>
             </header>
 
             {error && <Alert variant="error" className="mb-6" onClose={() => setError('')}>{error}</Alert>}
 
-            <form onSubmit={handleSubmit}>
-                {section('Blood required', 'The blood group, number of units and when they are needed.', <>
+            {/* Verification sits outside this form (it has forms of its own); the
+                Post button below submits it via form="request-form". */}
+            <form id="request-form" onSubmit={handleSubmit} noValidate>
+                {section('Blood needed', 'The blood group, how many units and by when.', <>
                     <div>
                         <p className="mb-1.5 text-[13px] font-medium text-gray-800">Blood group</p>
                         <div className="grid grid-cols-4 gap-1.5" role="radiogroup" aria-label="Blood group">
@@ -433,65 +386,46 @@ export default function CreateRequestPage() {
                             ))}
                         </div>
                     </div>
-                    <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="grid grid-cols-2 gap-4">
                         <Input
                             type="number"
-                            label="Units needed"
+                            label="Units"
                             min={1}
                             max={20}
                             value={formData.unitsNeeded}
-                            onChange={(e) => setFormData({ ...formData, unitsNeeded: Math.max(1, parseInt(e.target.value) || 1) })}
+                            onChange={(e) => setFormData({ ...formData, unitsNeeded: Math.min(20, Math.max(1, parseInt(e.target.value) || 1)) })}
                             required
                         />
                         <Input
                             type="date"
                             label="Needed by"
                             value={formData.dateNeeded}
-                            min={new Date().toISOString().split('T')[0]}
-                            onChange={(e) => setFormData({ ...formData, dateNeeded: e.target.value })}
+                            min={today()}
+                            onChange={(e) => setFormData({ ...formData, dateNeeded: e.target.value || today() })}
                             required
                         />
                     </div>
-                    <div>
-                        <p className="mb-1.5 text-[13px] font-medium text-gray-800">Urgency</p>
-                        <div className="grid grid-cols-3 gap-1.5" role="radiogroup" aria-label="Urgency">
-                            {([['High', 'Urgent', 'Today'], ['Medium', 'Needed soon', 'In a few days'], ['Low', 'Planned', 'Scheduled']] as const).map(([value, label, hint]) => (
-                                <button
-                                    key={value}
-                                    type="button"
-                                    role="radio"
-                                    aria-checked={formData.urgencyLevel === value}
-                                    onClick={() => setFormData({ ...formData, urgencyLevel: value })}
-                                    className={`rounded-md border px-3 py-2.5 text-left transition-colors ${formData.urgencyLevel === value ? (value === 'High' ? 'border-red-600 bg-red-600 text-white' : 'border-gray-900 bg-gray-900 text-white') : 'border-gray-300 bg-white text-gray-900 hover:border-gray-400'}`}
-                                >
-                                    <span className="block text-sm font-medium">{label}</span>
-                                    <span className={`block text-xs ${formData.urgencyLevel === value ? 'opacity-70' : 'text-gray-500'}`}>{hint}</span>
-                                </button>
-                            ))}
-                        </div>
-                    </div>
                 </>)}
 
-                {section('Hospital', 'Where the donation will take place. Donors near the pin are alerted, so place it on the hospital itself.', <>
-                    <Input label="Hospital" value={formData.hospitalName} onChange={(e) => setFormData({ ...formData, hospitalName: e.target.value })} required placeholder="e.g. General Hospital" />
+                {section('Hospital', 'Donors near the pin are alerted, so place it on the hospital itself.', <>
                     <div>
-                        <label htmlFor="hospital-search" className="mb-1.5 block text-[13px] font-medium text-gray-800">Find the hospital on the map</label>
                         <div className="flex gap-2">
-                            <input
-                                id="hospital-search"
-                                type="search"
-                                value={hospitalQuery}
-                                onChange={(e) => setHospitalQuery(e.target.value)}
-                                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); searchHospital(); } }}
-                                placeholder={[formData.hospitalName, formData.city].filter(Boolean).join(', ') || 'Hospital name and city'}
-                                aria-describedby="hospital-search-hint"
-                                className="h-10 w-full rounded-md border border-gray-300 bg-white px-3 text-[15px] text-gray-900 placeholder:text-gray-400 hover:border-gray-400 focus:border-gray-900 focus:outline-none"
-                            />
-                            <Button type="button" variant="secondary" onClick={searchHospital} isLoading={searching}>
-                                <Search className="mr-1.5 h-3.5 w-3.5" aria-hidden /> Search
+                            <div className="flex-1">
+                                <Input
+                                    label="Hospital"
+                                    value={formData.hospitalName}
+                                    onChange={(e) => setFormData({ ...formData, hospitalName: e.target.value })}
+                                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); searchHospital(); } }}
+                                    required
+                                    placeholder="e.g. General Hospital, Kochi"
+                                    aria-describedby="hospital-search-hint"
+                                />
+                            </div>
+                            <Button type="button" variant="secondary" onClick={searchHospital} isLoading={searching} className="mt-[26px] shrink-0">
+                                <Search className="mr-1.5 h-3.5 w-3.5" aria-hidden /> Find
                             </Button>
                         </div>
-                        <p id="hospital-search-hint" className="mt-1.5 text-[13px] text-gray-500">Search by name or address, then pick the right result. Or tap the map.</p>
+                        <p id="hospital-search-hint" className="mt-1.5 text-[13px] text-gray-500">Type the name and tap Find, then pick the right result. Or tap the map.</p>
                         {searchError && <p role="alert" className="mt-1.5 text-[13px] text-red-700">{searchError}</p>}
                         {searchResults && searchResults.length > 0 && (
                             <ul className="mt-2 divide-y divide-gray-200 rounded-md border border-gray-200 bg-white" aria-label="Search results">
@@ -502,7 +436,6 @@ export default function CreateRequestPage() {
                                             onClick={() => {
                                                 setPin(place.latitude, place.longitude, 'search', null, place);
                                                 setSearchResults(null);
-                                                if (!formData.hospitalName.trim()) setFormData(prev => ({ ...prev, hospitalName: place.label.split(',')[0] }));
                                             }}
                                             className="block w-full px-3 py-2.5 text-left hover:bg-gray-50 focus-visible:bg-gray-50"
                                         >
@@ -521,7 +454,7 @@ export default function CreateRequestPage() {
                                 <MapPin className="h-3.5 w-3.5" aria-hidden /> {locating ? 'Locating…' : 'I’m at the hospital: use my location'}
                             </button>
                         </div>
-                        <div className={`relative z-0 h-[300px] overflow-hidden rounded-md border ${hasLocation ? 'border-gray-300' : 'border-dashed border-gray-400'}`}>
+                        <div className={`relative z-0 h-[260px] overflow-hidden rounded-md border sm:h-[300px] ${hasLocation ? 'border-gray-300' : 'border-dashed border-gray-400'}`}>
                             <Map
                                 interactive={true}
                                 center={hasLocation ? { lat: formData.location.latitude, lng: formData.location.longitude } : { lat: 20.5937, lng: 78.9629 }}
@@ -535,35 +468,31 @@ export default function CreateRequestPage() {
                             {hasLocation
                                 ? <>Pin {pinPlace ? <>near <span className="text-gray-800">{pinPlace.label}</span></> : 'placed'}
                                     {formData.location.source === 'gps' && formData.location.accuracy_m ? ` (from your device, ${describeAccuracy(formData.location.accuracy_m)})` : ''}.
-                                    {' '}Zoom in and tap to move it onto the hospital building if needed.</>
-                                : 'Search above, or tap the map to mark the hospital’s location.'}
+                                    {' '}If it’s not on the hospital, zoom in and tap the right spot.</>
+                                : 'Find the hospital above, or tap the map to mark it.'}
                         </p>
-                        {hasLocation && (
-                            <label className="mt-3 flex cursor-pointer items-start gap-3">
-                                <input
-                                    type="checkbox"
-                                    checked={pinConfirmed}
-                                    onChange={(e) => setPinConfirmed(e.target.checked)}
-                                    className="mt-1 h-4 w-4 shrink-0 rounded-[4px] border-gray-400 accent-gray-900"
-                                />
-                                <span className="text-sm leading-relaxed text-gray-700">
-                                    I’ve checked the pin is on {formData.hospitalName.trim() || 'the hospital'}.
-                                    <span className="block text-[13px] text-gray-500">Donors are alerted by distance from this pin.</span>
-                                </span>
-                            </label>
-                        )}
                     </div>
-                    <Input label="Address" value={formData.hospitalAddress} onChange={(e) => setFormData({ ...formData, hospitalAddress: e.target.value })} required />
-                    <div className="grid gap-4 sm:grid-cols-2">
-                        <Input label="City" value={formData.city} onChange={(e) => setFormData({ ...formData, city: e.target.value })} required placeholder="e.g. Kochi" helperText="Filled from the pin. Donors in its district who haven’t set a location are emailed too." />
-                        <Input label="PIN code" inputMode="numeric" maxLength={6} value={formData.zipcode} onChange={(e) => setFormData({ ...formData, zipcode: e.target.value.replace(/\D/g, '').slice(0, 6) })} required placeholder="e.g. 682011" />
-                    </div>
+                    {hasLocation && (
+                        <details open={addressOpen} onToggle={(e) => setAddressOpen((e.target as HTMLDetailsElement).open)} className="rounded-md border border-gray-200 bg-white px-4 py-3">
+                            <summary className="cursor-pointer text-sm text-gray-700">
+                                {[formData.city.trim(), formData.zipcode.trim()].filter(Boolean).join(', ') || 'Add the town and PIN code'}
+                                <span className="ml-2 text-[13px] text-gray-500">Filled from the pin. Edit</span>
+                            </summary>
+                            <div className="mt-3 space-y-4">
+                                <Input label="Address (optional)" value={formData.hospitalAddress} onChange={(e) => setFormData({ ...formData, hospitalAddress: e.target.value })} />
+                                <div className="grid gap-4 sm:grid-cols-2">
+                                    <Input label="Town or city" value={formData.city} onChange={(e) => setFormData({ ...formData, city: e.target.value })} placeholder="e.g. Kochi" />
+                                    <Input label="PIN code" inputMode="numeric" maxLength={6} value={formData.zipcode} onChange={(e) => setFormData({ ...formData, zipcode: e.target.value.replace(/\D/g, '').slice(0, 6) })} placeholder="e.g. 682011" />
+                                </div>
+                            </div>
+                        </details>
+                    )}
                     {(cityMismatch || zipMismatch) && pinPlace && (
                         <div role="status" className="rounded-md border-l-2 border-warning-500 bg-warning-50 px-4 py-3 text-sm text-warning-800">
                             <p>
                                 The pin is in {[cityMismatch ? (pinPlace.city || pinPlace.district) : null, zipMismatch ? `PIN ${pinPlace.zipcode}` : null].filter(Boolean).join(', ')},
                                 {' '}but you entered {[cityMismatch ? formData.city : null, zipMismatch ? `PIN ${formData.zipcode}` : null].filter(Boolean).join(', ')}.
-                                {' '}Check the pin, or update the {cityMismatch && zipMismatch ? 'city and PIN code' : cityMismatch ? 'city' : 'PIN code'}.
+                                {' '}Check the pin, or update the {cityMismatch && zipMismatch ? 'town and PIN code' : cityMismatch ? 'town' : 'PIN code'}.
                             </p>
                             <button
                                 type="button"
@@ -580,10 +509,10 @@ export default function CreateRequestPage() {
                     )}
                 </>)}
 
-                {section('Contact details', 'The person donors should call. The phone number is shown only to donors who offer.', <>
+                {section('Who donors should call', 'The phone number is shown only to donors who offer.', <>
                     <div className="grid gap-4 sm:grid-cols-2">
-                        <Input label="Contact name" value={formData.contactName} onChange={(e) => setFormData({ ...formData, contactName: e.target.value })} required />
-                        <Input label="Contact phone" type="tel" value={formData.contactPhone} onChange={(e) => setFormData({ ...formData, contactPhone: e.target.value })} required helperText="Only shown to donors who offer." />
+                        <Input label="Contact name" value={formData.contactName} onChange={(e) => setFormData({ ...formData, contactName: e.target.value })} required autoComplete="name" />
+                        <Input label="Contact phone" type="tel" value={formData.contactPhone} onChange={(e) => setFormData({ ...formData, contactPhone: e.target.value })} required autoComplete="tel" />
                     </div>
                     <label className="flex cursor-pointer items-start gap-3">
                         <input
@@ -594,7 +523,7 @@ export default function CreateRequestPage() {
                         />
                         <span className="text-sm leading-relaxed text-gray-600">
                             <span className="block text-gray-900">Send updates on WhatsApp to this number</span>
-                            When a donor offers, and to confirm the donation with their PIN afterwards. Numbers are never shared in WhatsApp; you’ll get a private link instead.
+                            When a donor offers. Numbers are never shared in WhatsApp; you get a private link instead.
                             {formData.whatsappUpdates && formData.contactPhone.trim() !== '' && !waNumber(formData.contactPhone) && (
                                 <span className="mt-1 block text-warning-800">WhatsApp updates need a 10-digit Indian mobile number.</span>
                             )}
@@ -607,111 +536,69 @@ export default function CreateRequestPage() {
                         placeholder="For example, ward number or the best time to call"
                     />
                 </>)}
+            </form>
 
-                {!user && section('Verify your email', 'Required to post without an account.', <>
-                    {verifiedUserId ? (
-                        <p className="flex items-center gap-2 text-sm text-success-700">
-                            <span className="h-2 w-2 rounded-full bg-success-500" /> Email confirmed as {verifyEmail}. You can now post your request.
-                        </p>
-                    ) : (
-                        <>
-                            <p className="text-sm leading-relaxed text-gray-600">
-                                You don’t need an account. We will email you a one-time code, which also lets you manage this request later.
-                                Already registered? <Link href="/login?redirect=/requests/new" className="text-gray-900 underline decoration-gray-300 underline-offset-4">Sign in</Link>.
-                            </p>
-                            <label className="flex cursor-pointer items-start gap-3">
-                                <input
-                                    type="checkbox"
-                                    checked={guestConsent}
-                                    onChange={(e) => setGuestConsent(e.target.checked)}
-                                    disabled={codeSent}
-                                    aria-describedby={!guestConsent && !codeSent ? 'guest-consent-hint' : undefined}
-                                    className="mt-1 h-4 w-4 shrink-0 rounded-[4px] border-gray-400 accent-gray-900"
-                                />
-                                <span className="text-sm leading-relaxed text-gray-600">
-                                    I agree to the{' '}
-                                    <Link href="/terms" target="_blank" className="text-gray-900 underline decoration-gray-300 underline-offset-4">Terms</Link>
-                                    {' '}and have read the{' '}
-                                    <Link href="/privacy" target="_blank" className="text-gray-900 underline decoration-gray-300 underline-offset-4">Privacy notice</Link>
-                                    . My name and contact phone are stored with this request and shown to donors who offer.
-                                </span>
-                            </label>
-                            {!guestConsent && !codeSent && (
-                                <p id="guest-consent-hint" className="ml-7 text-[13px] text-gray-500">Tick the box to get a code.</p>
-                            )}
-                            {!codeSent && <TurnstileField ref={captcha} />}
-                            <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
-                                <div className="flex-1">
-                                    <Input label="Your email" type="email" autoComplete="email" value={verifyEmail} onChange={(e) => setVerifyEmail(e.target.value)} disabled={codeSent} />
-                                </div>
-                                <Button type="button" variant="secondary" onClick={codeSent ? () => { setCodeSent(false); setCode(''); } : sendCode} isLoading={verifyBusy && !codeSent}
-                                    disabled={!codeSent && !guestConsent}
-                                    aria-describedby={!codeSent && !guestConsent ? 'guest-consent-hint' : undefined}>
-                                    {codeSent ? 'Change email' : 'Send code'}
-                                </Button>
-                            </div>
-                            {codeSent && (
-                                <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
-                                    <div className="flex-1">
-                                        <Input
-                                            label="Code from the email"
-                                            inputMode="numeric"
-                                            autoComplete="one-time-code"
-                                            value={code}
-                                            onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 8))}
-                                            className="font-mono tracking-[0.3em]"
-                                        />
-                                    </div>
-                                    <Button type="button" variant="ink" onClick={confirmCode} isLoading={verifyBusy} disabled={code.length < 6}>
-                                        Verify
-                                    </Button>
-                                </div>
-                            )}
-                        </>
-                    )}
-                </>)}
-
-                <p className="border-t border-gray-200 pt-6 text-[13px] leading-relaxed text-gray-500">
-                    Posting makes your request visible to donors on Vital. Vital does not arrange, verify or guarantee a
-                    donor, and is not involved in any payment. You are responsible for the accuracy of your request, and
-                    any contact with a donor is directly between you, at your own discretion. In an emergency, also contact
-                    the hospital or a blood bank directly. See the{' '}
-                    <Link href="/terms" className="text-gray-900 underline decoration-gray-300 underline-offset-4">Terms</Link>.
-                </p>
-
-                {needsSignedInConsent && (
-                    <label className="mt-4 flex cursor-pointer items-start gap-3">
+            {showConsent && (
+                <div className="border-t border-gray-200 pt-6">
+                    <label className="flex cursor-pointer items-start gap-3">
                         <input
                             type="checkbox"
-                            checked={signedInConsent}
-                            onChange={(e) => setSignedInConsent(e.target.checked)}
-                            aria-describedby={!signedInConsent ? 'signed-in-consent-hint' : undefined}
+                            checked={agreed}
+                            onChange={(e) => { setAgreed(e.target.checked); if (e.target.checked) setConsentError(''); }}
+                            disabled={!!verifiedUserId && !signedInWithoutConsent}
+                            aria-invalid={!!consentError || undefined}
+                            aria-describedby={consentError ? 'consent-error' : undefined}
                             className="mt-1 h-4 w-4 shrink-0 rounded-[4px] border-gray-400 accent-gray-900"
                         />
                         <span className="text-sm leading-relaxed text-gray-600">
-                            I agree to the{' '}
-                            <Link href="/terms" target="_blank" className="text-gray-900 underline decoration-gray-300 underline-offset-4">Terms</Link>
-                            {' '}and have read the{' '}
-                            <Link href="/privacy" target="_blank" className="text-gray-900 underline decoration-gray-300 underline-offset-4">Privacy notice</Link>
-                            . My name and contact phone are stored with this request and shown to donors who offer.
-                            {!signedInConsent && <span id="signed-in-consent-hint" className="mt-1 block text-[13px] text-gray-500">Tick the box to post your request.</span>}
+                            I agree to the <Link href="/terms" target="_blank" className={linkClass}>Terms</Link> and have read the{' '}
+                            <Link href="/privacy" target="_blank" className={linkClass}>Privacy notice</Link>.
+                            {' '}The contact name and phone are stored with this request and shown to donors who offer.
                         </span>
                     </label>
-                )}
-
-                <div className="mt-4 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-                    <Button type="button" variant="ghost" onClick={() => router.push('/requests')}>Cancel</Button>
-                    <Button
-                        type="submit"
-                        variant="primary"
-                        size="lg"
-                        isLoading={isLoading}
-                        disabled={!formData.bloodGroup || !formData.urgencyLevel || !userId || (needsSignedInConsent && !signedInConsent)}
-                    >
-                        Post request
-                    </Button>
+                    {consentError && <p id="consent-error" className="ml-7 mt-1.5 text-[13px] text-red-700">{consentError}</p>}
                 </div>
-            </form>
+            )}
+
+            {!user && section('Verify it’s you', 'One quick check, so requests are real. It also lets you manage this request later.', verifiedUserId ? (
+                <p className="flex items-center gap-2 text-sm text-success-700">
+                    <span className="h-2 w-2 rounded-full bg-success-500" /> Verified. You can post your request now.
+                </p>
+            ) : (
+                <>
+                    <p className="text-sm leading-relaxed text-gray-600">
+                        Get a code by email{' '}or on WhatsApp. Already registered?{' '}
+                        <Link href="/login?redirect=/requests/new" className={linkClass}>Sign in</Link>.
+                    </p>
+                    <QuickVerify
+                        consented={agreed}
+                        onNeedConsent={() => setConsentError('Tick the box above to agree before we send a code.')}
+                        initialPhone={formData.contactPhone}
+                        emailRedirectTo={typeof window !== 'undefined' ? `${window.location.origin}/requests/new` : undefined}
+                        onVerified={(u) => setVerifiedUserId(u.id)}
+                    />
+                </>
+            ))}
+
+            <p className="border-t border-gray-200 pt-6 text-[13px] leading-relaxed text-gray-500">
+                Vital does not arrange, verify or guarantee a donor, and is not involved in any payment. Any contact with a
+                donor is directly between you. In an emergency, also contact the hospital or a blood bank directly. See the{' '}
+                <Link href="/terms" className={linkClass}>Terms</Link>.
+            </p>
+
+            <div className="mt-4 flex flex-col-reverse gap-2 pb-4 sm:flex-row sm:justify-end">
+                <Button type="button" variant="ghost" onClick={() => router.push('/requests')}>Cancel</Button>
+                <Button
+                    type="submit"
+                    form="request-form"
+                    variant="primary"
+                    size="lg"
+                    isLoading={isLoading}
+                    disabled={!userId}
+                >
+                    {userId ? 'Post request' : 'Verify above to post'}
+                </Button>
+            </div>
         </div>
     );
 }
