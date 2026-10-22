@@ -6,6 +6,7 @@ import { createContactLink } from '@/lib/contact-links';
 import { onDonationConfirmed } from '@/lib/donation-events';
 import { TEMPLATES, sendButtons, sendTemplate, sendText, waNumber } from '@/lib/whatsapp';
 import { PHONE_CODE_MAX_ATTEMPTS, PHONE_PURPOSE, parseVerifyMessage, phoneCodeHash } from '@/lib/phone-verification';
+import { PHONE_LOGIN_MAX_DELIVERIES, decryptCode, isLoginMessage, loginCodeMessage } from '@/lib/phone-login';
 
 /**
  * Replies to people messaging Vital's WhatsApp number. Inputs are button taps
@@ -19,6 +20,8 @@ import { PHONE_CODE_MAX_ATTEMPTS, PHONE_PURPOSE, parseVerifyMessage, phoneCodeHa
  *   Text              STOP / START / LINK / a 4-digit PIN / anything else -> help
  *                     VERIFY <6-digit code> -> verifies the sender's number
  *                     (the code comes from registration or Settings)
+ *                     LOGIN -> the sign-in code waiting for the sender's number
+ *                     ("Continue with WhatsApp", lib/phone-login.ts)
  *
  * Every action re-checks the database: a payload only names a request or
  * offer, and the sender's number must belong to the right person.
@@ -75,6 +78,7 @@ export async function handleInbound(msg: Inbound) {
     const verifyCode = parseVerifyMessage(text);
     if (verifyCode) return verifyNumber(from, verifyCode);
     if (/^VERIFY\b/.test(word)) return reply(from, VERIFY_HELP);
+    if (isLoginMessage(text)) return sendLoginCode(from);
     if (/^\d{4}$/.test(text)) return checkPin(from, text);
     return reply(from, HELP);
 }
@@ -363,4 +367,30 @@ async function verifyNumber(from: string, code: string) {
         default:
             return reply(from, 'The number on your Vital profile isn’t this one. Check it in Settings, then tap “Verify on WhatsApp” again.', { userId: match.user_id });
     }
+}
+
+/**
+ * "LOGIN": the sign-in code Supabase made for this number (stored by the Send
+ * SMS hook, app/api/auth/send-sms). WhatsApp says who sent the message, so the
+ * code only ever goes to the number it was made for.
+ */
+async function sendLoginCode(from: string) {
+    const admin = serviceClient();
+    const { data: row } = await admin.from('phone_login_codes')
+        .select('user_id, code_enc, expires_at, deliveries')
+        .eq('wa_number', from)
+        .maybeSingle();
+    const site = SITE_URL.replace(/^https?:\/\//, '');
+    if (!row || Date.parse(row.expires_at) < Date.now()) {
+        return reply(from, `No sign-in code is waiting for this number. On ${site}, tap “Continue with WhatsApp”, enter this number, then send LOGIN again.`);
+    }
+    if (row.deliveries >= PHONE_LOGIN_MAX_DELIVERIES) {
+        return reply(from, `We’ve already sent this code several times. Scroll up in this chat to find it, or ask for a new code on ${site}.`, { userId: row.user_id });
+    }
+    const code = decryptCode(row.code_enc);
+    if (!code) return reply(from, `Sorry, we couldn’t read your code. Please ask for a new one on ${site}.`);
+    await admin.from('phone_login_codes')
+        .update({ deliveries: row.deliveries + 1, delivered_at: new Date().toISOString() })
+        .eq('wa_number', from);
+    return reply(from, loginCodeMessage(code), { userId: row.user_id });
 }

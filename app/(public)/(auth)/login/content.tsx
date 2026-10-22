@@ -10,7 +10,9 @@ import { Button } from '@/components/ui/Button';
 import { Alert } from '@/components/ui/Alert';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
-import { isRegistrationComplete } from '@/lib/auth-helpers';
+import { pathAfterSignIn } from '@/lib/auth-helpers';
+import { WhatsAppSignIn } from '@/components/auth/WhatsAppSignIn';
+import { PHONE_SIGNIN } from '@/lib/features';
 import { safeInternalPath } from '@/lib/site';
 import { ConfirmEmailCode } from '@/components/auth/ConfirmEmailCode';
 import { TurnstileField, type TurnstileHandle } from '@/components/TurnstileField';
@@ -18,7 +20,7 @@ import { GoogleSignIn } from '@/components/auth/GoogleSignIn';
 
 export default function LoginPage() {
     const router = useRouter();
-    const { signIn, user } = useAuth();
+    const { signIn, user, session } = useAuth();
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
@@ -30,35 +32,12 @@ export default function LoginPage() {
 
     useEffect(() => {
         if (!user) return;
-
         const params = new URLSearchParams(window.location.search);
         const redirect = safeInternalPath(params.get('redirect') || params.get('from'), '');
-
-        const route = async () => {
-            // Requesting blood doesn't require a full donor profile.
-            if (redirect.startsWith('/requests')) {
-                router.push(redirect);
-                return;
-            }
-
-            const isComplete = await isRegistrationComplete(user.id).catch(() => false);
-            if (isComplete) {
-                router.push(redirect || '/dashboard');
-                return;
-            }
-
-            try {
-                localStorage.setItem('pendingRegistration', JSON.stringify({
-                    userId: user.id,
-                    email: user.email,
-                    phone: user.phone || '',
-                }));
-            } catch { /* storage blocked */ }
-            router.push('/complete-registration');
-        };
-
-        route();
-    }, [user, router]);
+        // Donors to the dashboard, requesters to their requests, new accounts
+        // to the short donor form (which they can skip).
+        pathAfterSignIn(user.id, session?.user?.user_metadata, redirect).then(path => router.push(path));
+    }, [user, session, router]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -118,7 +97,7 @@ export default function LoginPage() {
     return (
         <AuthFrame
             title="Sign in"
-            subtitle="Use the email address you registered with, or continue with Google."
+            subtitle={PHONE_SIGNIN ? 'Use your mobile number, Google, or the email you registered with.' : 'Use the email address you registered with, or continue with Google.'}
             footer={
                 <div className="flex flex-wrap justify-between gap-3">
                     <span>
@@ -143,6 +122,12 @@ export default function LoginPage() {
                 <Link href="/terms" className={authLinkClass}>Terms</Link> and{' '}
                 <Link href="/privacy" className={authLinkClass}>Privacy notice</Link>. You will confirm this on the next screen.
             </p>
+            {PHONE_SIGNIN && (
+                <div className="mt-6">
+                    {/* verifyOtp signs the person in; the effect above then routes them. */}
+                    <WhatsAppSignIn onSignedIn={() => {}} />
+                </div>
+            )}
             <OrDivider />
 
             <form onSubmit={handleSubmit} className="space-y-4">
