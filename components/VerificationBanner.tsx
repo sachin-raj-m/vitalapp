@@ -1,3 +1,5 @@
+"use client";
+
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
@@ -11,9 +13,11 @@ import { ConfirmEmailCode } from '@/components/auth/ConfirmEmailCode';
 import { WhatsAppVerify } from '@/components/WhatsAppVerify';
 
 /**
- * "Pending verification": what's missing (email, mobile number) and how to fix
- * it, right here. The phone is optional and only asked for when there's a way
- * to verify it (lib/features.ts).
+ * "Pending verification": shown only when neither the email nor the mobile
+ * number is verified (lib/verification.ts). Either one is enough, so the
+ * banner offers both and goes away once one is done. Verifying the other is
+ * optional and lives in Settings. The phone is only offered when there's a
+ * way to verify it (lib/features.ts).
  */
 export const VerificationBanner = () => {
     const { session, user, refreshProfile } = useAuth();
@@ -26,27 +30,36 @@ export const VerificationBanner = () => {
     const status = contactVerification(user, session.user.email_confirmed_at);
     const canVerifyPhone = WHATSAPP_VERIFY_NUMBER || WHATSAPP_LIVE;
     const phoneReachable = !!waNumber(user?.phone);
-    // Ask about the phone only once the profile is loaded and there's a way to verify it.
-    const askPhone = !!user && !status.phone && (status.phoneMissing || (canVerifyPhone && phoneReachable));
-    const askEmail = !status.email;
 
-    if (!askEmail && !askPhone) {
+    // Wait for the profile; then ask only while nothing is verified.
+    if (!user || !status.pending) {
         return done ? (
-            <div className="rounded-md border-l-2 border-success-500 bg-success-50 px-4 py-3 text-sm text-success-800">{done}</div>
+            <div className="rounded-md border-l-2 border-success-500 bg-success-50 px-4 py-3 text-sm text-success-800">
+                {done} You can add the other one in <Link href="/profile/edit" className="underline underline-offset-4">Settings</Link> if you like. It’s optional.
+            </div>
         ) : null;
     }
 
-    const missing = [askEmail && 'confirm your email', askPhone && (status.phoneMissing ? 'add your mobile number' : 'verify your mobile number')].filter(Boolean).join(' and ');
+    const askEmail = !!session.user.email;
+    const askPhone = status.phoneMissing || (canVerifyPhone && phoneReachable);
+    if (!askEmail && !askPhone) return null;
+
+    const options = [
+        askEmail && 'confirm your email',
+        askPhone && (status.phoneMissing ? 'add your mobile number' : 'verify your mobile number'),
+    ].filter(Boolean).join(' or ');
 
     return (
         <div className="space-y-3 rounded-md border-l-2 border-warning-500 bg-warning-50 px-4 py-3 text-sm">
             <div className="flex items-start gap-3">
                 <div className="flex-1 text-warning-800">
-                    <p><span className="font-medium">Your account is pending verification.</span> Please {missing}.</p>
-                    {askPhone && status.phoneMissing && user?.phone_released_at && (
+                    <p>
+                        <span className="font-medium">Your account is pending verification.</span> Please {options}.
+                        {askEmail && askPhone && ' Either one is enough.'}
+                    </p>
+                    {askPhone && status.phoneMissing && user.phone_released_at && (
                         <p className="mt-1 text-[13px]">Another Vital account verified the number you had, so it was removed from yours.</p>
                     )}
-                    {done && <p className="mt-1 text-[13px] text-success-700">{done}</p>}
                 </div>
                 <button onClick={() => setIsVisible(false)} className="rounded p-1 text-warning-600 hover:text-warning-800" aria-label="Dismiss">
                     <X className="h-4 w-4" />

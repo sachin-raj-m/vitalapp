@@ -29,6 +29,8 @@ export interface Insights {
         donors_7d: number; donors_without_location: number; donors_without_blood_group: number;
         consent_recorded: number; consent_missing: number; email_confirmed: number; email_unconfirmed: number;
         no_email: number; phone_verified: number; phone_unverified: number; no_phone: number;
+        /** Email confirmed OR phone verified (20261022000100); missing before that migration. */
+        contact_verified?: number; contact_unverified?: number;
         whatsapp_opted_in: number; whatsapp_opted_in_donors: number;
         donors_by_blood_group: (Labelled & { count: number; available: number })[];
         /** By profile district (and state); migration 20261018000300. */
@@ -432,12 +434,15 @@ export function AdminInsights({ onRequestClosed }: { onRequestClosed?: (requestI
                         <CardHeader className="py-3 sm:py-3"><h4 className="font-semibold text-gray-700">Account health</h4></CardHeader>
                         <CardBody className="space-y-3">
                             <Meter label="Consent recorded" value={people.consent_recorded} total={people.accounts} />
+                            {people.contact_verified !== undefined && (
+                                <Meter label="Verified (email or mobile)" value={people.contact_verified} total={people.accounts} />
+                            )}
                             <Meter label="Email confirmed" value={people.email_confirmed} total={people.accounts} />
                             <Meter label="Phone verified" value={people.phone_verified} total={people.accounts} />
                             <Meter label="Donors with a location" value={people.donors - people.donors_without_location} total={people.donors} />
                             <Meter label="Donors on WhatsApp alerts" value={people.whatsapp_opted_in_donors} total={people.donors} />
                             <p className="text-xs text-gray-600">
-                                {people.consent_missing} without consent · {people.email_unconfirmed} unconfirmed emails{people.no_email ? ` · ${people.no_email} without email` : ''} · {people.phone_unverified} unverified phones · {people.no_phone} without a phone
+                                {people.consent_missing} without consent{people.contact_unverified !== undefined ? ` · ${people.contact_unverified} pending verification` : ''} · {people.email_unconfirmed} unconfirmed emails{people.no_email ? ` · ${people.no_email} without email` : ''} · {people.phone_unverified} unverified phones · {people.no_phone} without a phone
                             </p>
                         </CardBody>
                     </Card>

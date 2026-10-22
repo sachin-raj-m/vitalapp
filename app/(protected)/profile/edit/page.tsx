@@ -292,10 +292,18 @@ export default function ProfileEditPage() {
                 ? { tone: 'ok', text: 'WhatsApp' }
                 : { tone: 'ok', text: 'Email' };
     const overview: { label: string; status: Status; href: string }[] = [
-        { label: 'Email', href: '#personal', status: contact.email ? { tone: 'ok', text: 'Verified' } : { tone: 'todo', text: 'Not confirmed' } },
+        // Verified = email OR mobile (lib/verification.ts): once one is done, the other is optional.
+        {
+            label: 'Email', href: '#personal',
+            status: contact.email ? { tone: 'ok', text: 'Verified' }
+                : contact.emailMissing ? { tone: 'info', text: 'Not added' }
+                    : contact.pending ? { tone: 'todo', text: 'Not confirmed' } : { tone: 'info', text: 'Not confirmed (optional)' },
+        },
         {
             label: 'Mobile', href: '#phone',
-            status: contact.phoneMissing ? { tone: 'todo', text: 'Missing' } : contact.phone ? { tone: 'ok', text: 'Verified' } : { tone: 'todo', text: 'Not verified' },
+            status: contact.phone ? { tone: 'ok', text: 'Verified' }
+                : !contact.pending ? { tone: 'info', text: contact.phoneMissing ? 'Not added (optional)' : 'Not verified (optional)' }
+                    : contact.phoneMissing ? { tone: 'todo', text: 'Missing' } : { tone: 'todo', text: 'Not verified' },
         },
         {
             label: 'Alert location', href: '#alert-location',
@@ -410,7 +418,7 @@ export default function ProfileEditPage() {
                             </p>
                         )}
                     </div>
-                </>, contact.phoneMissing ? { tone: 'todo', text: 'Add your number' } : contact.phone ? { tone: 'ok', text: 'Verified' } : { tone: 'todo', text: 'Verify your number' })}
+                </>, contact.phone ? { tone: 'ok', text: 'Verified' } : !contact.pending ? undefined : contact.phoneMissing ? { tone: 'todo', text: 'Add your number' } : { tone: 'todo', text: 'Verify your number' })}
 
                 {section('location', MapPin, 'Location', `Used to show you donors within ${MATCH_RADIUS_KM} km and to alert you to requests near you.`, <>
                     <StateDistrictSelect
@@ -424,8 +432,8 @@ export default function ProfileEditPage() {
                         districtError={locationErrors.district}
                     />
                     <div className="grid gap-4 sm:grid-cols-2">
-                        <Input label="Current PIN code" inputMode="numeric" value={editForm.present_zip} onChange={(e) => setEditForm({ ...editForm, present_zip: e.target.value })} required />
-                        <Input label="Permanent PIN code" inputMode="numeric" value={editForm.permanent_zip} onChange={(e) => setEditForm({ ...editForm, permanent_zip: e.target.value })} required />
+                        <Input label="Current PIN code" inputMode="numeric" value={editForm.present_zip} onChange={(e) => setEditForm({ ...editForm, present_zip: e.target.value })} helperText="Places you on the map if you don’t set an exact point." />
+                        <Input label="Permanent PIN code (optional)" inputMode="numeric" value={editForm.permanent_zip} onChange={(e) => setEditForm({ ...editForm, permanent_zip: e.target.value })} />
                     </div>
                     <div id="alert-location" className={cn('scroll-mt-24 rounded-lg border p-4', savedPoint ? 'border-gray-200' : 'border-warning-200 bg-warning-50/60')}>
                         <h3 className="mb-1 flex items-center text-[13px] font-medium text-gray-800">Where we alert you from {savesOnItsOwn}</h3>

@@ -127,7 +127,7 @@ export default function AdminDashboard() {
             setStats({
                 users: allUsers.length,
                 donors: allUsers.filter(u => u.is_donor).length,
-                // Pending verification = email not confirmed or phone not verified (lib/verification.ts).
+                // Pending verification = neither the email nor the phone is verified (lib/verification.ts).
                 pending: allUsers.filter(u => u.is_donor && contactVerification(u).pending).length,
                 // Same rule as the public site: active and not past its needed-by date.
                 requests: allRequests.filter(r => isRequestOpen(r)).length
@@ -460,7 +460,7 @@ export default function AdminDashboard() {
                                         <tr key={user.id}>
                                             <td className="px-6 py-4 whitespace-nowrap">
                                                 <div className="text-sm font-medium text-gray-900">{user.full_name || 'Unknown'}</div>
-                                                <div className="text-sm text-gray-500">{user.email}</div>
+                                                <div className="text-sm text-gray-500">{user.email || user.phone || 'No email'}</div>
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap">
                                                 <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${user.role === 'admin' ? 'bg-gray-100 text-gray-900' : 'bg-gray-100 text-gray-800'}`}>
@@ -477,8 +477,12 @@ export default function AdminDashboard() {
                                                     );
                                                     return (
                                                         <div className="flex flex-wrap items-center gap-1">
-                                                            {badge(v.email, 'Email')}
-                                                            {badge(v.phone, 'Phone')}
+                                                            {v.pending
+                                                                ? <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-warning-100 text-warning-800">Pending verification</span>
+                                                                : <>
+                                                                    {v.email && badge(true, 'Email')}
+                                                                    {v.phone && badge(true, 'Phone')}
+                                                                </>}
                                                             {user.is_donor && user.verification_status === 'verified' && (
                                                                 <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">Reviewed</span>
                                                             )}
