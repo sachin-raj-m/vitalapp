@@ -11,6 +11,8 @@ import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { TurnstileField, type TurnstileHandle } from '@/components/TurnstileField';
 import { GoogleSignIn } from '@/components/auth/GoogleSignIn';
+import { WhatsAppSignIn } from '@/components/auth/WhatsAppSignIn';
+import { PHONE_SIGNIN } from '@/lib/features';
 
 interface AuthModalProps {
     isOpen: boolean;
@@ -79,6 +81,11 @@ export function AuthModal({ isOpen, onClose, onSuccess, message = "Sign in to co
                 getCaptchaToken={async () => { const t = await captcha.current?.getToken(); captcha.current?.reset(); return t; }}
                 onError={message => setError(friendlyAuthError(message))}
             />
+            {PHONE_SIGNIN && (
+                <div className="mt-4">
+                    <WhatsAppSignIn onSignedIn={() => onSuccess()} />
+                </div>
+            )}
 
             <p className="mt-6 text-center text-sm text-gray-600">
                 New here?{' '}
