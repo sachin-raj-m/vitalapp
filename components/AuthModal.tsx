@@ -2,16 +2,15 @@
 
 import React, { useState, useRef } from 'react';
 import Link from 'next/link';
-import { Button } from '@/components/ui/Button';
-import { Input } from '@/components/ui/Input';
 import { Alert } from '@/components/ui/Alert';
 import { Modal } from '@/components/ui/Modal';
 import { OrDivider, friendlyAuthError } from '@/components/auth/GoogleButton';
-import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
+import { rememberNext, withRedirect } from '@/lib/auth-helpers';
 import { TurnstileField, type TurnstileHandle } from '@/components/TurnstileField';
 import { GoogleSignIn } from '@/components/auth/GoogleSignIn';
 import { WhatsAppSignIn } from '@/components/auth/WhatsAppSignIn';
+import { EmailSignIn } from '@/components/auth/EmailSignIn';
 import { PHONE_SIGNIN } from '@/lib/features';
 
 interface AuthModalProps {
@@ -19,37 +18,26 @@ interface AuthModalProps {
     onClose: () => void;
     onSuccess: () => void;
     message?: string;
+    /** Where to come back to when signing in leaves the page (Google, Join). */
+    next?: string;
 }
 
-export function AuthModal({ isOpen, onClose, onSuccess, message = "Sign in to continue" }: AuthModalProps) {
-    const { signIn } = useAuth();
-    const [email, setEmail] = useState('');
-    const [password, setPassword] = useState('');
+/**
+ * Sign in without leaving the page: the same choices, in the same order, as
+ * the sign-in page (Google, WhatsApp when switched on, email with a password
+ * or a code). New people are pointed to Join, which brings them back to `next`.
+ */
+export function AuthModal({ isOpen, onClose, onSuccess, message = "Sign in to continue", next }: AuthModalProps) {
     const [error, setError] = useState('');
-    const [isLoading, setIsLoading] = useState(false);
     const [isGoogleLoading, setIsGoogleLoading] = useState(false);
     const captcha = useRef<TurnstileHandle>(null);
-
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setError('');
-        setIsLoading(true);
-
-        try {
-            await signIn(email, password, await captcha.current?.getToken());
-            onSuccess();
-        } catch (err: any) {
-            setError(friendlyAuthError(err?.message));
-            captcha.current?.reset(); // tokens work once
-        } finally {
-            setIsLoading(false);
-        }
-    };
 
     const handleGoogleSignIn = async () => {
         setIsGoogleLoading(true);
         setError('');
         try {
+            // Google's redirect can't carry where to return; /auth/callback picks it up.
+            rememberNext(next);
             const { error } = await supabase.auth.signInWithOAuth({
                 provider: 'google',
                 options: { redirectTo: `${window.location.origin}/auth/callback` },
@@ -61,36 +49,33 @@ export function AuthModal({ isOpen, onClose, onSuccess, message = "Sign in to co
         }
     };
 
+    const registerHref = withRedirect('/register', next);
+
     return (
         <Modal isOpen={isOpen} onClose={onClose} title={message}>
             {error && <Alert variant="error" className="mb-5">{error}</Alert>}
 
-            <form onSubmit={handleSubmit} className="space-y-4">
-                <Input label="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="email" />
-                <Input label="Password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required autoComplete="current-password" />
-                <TurnstileField ref={captcha} />
-                <Button type="submit" variant="ink" size="lg" className="w-full" isLoading={isLoading}>
-                    Sign in
-                </Button>
-            </form>
-
-            <OrDivider />
             <GoogleSignIn
+                next={next}
                 onFallback={handleGoogleSignIn}
                 fallbackLoading={isGoogleLoading}
                 getCaptchaToken={async () => { const t = await captcha.current?.getToken(); captcha.current?.reset(); return t; }}
                 onError={message => setError(friendlyAuthError(message))}
             />
+            <TurnstileField ref={captcha} />
             {PHONE_SIGNIN && (
                 <div className="mt-4">
                     <WhatsAppSignIn onSignedIn={() => onSuccess()} />
                 </div>
             )}
 
+            <OrDivider />
+            <EmailSignIn onSignedIn={onSuccess} registerHref={registerHref} />
+
             <p className="mt-6 text-center text-sm text-gray-600">
                 New here?{' '}
-                <Link href="/register" className="font-medium text-gray-900 underline decoration-gray-300 underline-offset-4 hover:decoration-gray-900">
-                    Create an account
+                <Link href={registerHref} className="font-medium text-gray-900 underline decoration-gray-300 underline-offset-4 hover:decoration-gray-900">
+                    Join in about a minute
                 </Link>
             </p>
         </Modal>
