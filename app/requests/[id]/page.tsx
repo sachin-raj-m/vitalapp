@@ -185,7 +185,8 @@ export default async function RequestDetailsPage({ params }: Props) {
                             </Link>
                         )}
                         {!user && (
-                            <Link href="/register" className="inline-flex h-11 items-center rounded-md border border-gray-300 px-5 text-sm font-medium text-gray-900 hover:border-gray-400">
+                            // Back to this request once registered.
+                            <Link href={`/register?redirect=${encodeURIComponent(`/requests/${request.id}`)}`} className="inline-flex h-11 items-center rounded-md border border-gray-300 px-5 text-sm font-medium text-gray-900 hover:border-gray-400">
                                 Register as a donor
                             </Link>
                         )}

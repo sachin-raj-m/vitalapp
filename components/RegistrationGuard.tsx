@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '../context/AuthContext';
-import { REQUESTER_PATHS, accountStage } from '../lib/auth-helpers';
+import { REQUESTER_PATHS, accountStage, withRedirect } from '../lib/auth-helpers';
 import { PageLoader } from './PageLoader';
 
 interface RegistrationGuardProps {
@@ -23,8 +23,10 @@ export function RegistrationGuard({ children }: RegistrationGuardProps) {
     const [isChecking, setIsChecking] = useState(true);
 
     useEffect(() => {
+        // Back here once signed in or registered (e.g. a shared /nearby-donors link).
+        const here = `${pathname}${window.location.search}`;
         if (!user) {
-            router.push('/login');
+            router.replace(withRedirect('/login', here));
             return;
         }
         let cancelled = false;
@@ -35,10 +37,10 @@ export function RegistrationGuard({ children }: RegistrationGuardProps) {
                 if (stage === 'complete') { setIsChecking(false); return; }
                 if (stage === 'requester') {
                     if (REQUESTER_PATHS.some(p => pathname.startsWith(p))) setIsChecking(false);
-                    else router.push('/requests/my-requests');
+                    else router.replace('/requests/my-requests');
                     return;
                 }
-                router.push('/complete-registration');
+                router.replace(withRedirect('/complete-registration', here));
             });
         return () => { cancelled = true; };
         // Re-checked per account and page; session metadata is read as it is then.
