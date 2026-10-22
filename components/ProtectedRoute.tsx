@@ -26,7 +26,8 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
   // After 3 retries, if still no user profile, redirect to login
   useEffect(() => {
     if ((!user || !session) && (!loading || retryCount >= 3)) {
-      router.push(`/login?redirect=${encodeURIComponent(pathname || '/dashboard')}`);
+      // Back to the same page (with its query, e.g. a filter) once signed in.
+      router.replace(`/login?redirect=${encodeURIComponent(`${pathname || '/dashboard'}${window.location.search}`)}`);
     }
   }, [user, session, loading, retryCount, router, pathname]);
 

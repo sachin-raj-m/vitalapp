@@ -108,9 +108,6 @@ export default function RegisterPage() {
         if (!hasRecordedConsent(profile)) {
             await supabase.from('profiles').update(consentStamp()).eq('id', signedIn.id).then(() => {}, () => {});
         }
-        try {
-            localStorage.setItem('pendingRegistration', JSON.stringify({ userId: signedIn.id, email: signedIn.email }));
-        } catch { /* storage blocked */ }
         // Welcome email to the signed-in user's own address (server-side; new accounts only).
         if (signedIn.email) authedFetch('/api/notify/welcome', { method: 'POST' }).catch(() => {});
         router.push(await pathAfterSignUp(signedIn.id, next));
