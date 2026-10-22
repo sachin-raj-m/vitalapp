@@ -11,6 +11,7 @@ import { useAuth } from '@/context/AuthContext';
 import { authedFetch } from '@/lib/api';
 import { AlertCircle, ArrowLeft, Bell, CheckCircle2, HeartPulse, KeyRound, MapPin, PauseCircle, ShieldCheck, UserRound } from 'lucide-react';
 import { SecuritySettings } from '@/app/(protected)/profile/SecuritySettings';
+import { AddEmail } from '@/app/(protected)/profile/AddEmail';
 import { PushNotificationManager } from '@/components/PushNotificationManager';
 import { formatWaNumber, waNumber } from '@/lib/phone';
 import { WHATSAPP_LIVE, WHATSAPP_VERIFY_NUMBER } from '@/lib/features';
@@ -273,6 +274,14 @@ export default function ProfileEditPage() {
         ? 'Verify your mobile number with one WhatsApp message. Each number can belong to only one Vital account.'
         : 'Use a mobile number you have WhatsApp on. Each number can belong to only one Vital account.';
 
+    // Accounts made with "Continue with WhatsApp" have no email; adding one is optional.
+    const [addEmailOpen, setAddEmailOpen] = useState(false);
+    const onEmailAdded = async (email: string) => {
+        await refreshProfile();
+        setError('');
+        setSuccess(`${email} is confirmed. You can now also sign in with it, and set a password below.`);
+    };
+
     const onPhoneVerified = async () => {
         await refreshProfile();
         setError('');
@@ -281,6 +290,7 @@ export default function ProfileEditPage() {
 
     // What's saved now (not the unsaved form), for the overview and badges.
     const contact = contactVerification(user, session?.user?.email_confirmed_at);
+    const savedEmail = (session?.user?.email || user?.email || '').trim();
     const savedPoint = usableLocation(user?.location);
     const savedRegion = resolveRegion(user?.state, user?.district);
     const savedWa = waNumber(user?.phone || '');
@@ -290,13 +300,14 @@ export default function ProfileEditPage() {
             ? { tone: 'off', text: 'Paused' }
             : user.whatsapp_alerts && savedWa
                 ? { tone: 'ok', text: 'WhatsApp' }
-                : { tone: 'ok', text: 'Email' };
+                : savedEmail ? { tone: 'ok', text: 'Email' } : { tone: 'todo', text: 'Turn on WhatsApp' };
     const overview: { label: string; status: Status; href: string }[] = [
         // Verified = email OR mobile (lib/verification.ts): once one is done, the other is optional.
         {
-            label: 'Email', href: '#personal',
+            label: 'Email', href: '#email',
             status: contact.email ? { tone: 'ok', text: 'Verified' }
-                : contact.emailMissing ? { tone: 'info', text: 'Not added' }
+                // Phone-only accounts (WhatsApp sign-in): an email is a second way in, not a problem.
+                : contact.emailMissing ? { tone: 'info', text: 'Add an email (optional)' }
                     : contact.pending ? { tone: 'todo', text: 'Not confirmed' } : { tone: 'info', text: 'Not confirmed (optional)' },
         },
         {
@@ -391,6 +402,24 @@ export default function ProfileEditPage() {
             <form onSubmit={handleSave}>
                 {section('personal', UserRound, 'Personal details', phoneHint, <>
                     <Input label="Full name" value={editForm.full_name} onChange={(e) => setEditForm({ ...editForm, full_name: e.target.value })} required autoComplete="name" />
+                    <div id="email" className="scroll-mt-24">
+                        <span className="block text-[13px] font-medium text-gray-800">Email</span>
+                        {savedEmail ? (
+                            <p className="mt-1.5 flex flex-wrap items-center gap-2 text-gray-900">
+                                <span className="break-all">{savedEmail}</span>
+                                {contact.email
+                                    ? <StatusPill status={{ tone: 'ok', text: 'Verified' }} />
+                                    : <StatusPill status={contact.pending ? { tone: 'todo', text: 'Not confirmed' } : { tone: 'info', text: 'Not confirmed (optional)' }} />}
+                            </p>
+                        ) : (
+                            <div className="mt-1.5 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-gray-200 p-4">
+                                <span className="text-sm text-gray-600">
+                                    Optional. You sign in with WhatsApp; an email gives you a second way in.
+                                </span>
+                                <Button type="button" variant="secondary" size="sm" onClick={() => setAddEmailOpen(true)}>Add an email</Button>
+                            </div>
+                        )}
+                    </div>
                     <div id="phone" className="scroll-mt-24">
                         {user?.phone_released_at && !user.phone && (
                             <Alert variant="warning" className="mb-3">
@@ -488,8 +517,10 @@ export default function ProfileEditPage() {
                         {!editForm.is_available
                             ? <>Alerts are <strong>paused</strong> because “Available to donate” is off.</>
                             : editForm.whatsapp_alerts && waNumber(editForm.phone)
-                                ? <>Alerts reach you on <strong>WhatsApp</strong> at {formatWaNumber(waNumber(editForm.phone)!)}. If a WhatsApp message can’t be sent, we email {user?.email || 'you'} instead.</>
-                                : <>Alerts reach you by <strong>email</strong> at {user?.email || 'your email address'}.</>}
+                                ? <>Alerts reach you on <strong>WhatsApp</strong> at {formatWaNumber(waNumber(editForm.phone)!)}.{savedEmail && <> If a WhatsApp message can’t be sent, we email {savedEmail} instead.</>}</>
+                                : savedEmail
+                                    ? <>Alerts reach you by <strong>email</strong> at {savedEmail}.</>
+                                    : <>Turn on <strong>WhatsApp alerts</strong> below (or add an email) so we can reach you.</>}
                     </p>
                     {toggle(editForm.whatsapp_alerts, v => setEditForm({ ...editForm, whatsapp_alerts: v }), 'WhatsApp alerts',
                         waNumber(editForm.phone)
@@ -525,7 +556,9 @@ export default function ProfileEditPage() {
                 </div>
             </form>
 
-            {section('password', KeyRound, 'Password', 'How you sign in to Vital.', <SecuritySettings />)}
+            {section('password', KeyRound, 'Password', 'How you sign in to Vital.', <SecuritySettings email={savedEmail} onAddEmail={() => setAddEmailOpen(true)} />)}
+
+            <AddEmail isOpen={addEmailOpen} onClose={() => setAddEmailOpen(false)} onAdded={onEmailAdded} />
 
             <Modal
                 isOpen={bgCodeOpen}

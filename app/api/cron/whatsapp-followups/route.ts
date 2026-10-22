@@ -15,16 +15,21 @@ const MAX_FOLLOWUPS = 3;
  * turned into donations: [Yes] -> PIN in chat, [Not yet] -> asked again, [No].
  * Only for requests whose contact asked for WhatsApp updates. Vercel calls it
  * with "Authorization: Bearer $CRON_SECRET".
+ *
+ * Also deletes expired WhatsApp sign-in codes (phone_login_codes), so none is
+ * kept for more than a day even when no new code is asked for (the Privacy
+ * notice says they are deleted after 10 minutes).
  */
 export async function GET(request: Request) {
     const secret = process.env.CRON_SECRET;
     if (!secret || request.headers.get('authorization') !== `Bearer ${secret}`) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
-    if (!whatsappEnabled()) return NextResponse.json({ skipped: 'whatsapp disabled' });
-
     const admin = serviceClient();
     const now = Date.now();
+    await admin.from('phone_login_codes').delete().lt('expires_at', new Date(now).toISOString());
+    if (!whatsappEnabled()) return NextResponse.json({ skipped: 'whatsapp disabled' });
+
     const { data: offers, error } = await admin
         .from('donations')
         .select('id, donor_id, request_id, followup_count, followup_sent_at')

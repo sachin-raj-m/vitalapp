@@ -382,6 +382,7 @@ async function sendLoginCode(from: string) {
         .maybeSingle();
     const site = SITE_URL.replace(/^https?:\/\//, '');
     if (!row || Date.parse(row.expires_at) < Date.now()) {
+        if (row) await admin.from('phone_login_codes').delete().eq('wa_number', from);
         return reply(from, `No sign-in code is waiting for this number. On ${site}, tap “Continue with WhatsApp”, enter this number, then send LOGIN again.`);
     }
     if (row.deliveries >= PHONE_LOGIN_MAX_DELIVERIES) {
