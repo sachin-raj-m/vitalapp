@@ -579,6 +579,11 @@ export default function CompleteRegistration() {
                         </>,
                         fieldErrors.ready,
                     )}
+                    <p className="text-[13px] leading-relaxed text-gray-500">
+                        <strong className="font-medium text-gray-700">This one box covers two things:</strong> that you meet the basic
+                        eligibility to donate, and that you agree your name and mobile number are shared with a requester when you offer to
+                        donate. You can stop being a donor or delete your account any time in Settings.
+                    </p>
                 </>)}
 
                 <div className="flex justify-end border-t border-gray-200 pt-6">

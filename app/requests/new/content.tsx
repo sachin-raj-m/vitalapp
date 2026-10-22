@@ -164,10 +164,11 @@ export default function CreateRequestPage() {
         }));
     }, [user]);
 
-    // One consent box for everyone who hasn't agreed yet: visitors (needed
-    // before a code is sent) and signed-in people without consent on record.
-    const [agreed, setAgreed] = useState(false);
-    const [consentError, setConsentError] = useState('');
+    // "By continuing you agree…" for everyone who hasn't agreed yet: visitors
+    // (a code is only sent after it) and signed-in people without consent on
+    // record. Continuing (verifying or posting) is the agreement, recorded with
+    // its time and version.
+    const agreed = true;
     const [verifiedUserId, setVerifiedUserId] = useState<string | null>(null);
     const userId = user?.id ?? verifiedUserId;
 
@@ -180,9 +181,8 @@ export default function CreateRequestPage() {
         return () => { cancelled = true; };
     }, [user]);
     const signedInWithoutConsent = !!user && profileConsent !== undefined && !hasRecordedConsent(profileConsent);
-    // Shown until posting; stays visible (ticked) after a visitor verifies.
-    const showConsent = !user || signedInWithoutConsent || (!!verifiedUserId && agreed);
-    const consentMissing = (!userId || signedInWithoutConsent) && !agreed;
+    // Shown until posting, also after a visitor verifies.
+    const showConsent = !user || signedInWithoutConsent || !!verifiedUserId;
 
     if (loading) {
         return (
@@ -233,10 +233,6 @@ export default function CreateRequestPage() {
         if (problem) {
             if (problem.address) setAddressOpen(true);
             return fail(problem.message);
-        }
-        if (consentMissing) {
-            setConsentError('Tick the box to agree to the Terms and Privacy notice.');
-            return;
         }
         if (!userId) {
             setError(PHONE_SIGNIN ? 'Verify your email or WhatsApp below, then post.' : 'Verify your email below, then post.');
@@ -559,25 +555,11 @@ export default function CreateRequestPage() {
             </form>
 
             {showConsent && (
-                <div className="border-t border-gray-200 pt-6">
-                    <label className="flex cursor-pointer items-start gap-3">
-                        <input
-                            type="checkbox"
-                            checked={agreed}
-                            onChange={(e) => { setAgreed(e.target.checked); if (e.target.checked) setConsentError(''); }}
-                            disabled={!!verifiedUserId && !signedInWithoutConsent}
-                            aria-invalid={!!consentError || undefined}
-                            aria-describedby={consentError ? 'consent-error' : undefined}
-                            className="mt-1 h-4 w-4 shrink-0 rounded-[4px] border-gray-400 accent-gray-900"
-                        />
-                        <span className="text-sm leading-relaxed text-gray-600">
-                            I agree to the <Link href="/terms" target="_blank" className={linkClass}>Terms</Link> and have read the{' '}
-                            <Link href="/privacy" target="_blank" className={linkClass}>Privacy notice</Link>.
-                            {' '}The contact name and phone are stored with this request and shown to donors who offer.
-                        </span>
-                    </label>
-                    {consentError && <p id="consent-error" className="ml-7 mt-1.5 text-[13px] text-red-700">{consentError}</p>}
-                </div>
+                <p className="border-t border-gray-200 pt-6 text-sm leading-relaxed text-gray-600">
+                    By continuing, you agree to the <Link href="/terms" target="_blank" className={linkClass}>Terms</Link> and confirm
+                    you have read the <Link href="/privacy" target="_blank" className={linkClass}>Privacy notice</Link>.
+                    {' '}The contact name and phone are stored with this request and shown to donors who offer.
+                </p>
             )}
 
             {!user && section('Verify it’s you', 'One quick check, so requests are real. It also lets you manage this request later.', verifiedUserId ? (
@@ -593,7 +575,6 @@ export default function CreateRequestPage() {
                     </p>
                     <QuickVerify
                         consented={agreed}
-                        onNeedConsent={() => setConsentError('Tick the box above to agree before we send a code.')}
                         initialPhone={formData.contactPhone}
                         emailRedirectTo={typeof window !== 'undefined' ? `${window.location.origin}/requests/new` : undefined}
                         onVerified={onVerified}

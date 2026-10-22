@@ -25,7 +25,7 @@ import { cleanNext, pathAfterSignUp, rememberNext, withRedirect } from '@/lib/au
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /**
- * Joining as a donor: one consent box, then Google, WhatsApp (when switched
+ * Joining as a donor: "By continuing, you agree…", then Google, WhatsApp (when switched
  * on) or an email code. No password: the emailed code proves the address and
  * signs the person in (a password can be added later in Settings). The same
  * code signs in an existing account, so typing a registered email here isn't
@@ -42,7 +42,6 @@ export default function RegisterPage() {
     const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
     const [isLoading, setIsLoading] = useState(false);
     const [isGoogleLoading, setIsGoogleLoading] = useState(false);
-    const [agreed, setAgreed] = useState(false);
     // Set once a code has been emailed.
     const [pendingEmail, setPendingEmail] = useState<string | null>(null);
     const [next, setNext] = useState('');
@@ -65,7 +64,6 @@ export default function RegisterPage() {
         pathAfterSignUp(user.id, redirect).then(path => router.replace(path));
     }, [authLoading, user, router]);
 
-    const consentError = 'Tick the box to agree to the Terms and Privacy notice before continuing.';
     // Only here to request blood? That needs no account up front.
     const requestLink = <Link href="/requests/new" className={authLinkClass}>post a request without an account</Link>;
     // Stored on the account when it is created (the database checks the consent).
@@ -75,10 +73,6 @@ export default function RegisterPage() {
 
     const handleGoogleSignUp = async () => {
         setError('');
-        if (!agreed) {
-            setFieldErrors({ consent: consentError });
-            return;
-        }
         setFieldErrors({});
         setIsGoogleLoading(true);
         try {
@@ -101,8 +95,8 @@ export default function RegisterPage() {
     // Runs once the person has a session (email code or WhatsApp code).
     const finishSignUp = async (signedIn: User) => {
         // The database copies the sign-up consent onto a new profile. An
-        // existing account signing in here has just ticked the box too: record
-        // it if there's nothing on record yet (best effort).
+        // existing account signing in here has just agreed too (by continuing):
+        // record it if there's nothing on record yet (best effort).
         const { data: profile } = await supabase.from('profiles')
             .select('consent_agreed, consent_at, consent_version').eq('id', signedIn.id).maybeSingle();
         if (!hasRecordedConsent(profile)) {
@@ -120,7 +114,6 @@ export default function RegisterPage() {
         const address = email.trim();
         if (!address) errors.email = 'Enter your email address.';
         else if (!EMAIL_RE.test(address)) errors.email = 'That doesn’t look like an email address. Check it and try again.';
-        if (!agreed) errors.consent = consentError;
         setFieldErrors(errors);
         if (Object.keys(errors).length) return;
 
@@ -177,49 +170,30 @@ export default function RegisterPage() {
         >
             {error && <Alert variant="error" className="mb-6">{error}</Alert>}
 
-            <div className="mb-6">
-                <label className="flex cursor-pointer items-start gap-3">
-                    <input
-                        type="checkbox"
-                        checked={agreed}
-                        onChange={(e) => { setAgreed(e.target.checked); if (e.target.checked) setFieldErrors(({ consent: _c, ...rest }) => rest); }}
-                        aria-invalid={!!fieldErrors.consent}
-                        aria-describedby={fieldErrors.consent ? 'consent-error' : !agreed ? 'consent-hint' : undefined}
-                        className="mt-1 h-4 w-4 shrink-0 rounded-[4px] border-gray-400 accent-gray-900"
-                    />
-                    <span className="text-sm leading-relaxed text-gray-600">
-                        I agree to the <Link href="/terms" target="_blank" className={authLinkClass}>Terms</Link> and have read the
-                        {' '}<Link href="/privacy" target="_blank" className={authLinkClass}>Privacy notice</Link>.
-                    </span>
-                </label>
-                {fieldErrors.consent
-                    ? <p id="consent-error" className="ml-7 mt-1.5 text-[13px] text-red-700">{fieldErrors.consent}</p>
-                    : !agreed && <p id="consent-hint" className="ml-7 mt-1.5 text-[13px] text-gray-500">Tick the box to continue. The buttons below stay off until you do.</p>}
-            </div>
+            {/* Continuing is the agreement: every way in below records it (when and which version). */}
+            <p id="consent-note" className="mb-6 text-sm leading-relaxed text-gray-600">
+                By continuing, you agree to the <Link href="/terms" target="_blank" className={authLinkClass}>Terms</Link> and
+                confirm you have read the <Link href="/privacy" target="_blank" className={authLinkClass}>Privacy notice</Link>.
+            </p>
 
-            {/* A disabled fieldset disables every way in until consent is ticked. */}
-            <fieldset disabled={!agreed} aria-describedby={!agreed ? 'consent-hint' : undefined} className="m-0 min-w-0 border-0 p-0">
-                <GoogleSignIn
-                    disabled={!agreed}
-                    next={next}
-                    onFallback={handleGoogleSignUp}
-                    fallbackLoading={isGoogleLoading}
-                    getCaptchaToken={async () => { const t = await captcha.current?.getToken(); captcha.current?.reset(); return t; }}
-                    // Google can't carry user metadata, so remember the consent locally;
-                    // complete-registration records it against the account.
-                    onBeforeSignIn={() => { try { localStorage.setItem('pendingConsent', JSON.stringify(consentStamp())); } catch { /* storage unavailable */ } }}
-                    onError={message => setError(friendlyAuthError(message))}
-                />
-                {PHONE_SIGNIN && (
-                    <div className="mt-4">
-                        {/* The box above is the consent; the account is created with it. */}
-                        <WhatsAppSignIn consented={agreed} onSignedIn={finishSignUp} />
-                    </div>
-                )}
-            </fieldset>
+            <GoogleSignIn
+                next={next}
+                onFallback={handleGoogleSignUp}
+                fallbackLoading={isGoogleLoading}
+                getCaptchaToken={async () => { const t = await captcha.current?.getToken(); captcha.current?.reset(); return t; }}
+                // Google can't carry user metadata, so remember the consent locally;
+                // complete-registration records it against the account.
+                onBeforeSignIn={() => { try { localStorage.setItem('pendingConsent', JSON.stringify(consentStamp())); } catch { /* storage unavailable */ } }}
+                onError={message => setError(friendlyAuthError(message))}
+            />
+            {PHONE_SIGNIN && (
+                <div className="mt-4">
+                    {/* Continuing is the consent; the account is created with it. */}
+                    <WhatsAppSignIn consented onSignedIn={finishSignUp} />
+                </div>
+            )}
             <OrDivider />
 
-            {/* Typing is fine before the box is ticked; the button waits for it. */}
             <form onSubmit={handleSubmit} className="space-y-4" noValidate>
                 <Input
                     label="Email"
@@ -242,7 +216,6 @@ export default function RegisterPage() {
                     size="lg"
                     className="w-full !mt-6"
                     isLoading={isLoading}
-                    disabled={!agreed}
                 >
                     Continue with email
                 </Button>

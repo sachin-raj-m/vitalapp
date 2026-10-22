@@ -37,7 +37,7 @@ export function QuickVerify({
     /** The page's consent box is ticked. */
     consented: boolean;
     /** Called when a code is asked for before the box is ticked. */
-    onNeedConsent: () => void;
+    onNeedConsent?: () => void;
     onVerified: (user: User) => void | Promise<void>;
     initialPhone?: string;
     emailRedirectTo?: string;
@@ -67,7 +67,7 @@ export function QuickVerify({
             return;
         }
         if (!consented) {
-            onNeedConsent();
+            onNeedConsent?.();
             return;
         }
         setBusy(true);
@@ -146,7 +146,7 @@ export function QuickVerify({
                         onSignedIn={onVerified}
                         onUseEmail={() => setMethod('email')}
                     />
-                    {!consented && <p className="mt-2 text-[13px] text-gray-500">Tick the box above first.</p>}
+                    
                 </fieldset>
             ) : (
                 <>
