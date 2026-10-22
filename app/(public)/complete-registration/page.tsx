@@ -17,330 +17,316 @@ import Link from 'next/link';
 import { PRIVACY_VERSION, earliestConsentAt } from '@/lib/legal';
 import { takeReferral } from '@/lib/referrals';
 import { MATCH_RADIUS_KM } from '@/lib/geo';
-import { DonorLocationPicker, type PickedPoint } from '@/components/DonorLocationPicker';
+import { DonorLocationPicker } from '@/components/DonorLocationPicker';
 import { PHONE_TAKEN, formatWaNumber, isPhoneTakenError, waNumber } from '@/lib/phone';
 import { WHATSAPP_VERIFY_NUMBER } from '@/lib/features';
 import { WhatsAppVerify } from '@/components/WhatsAppVerify';
 import { StateDistrictSelect } from '@/components/StateDistrictSelect';
 import { districtsOf, resolveRegion } from '@/lib/india-regions';
 
-interface PendingRegistration {
-    userId: string;
-    email: string;
-    phone?: string;
-}
+/**
+ * Becoming a donor, in two parts:
+ *
+ *   1. The minimum to be matched (required): name, mobile, blood group, state
+ *      and district (PIN code optional), one eligibility confirmation and the
+ *      consent to share details when offering. Completes registration
+ *      (isRegistrationComplete: name + state + district).
+ *   2. Optional details, right after or later from the dashboard
+ *      (/complete-registration?step=more): last donation date, gender, date of
+ *      birth, usual availability, permanent PIN, exact alert location and
+ *      verifying the number on WhatsApp.
+ *
+ * Someone only here to request blood can skip to the request form; they are
+ * not asked again (lib/auth-helpers.ts accountStage).
+ */
 
-interface CompleteRegistrationForm {
+interface BasicsForm {
     fullName: string;
-    dob: string;
-    gender: string;
     phone: string;
     bloodGroup: BloodGroup | '';
     state: string;
     district: string;
-    permanentZip: string;
     presentZip: string;
-    lastDonationDate: string;
-    willingTovelKm: number;
-    availability: string[];
-    hasConditions: boolean;
-    consent: boolean;
     whatsappAlerts: boolean;
+    eligible: boolean;
+    consent: boolean;
 }
+
+interface MoreForm {
+    lastDonationDate: string;
+    gender: string;
+    dob: string;
+    availability: string[];
+    permanentZip: string;
+}
+
+type Status = 'loading' | 'form' | 'saving' | 'more' | 'saving_more' | 'error';
+
+const ageOn = (dob: string) => {
+    const birth = new Date(dob);
+    const now = new Date();
+    let age = now.getFullYear() - birth.getFullYear();
+    if (now.getMonth() < birth.getMonth() || (now.getMonth() === birth.getMonth() && now.getDate() < birth.getDate())) age--;
+    return age;
+};
 
 export default function CompleteRegistration() {
     const router = useRouter();
-    const { user, loading: authLoading, refreshProfile } = useAuth();
-    const [error, setError] = useState<string>('');
-    const [status, setStatus] = useState<string>('loading');
-    const [progress, setProgress] = useState<number>(0);
-    const [pendingData, setPendingData] = useState<PendingRegistration | null>(null);
-    const [formData, setFormData] = useState<CompleteRegistrationForm>({
-        fullName: '',
-        dob: '',
-        gender: '',
-        phone: '',
-        bloodGroup: '',
-        state: '',
-        district: '',
-        permanentZip: '',
-        presentZip: '',
-        lastDonationDate: '',
-        willingTovelKm: 10,
-        availability: ['Weekends'],
-        hasConditions: false,
-        consent: false,
-        whatsappAlerts: true,
+    const { user, session, loading: authLoading, refreshProfile } = useAuth();
+    const [error, setError] = useState('');
+    const [status, setStatus] = useState<Status>('loading');
+    const [form, setForm] = useState<BasicsForm>({
+        fullName: '', phone: '', bloodGroup: '', state: '', district: '', presentZip: '',
+        whatsappAlerts: true, eligible: false, consent: false,
     });
+    const [more, setMore] = useState<MoreForm>({ lastDonationDate: '', gender: '', dob: '', availability: [], permanentZip: '' });
     const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
-    const [nbtcEligible, setNbtcEligible] = useState<boolean>(true);
-    // A point from the device or the map, saved once the profile exists.
-    const [pickedPoint, setPickedPoint] = useState<PickedPoint | null>(null);
     // A blood group saved earlier can't be changed here (only once, from Settings).
     const [savedBloodGroup, setSavedBloodGroup] = useState<BloodGroup | null>(null);
-    // A state or district typed by hand before the dropdowns, kept for the hint
-    // when it didn't match the list (the dropdown then starts empty).
+    // A number proven by signing in with it (or verified earlier) isn't edited here.
+    const [phoneVerified, setPhoneVerified] = useState(false);
+    const [savedNextEligible, setSavedNextEligible] = useState<string | null>(null);
+    // A state or district typed by hand before the dropdowns, for the hint.
     const [typedRegion, setTypedRegion] = useState<{ state: string; district: string }>({ state: '', district: '' });
-    // Set once the form is submitted, so reloading the profile afterwards
-    // doesn't re-run the checks below and skip the verify step.
-    const submitted = useRef(false);
+    const [skipping, setSkipping] = useState(false);
+    // Set once loaded or submitted, so later profile reloads don't reset the page.
+    const started = useRef(false);
 
     useEffect(() => {
+        // Wait for auth to settle; `user` is null while loading.
+        if (authLoading || started.current) return;
         const init = async () => {
-            if (submitted.current) return;
-            try {
-                if (!user) {
-                    router.push('/login');
-                    return;
-                }
-
-                const isComplete = await isRegistrationComplete(user.id);
-                if (isComplete) {
-                    router.push('/dashboard');
-                    return;
-                }
-
-                const storedData = localStorage.getItem('pendingRegistration');
-                if (!storedData) {
-                    setError('Registration data not found. Please register again.');
-                    router.push('/register');
-                    return;
-                }
-
-                try {
-                    const data = JSON.parse(storedData);
-                    if (data.userId !== user.id) throw new Error('User ID mismatch');
-
-                    setPendingData(data);
-                    if (data.phone) {
-                        setFormData(prev => ({ ...prev, phone: data.phone }));
-                    }
-                    // Accounts that registered before some fields were asked:
-                    // start from what's already saved, so they only add what's missing.
-                    const { data: saved } = await supabase
-                        .from('profiles')
-                        .select('full_name, phone, dob, gender, blood_group, district, state, permanent_zip, present_zip, availability, whatsapp_alerts')
-                        .eq('id', user.id)
-                        .maybeSingle();
-                    if (saved) {
-                        // Older profiles have a hand-typed state and district:
-                        // preselect the listed names they match, else leave empty.
-                        const region = resolveRegion(saved.state, saved.district);
-                        setTypedRegion({ state: region.state ? '' : saved.state || '', district: region.district ? '' : saved.district || '' });
-                        setFormData(prev => ({
-                            ...prev,
-                            fullName: saved.full_name || prev.fullName,
-                            phone: saved.phone || prev.phone,
-                            dob: saved.dob || prev.dob,
-                            gender: saved.gender || prev.gender,
-                            bloodGroup: (saved.blood_group as BloodGroup) || prev.bloodGroup,
-                            district: region.district || prev.district,
-                            state: region.state || prev.state,
-                            permanentZip: saved.permanent_zip || prev.permanentZip,
-                            presentZip: saved.present_zip || prev.presentZip,
-                            availability: saved.availability?.length ? saved.availability : prev.availability,
-                            whatsappAlerts: saved.whatsapp_alerts ?? prev.whatsappAlerts,
-                        }));
-                        if (saved.blood_group) setSavedBloodGroup(saved.blood_group as BloodGroup);
-                    }
-                    setStatus('form');
-                } catch (err) {
-                    console.error('Error processing stored data:', err);
-                    throw new Error('Invalid registration data');
-                }
-            } catch (err: any) {
-                console.error('Initialization error:', err);
-                setError(err.message || 'Failed to load registration data');
-                router.push('/register');
+            if (!user) {
+                router.push('/login?redirect=/complete-registration');
+                return;
             }
+            started.current = true;
+            const wantsMore = new URLSearchParams(window.location.search).get('step') === 'more';
+            const complete = await isRegistrationComplete(user.id);
+            if (complete && !wantsMore) {
+                router.push('/dashboard');
+                return;
+            }
+
+            // Start from what's already saved, so people only add what's missing.
+            const { data: saved } = await supabase
+                .from('profiles')
+                .select('full_name, phone, phone_verified_at, dob, gender, blood_group, district, state, permanent_zip, present_zip, availability, whatsapp_alerts, next_eligible_date')
+                .eq('id', user.id)
+                .maybeSingle();
+            const authPhone = session?.user?.phone ? waNumber(session.user.phone)?.slice(2) ?? '' : '';
+            if (saved) {
+                const region = resolveRegion(saved.state, saved.district);
+                setTypedRegion({ state: region.state ? '' : saved.state || '', district: region.district ? '' : saved.district || '' });
+                setForm(prev => ({
+                    ...prev,
+                    fullName: saved.full_name || (session?.user?.user_metadata?.full_name as string) || '',
+                    phone: saved.phone || authPhone,
+                    bloodGroup: (saved.blood_group as BloodGroup) || '',
+                    district: region.district,
+                    state: region.state,
+                    presentZip: saved.present_zip || '',
+                    whatsappAlerts: saved.whatsapp_alerts ?? true,
+                }));
+                setMore({
+                    lastDonationDate: '',
+                    gender: saved.gender || '',
+                    dob: saved.dob || '',
+                    availability: saved.availability?.length ? saved.availability : [],
+                    permanentZip: saved.permanent_zip || '',
+                });
+                if (saved.blood_group) setSavedBloodGroup(saved.blood_group as BloodGroup);
+                setPhoneVerified(!!saved.phone_verified_at && !!saved.phone);
+                setSavedNextEligible(saved.next_eligible_date || null);
+            } else if (authPhone) {
+                setForm(prev => ({ ...prev, phone: authPhone }));
+            }
+            setStatus(complete && wantsMore ? 'more' : 'form');
         };
+        init().catch(err => {
+            console.error('Registration load error:', err);
+            setError('We couldn’t load your details. Please reload the page.');
+            setStatus('error');
+        });
+    }, [router, user, session, authLoading]);
 
-        // Wait for auth to settle; `user` is null while loading, which would
-        // otherwise bounce a freshly registered user to /login.
-        if (!authLoading) init();
-    }, [router, user, authLoading]);
+    const set = <K extends keyof BasicsForm>(key: K, value: BasicsForm[K]) => setForm(prev => ({ ...prev, [key]: value }));
+    const setM = <K extends keyof MoreForm>(key: K, value: MoreForm[K]) => setMore(prev => ({ ...prev, [key]: value }));
 
-    const validateForm = () => {
+    const validate = () => {
         const errors: Record<string, string> = {};
-
-        if (!formData.fullName.trim()) errors.fullName = 'Full name is required';
-        if (!formData.phone.trim()) errors.phone = 'Phone number is required';
-        else if (formData.whatsappAlerts && !waNumber(formData.phone)) errors.phone = 'Enter a 10-digit Indian mobile number for WhatsApp alerts, or untick WhatsApp alerts below.';
-        if (!formData.dob) errors.dob = 'Date of birth is required';
-        if (!formData.gender) errors.gender = 'Gender is required';
-        if (!formData.bloodGroup) errors.bloodGroup = 'Blood Group is required';
-        if (!formData.state) errors.state = 'Choose your state';
-        if (!formData.district || !districtsOf(formData.state).includes(formData.district)) errors.district = 'Choose your district';
-        if (!formData.permanentZip.trim()) errors.permanentZip = 'Permanent Zip Code is required';
-        if (!formData.presentZip.trim()) errors.presentZip = 'Present Zip Code is required';
-
-        if (formData.dob) {
-            const age = new Date().getFullYear() - new Date(formData.dob).getFullYear();
-            if (age < 18) errors.dob = 'You must be at least 18 years old to register as a donor.';
-        }
-
-        if (!formData.consent) errors.consent = 'Please agree to the Privacy notice to continue.';
-
+        if (!form.fullName.trim()) errors.fullName = 'Enter your name';
+        if (!form.phone.trim()) errors.phone = 'Enter your mobile number';
+        else if (form.whatsappAlerts && !waNumber(form.phone)) errors.phone = 'Enter a 10-digit Indian mobile number for WhatsApp alerts, or untick WhatsApp alerts.';
+        if (!form.bloodGroup) errors.bloodGroup = 'Choose your blood group';
+        if (!form.state) errors.state = 'Choose your state';
+        if (!form.district || !districtsOf(form.state).includes(form.district)) errors.district = 'Choose your district';
+        if (form.presentZip.trim() && !/^[1-9][0-9]{5}$/.test(form.presentZip.trim())) errors.presentZip = 'Enter a 6-digit PIN code, or leave it empty';
+        if (!form.eligible) errors.eligible = 'Please confirm you meet the basic requirements. If you don’t, you can still request blood.';
+        if (!form.consent) errors.consent = 'Please agree to share your details when you offer to donate.';
         setFieldErrors(errors);
         return Object.keys(errors).length === 0;
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!validateForm() || !pendingData) return;
-
-        submitted.current = true;
-        setStatus('creating_profile');
-        setProgress(50);
-
+        setError('');
+        if (!validate()) {
+            document.querySelector('[aria-invalid="true"], [data-error="true"]')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            return;
+        }
+        setStatus('saving');
         try {
-            const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+            const { data: { session: current }, error: sessionError } = await supabase.auth.getSession();
             if (sessionError) throw sessionError;
-            if (!session || session.user.id !== pendingData.userId) {
-                setError('Session invalid. Please sign in again.');
-                router.push('/login');
+            if (!current || current.user.id !== user?.id) {
+                router.push('/login?redirect=/complete-registration');
                 return;
             }
 
             // Keep the first time this person agreed to the current Privacy notice
-            // (on the register page, a guest request, or an earlier save) rather
-            // than overwriting it with now. Ticking the box here is itself consent.
+            // (sign-up, a guest request, or an earlier save) rather than now.
+            // Ticking the box here is itself consent.
             const { data: existingConsent } = await supabase
                 .from('profiles')
                 .select('consent_at, consent_version')
-                .eq('id', session.user.id)
+                .eq('id', current.user.id)
                 .maybeSingle();
             let pendingConsent: { consent_at?: string; consent_version?: string } | null = null;
             try { pendingConsent = JSON.parse(localStorage.getItem('pendingConsent') || 'null'); } catch { /* ignore */ }
             // Only trust the locally remembered (Google) consent if it was given just before this account was created.
-            if (pendingConsent?.consent_at && Date.parse(pendingConsent.consent_at) < Date.parse(session.user.created_at) - 30 * 60 * 1000) {
+            if (pendingConsent?.consent_at && Date.parse(pendingConsent.consent_at) < Date.parse(current.user.created_at) - 30 * 60 * 1000) {
                 pendingConsent = null;
             }
-            const consentAt = earliestConsentAt(existingConsent, session.user.user_metadata, pendingConsent) ?? new Date().toISOString();
+            const consentAt = earliestConsentAt(existingConsent, current.user.user_metadata, pendingConsent) ?? new Date().toISOString();
 
-            // Create/Update Profile
             const { error: profileError } = await supabase
                 .from('profiles')
-                .upsert(
-                    {
-                        id: session.user.id,
-                        email: pendingData.email,
-                        full_name: formData.fullName,
-                        phone: formData.phone,
-                        dob: formData.dob,
-                        gender: formData.gender,
-                        blood_group: formData.bloodGroup || null,
-                        // City isn't asked any more (the PIN code and district say
-                        // where): kept equal to the district for older readers.
-                        city: formData.district,
-                        district: formData.district,
-                        state: formData.state,
-                        permanent_zip: formData.permanentZip,
-                        present_zip: formData.presentZip,
-                        availability: formData.availability,
-                        has_medical_conditions: formData.hasConditions,
-                        consent_agreed: true,
-                        consent_at: consentAt,
-                        consent_version: PRIVACY_VERSION,
-                        next_eligible_date: (() => {
-                            if (!nbtcEligible) return null; // Permanent deferral
-                            if (!formData.lastDonationDate) return new Date().toISOString();
-
-                            const lastDate = new Date(formData.lastDonationDate);
-                            const daysToAdd = formData.gender === 'Female' ? 120 : 90;
-                            return addDays(lastDate, daysToAdd).toISOString();
-                        })(),
-                        // If NBTC ineligible, force is_donor to false (Volunteer Only)
-                        is_donor: nbtcEligible,
-                        is_available: nbtcEligible,
-                        whatsapp_alerts: formData.whatsappAlerts && !!waNumber(formData.phone),
-                    },
-                    { onConflict: 'id' }
-                );
+                .upsert({
+                    id: current.user.id,
+                    full_name: form.fullName.trim(),
+                    // A verified number stays as it is (changing it would unverify it).
+                    ...(phoneVerified ? {} : { phone: form.phone.trim() }),
+                    blood_group: form.bloodGroup || null,
+                    // City isn't asked any more: kept equal to the district for older readers.
+                    city: form.district,
+                    district: form.district,
+                    state: form.state,
+                    ...(form.presentZip.trim() ? { present_zip: form.presentZip.trim() } : {}),
+                    has_medical_conditions: false,
+                    consent_agreed: true,
+                    consent_at: consentAt,
+                    consent_version: PRIVACY_VERSION,
+                    // Eligible now unless an earlier save knew better; the last
+                    // donation date (optional, next step) refines it.
+                    next_eligible_date: savedNextEligible || new Date().toISOString(),
+                    is_donor: true,
+                    is_available: true,
+                    whatsapp_alerts: form.whatsappAlerts && !!waNumber(form.phone),
+                }, { onConflict: 'id' });
 
             if (isPhoneTakenError(profileError)) {
-                // Another account has verified this number: back to the form.
                 setFieldErrors({ phone: `${PHONE_TAKEN} Sign in to that account, or use your own number.` });
                 setStatus('form');
                 return;
             }
             if (profileError) throw profileError;
 
-            // Credit whoever invited this donor, if they came from a referral link.
-            // Best effort: the database checks the code and the limits.
-            const referralCode = nbtcEligible ? takeReferral() : null;
+            // Credit whoever invited this donor (best effort; the database checks it).
+            const referralCode = takeReferral();
             if (referralCode) {
                 await supabase.rpc('claim_referral', { p_code: referralCode }).then(() => {}, () => {});
             }
 
-            // Place the donor: the point they chose, else their PIN code centre
-            // (both server-side). Waited for briefly so the dashboard shows it, but
-            // never blocks registration: without it we still match by district.
-            const saveLocation = async () => {
-                const post = (body: Record<string, unknown>) =>
-                    authedFetch('/api/profile/location', { method: 'POST', keepalive: true, body: JSON.stringify(body) });
-                const res = pickedPoint
-                    ? await post({ mode: 'point', source: pickedPoint.source, latitude: pickedPoint.latitude, longitude: pickedPoint.longitude, accuracy: pickedPoint.accuracy })
-                    : null;
-                if (!res?.ok) await post({ mode: 'pin' });
-            };
-            await Promise.race([saveLocation().catch(() => {}), new Promise(resolve => setTimeout(resolve, 10000))]);
+            // Place the donor at their PIN code centre (server-side). Without it
+            // they are still matched by district. Never blocks registration.
+            if (form.presentZip.trim()) {
+                await Promise.race([
+                    authedFetch('/api/profile/location', { method: 'POST', keepalive: true, body: JSON.stringify({ mode: 'pin' }) }).catch(() => {}),
+                    new Promise(resolve => setTimeout(resolve, 5000)),
+                ]);
+            }
 
-            setProgress(90);
-            setStatus('finalizing');
-
-            const { error: updateError } = await supabase.auth.updateUser({
+            await supabase.auth.updateUser({
                 data: {
                     registration_completed: true,
-                    phone: formData.phone,
-                    full_name: formData.fullName,
+                    full_name: form.fullName.trim(),
                     consent_agreed: true,
                     consent_at: consentAt,
-                    consent_version: PRIVACY_VERSION
-                }
-            });
+                    consent_version: PRIVACY_VERSION,
+                },
+            }).then(() => {}, () => {}); // metadata is a copy; the profile is the record
 
-            if (updateError) throw updateError;
-
-            // Reload the signed-in profile so the dashboard, profile and card show
-            // the blood group and details just saved (not the pre-registration copy).
             await refreshProfile();
-
-            setProgress(100);
-            localStorage.removeItem('pendingRegistration');
-            localStorage.removeItem('pendingConsent');
+            try {
+                localStorage.removeItem('pendingRegistration');
+                localStorage.removeItem('pendingConsent');
+            } catch { /* storage blocked */ }
             toast.success('You’re on the network', {
-                description: 'We’ll alert you when someone nearby needs your blood group.'
+                description: 'We’ll alert you when someone nearby needs your blood group.',
             });
-            // Offer to verify the number now. Optional: skipping leaves it
-            // unverified, and the banner asks again later.
-            if (WHATSAPP_VERIFY_NUMBER && waNumber(formData.phone)) {
-                setStatus('verify_phone');
-                return;
-            }
-            setStatus('completed');
-            setTimeout(() => router.push('/dashboard'), 1500);
-
+            setStatus('more');
+            window.scrollTo({ top: 0 });
         } catch (err: any) {
             console.error('Registration completion error:', err);
-            setError(err.message || 'Failed to complete registration');
+            setError(err?.message || 'Failed to complete registration');
             setStatus('error');
         }
     };
 
-    const set = <K extends keyof CompleteRegistrationForm>(key: K, value: CompleteRegistrationForm[K]) =>
-        setFormData(prev => ({ ...prev, [key]: value }));
+    const saveMore = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setError('');
+        const errors: Record<string, string> = {};
+        if (more.dob) {
+            const age = ageOn(more.dob);
+            if (age < 18 || age > 65) errors.dob = 'Donors need to be 18 to 65. Check the date, or leave it empty.';
+        }
+        if (more.permanentZip.trim() && !/^[1-9][0-9]{5}$/.test(more.permanentZip.trim())) errors.permanentZip = 'Enter a 6-digit PIN code, or leave it empty';
+        setFieldErrors(errors);
+        if (Object.keys(errors).length) return;
+        if (!user) return;
 
-    const checkbox = (checked: boolean, onChange: (v: boolean) => void, title: string, body: React.ReactNode, error?: string) => (
-        <div>
+        setStatus('saving_more');
+        const update: Record<string, unknown> = {};
+        if (more.dob) update.dob = more.dob;
+        if (more.gender) update.gender = more.gender;
+        if (more.availability.length) update.availability = more.availability;
+        if (more.permanentZip.trim()) update.permanent_zip = more.permanentZip.trim();
+        // Only the next eligible date is stored (as before), worked out from the last donation.
+        if (more.lastDonationDate) {
+            update.next_eligible_date = addDays(new Date(more.lastDonationDate), more.gender === 'Female' ? 120 : 90).toISOString();
+        }
+        if (Object.keys(update).length) {
+            const { error: updateError } = await supabase.from('profiles').update(update).eq('id', user.id);
+            if (updateError) {
+                setError('We couldn’t save these details. Please try again.');
+                setStatus('more');
+                return;
+            }
+            await refreshProfile({ silent: true });
+            toast.success('Details saved');
+        }
+        router.push('/dashboard');
+    };
+
+    const skipAsRequester = async () => {
+        setSkipping(true);
+        // Remembered on the account so the donor form isn't shown again.
+        await supabase.auth.updateUser({ data: { account_type: 'requester' } }).then(() => {}, () => {});
+        router.push('/requests/new');
+    };
+
+    const checkbox = (name: string, checked: boolean, onChange: (v: boolean) => void, title: string, body: React.ReactNode, err?: string) => (
+        <div data-error={err ? 'true' : undefined}>
             <label className="flex cursor-pointer items-start gap-3">
-                <input type="checkbox" checked={checked} onChange={e => onChange(e.target.checked)} className="mt-1 h-4 w-4 shrink-0 rounded-[4px] border-gray-400 accent-gray-900" />
+                <input type="checkbox" name={name} checked={checked} onChange={e => onChange(e.target.checked)} aria-invalid={!!err || undefined} className="mt-1 h-4 w-4 shrink-0 rounded-[4px] border-gray-400 accent-gray-900" />
                 <span className="text-sm leading-relaxed text-gray-600">
                     <span className="block font-medium text-gray-900">{title}</span>
                     {body}
                 </span>
             </label>
-            {error && <p className="ml-7 mt-1.5 text-[13px] text-red-700">{error}</p>}
+            {err && <p className="ml-7 mt-1.5 text-[13px] text-red-700">{err}</p>}
         </div>
     );
 
@@ -354,40 +340,13 @@ export default function CompleteRegistration() {
         </section>
     );
 
-    if (status === 'loading' || status === 'creating_profile' || status === 'finalizing' || status === 'completed') {
-        const label = status === 'loading' ? 'Loading…' : status === 'completed' ? 'Registration complete. Opening your dashboard…' : 'Setting up your profile…';
-        return (
-            <div className="mx-auto flex min-h-[60vh] max-w-md flex-col justify-center px-5">
-                <p className="text-sm text-gray-500">{status === 'completed' ? 'Done' : 'Please wait'}</p>
-                <p className="display mt-2 text-3xl sm:text-4xl">{label}</p>
-                {status !== 'loading' && (
-                    <div className="mt-8 h-1 overflow-hidden rounded-full bg-gray-200">
-                        <div className="h-full rounded-full bg-red-600 transition-[width] duration-500" style={{ width: `${progress}%` }} />
-                    </div>
-                )}
-            </div>
-        );
-    }
+    const linkClass = 'text-gray-900 underline decoration-gray-300 underline-offset-4';
 
-    if (status === 'verify_phone') {
+    if (status === 'loading' || status === 'saving') {
         return (
             <div className="mx-auto flex min-h-[60vh] max-w-md flex-col justify-center px-5">
-                <p className="text-sm text-gray-500">One more step (optional)</p>
-                <p className="display mt-2 text-3xl sm:text-4xl">Verify your mobile number</p>
-                <p className="mt-4 leading-relaxed text-gray-600">
-                    Send one WhatsApp message from {formatWaNumber(waNumber(formData.phone)!)} to confirm it’s yours.
-                    Verified numbers can’t be used by another account.
-                </p>
-                <div className="mt-8">
-                    <WhatsAppVerify onVerified={async () => {
-                        await refreshProfile();
-                        toast.success('Your number is verified');
-                        router.push('/dashboard');
-                    }} />
-                </div>
-                <button type="button" onClick={() => router.push('/dashboard')} className="mt-8 self-start text-sm text-gray-600 underline underline-offset-4 hover:text-gray-900">
-                    Skip for now
-                </button>
+                <p className="text-sm text-gray-500">Please wait</p>
+                <p className="display mt-2 text-3xl sm:text-4xl">{status === 'loading' ? 'Loading…' : 'Setting up your profile…'}</p>
             </div>
         );
     }
@@ -397,7 +356,88 @@ export default function CompleteRegistration() {
             <div className="mx-auto flex min-h-[60vh] max-w-md flex-col justify-center px-5">
                 <p className="display text-3xl sm:text-4xl">We couldn’t save your details</p>
                 <p className="mt-4 text-gray-600">{error}</p>
-                <Button variant="ink" className="mt-8 self-start" onClick={() => setStatus('form')}>Back to the form</Button>
+                <Button variant="ink" className="mt-8 self-start" onClick={() => { setError(''); setStatus('form'); }}>Back to the form</Button>
+            </div>
+        );
+    }
+
+    if (status === 'more' || status === 'saving_more') {
+        const wa = waNumber(user?.phone || form.phone);
+        const canVerify = !!WHATSAPP_VERIFY_NUMBER && !!wa && !user?.phone_verified_at;
+        return (
+            <div className="mx-auto max-w-4xl px-5 py-12 sm:px-8 sm:py-16">
+                <header className="pb-8">
+                    <p className="text-sm text-success-700">You’re on the network</p>
+                    <h1 className="display mt-2 text-4xl sm:text-[2.75rem]">A few more details</h1>
+                    <p className="mt-3 max-w-xl leading-relaxed text-gray-600">
+                        All optional. They help us alert you only when you can donate. You can skip this and add them later.
+                    </p>
+                </header>
+
+                {error && <Alert variant="error" className="mb-6">{error}</Alert>}
+
+                <form onSubmit={saveMore} noValidate>
+                    {canVerify && section('Verify your number', 'One WhatsApp message. Verified numbers can’t be used by another account.', <>
+                        <p className="text-sm text-gray-600">Send one message from {formatWaNumber(wa!)} to confirm it’s yours.</p>
+                        <WhatsAppVerify size="sm" onVerified={async () => { await refreshProfile({ silent: true }); toast.success('Your number is verified'); }} />
+                    </>)}
+
+                    {section('Your last donation', 'Donors wait 90 days (men) or 120 days (women) between donations. We pause alerts until then.', <>
+                        <Input
+                            label="Date of your last donation (if any)"
+                            type="date"
+                            value={more.lastDonationDate}
+                            max={new Date().toISOString().split('T')[0]}
+                            onChange={e => setM('lastDonationDate', e.target.value)}
+                        />
+                        <div className="grid gap-4 sm:grid-cols-2">
+                            <Select
+                                label="Gender"
+                                value={more.gender}
+                                onChange={e => setM('gender', e.target.value)}
+                                options={[
+                                    { value: '', label: 'Prefer not to say' },
+                                    { value: 'Male', label: 'Male' },
+                                    { value: 'Female', label: 'Female' },
+                                    { value: 'Other', label: 'Other' },
+                                ]}
+                            />
+                            <Input label="Date of birth" type="date" value={more.dob} onChange={e => setM('dob', e.target.value)} error={fieldErrors.dob} />
+                        </div>
+                    </>)}
+
+                    {section('When and where', 'Helps us alert you at the right times and from the right place.', <>
+                        <div>
+                            <p className="mb-2 text-[13px] font-medium text-gray-800">Usually available on</p>
+                            <div className="flex flex-wrap gap-1.5">
+                                {['Weekdays', 'Weekends'].map(day => {
+                                    const on = more.availability.includes(day);
+                                    return (
+                                        <button
+                                            key={day}
+                                            type="button"
+                                            aria-pressed={on}
+                                            onClick={() => setM('availability', on ? more.availability.filter(d => d !== day) : [...more.availability, day])}
+                                            className={`h-9 rounded-full border px-4 text-sm transition-colors ${on ? 'border-gray-900 bg-gray-900 text-gray-50' : 'border-gray-300 bg-white text-gray-700 hover:border-gray-400'}`}
+                                        >
+                                            {day}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                        <Input label="Permanent PIN code" inputMode="numeric" value={more.permanentZip} onChange={e => setM('permanentZip', e.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="e.g. 682011" error={fieldErrors.permanentZip} helperText="If it’s different from where you live now." />
+                        <div>
+                            <h3 className="mb-1 text-[13px] font-medium text-gray-800">Where we alert you from</h3>
+                            <DonorLocationPicker mode="save" value={user?.location} onSaved={() => { refreshProfile({ silent: true }).catch(() => {}); }} />
+                        </div>
+                    </>)}
+
+                    <div className="flex flex-col-reverse gap-3 border-t border-gray-200 pt-6 sm:flex-row sm:justify-end">
+                        <Button type="button" variant="ghost" size="lg" onClick={() => router.push('/dashboard')}>Skip for now</Button>
+                        <Button type="submit" variant="primary" size="lg" isLoading={status === 'saving_more'}>Save and continue</Button>
+                    </div>
+                </form>
             </div>
         );
     }
@@ -405,137 +445,119 @@ export default function CompleteRegistration() {
     return (
         <div className="mx-auto max-w-4xl px-5 py-12 sm:px-8 sm:py-16">
             <header className="pb-8">
-                <p className="text-sm text-gray-500">Step 2 of 2</p>
-                <h1 className="display mt-2 text-4xl sm:text-[2.75rem]">Complete your profile</h1>
+                <p className="text-sm text-gray-500">Last step</p>
+                <h1 className="display mt-2 text-4xl sm:text-[2.75rem]">Join as a donor</h1>
                 <p className="mt-3 max-w-xl leading-relaxed text-gray-600">
-                    We use these details to notify you only when your blood group is needed near you (within about {MATCH_RADIUS_KM} km).
+                    Just what we need to alert you when your blood group is needed near you (within about {MATCH_RADIUS_KM} km).
+                </p>
+                <p className="mt-3 text-sm text-gray-600">
+                    Only here to request blood?{' '}
+                    <button type="button" onClick={skipAsRequester} disabled={skipping} className={`${linkClass} disabled:opacity-60`}>
+                        Skip this and post a request
+                    </button>
                 </p>
             </header>
 
             {error && <Alert variant="error" className="mb-6">{error}</Alert>}
 
             <form onSubmit={handleSubmit} noValidate>
-                {section('Personal details', 'Your name and number are shared with a requester only after you offer to donate.', <>
-                    <Input label="Full name" value={formData.fullName} onChange={e => set('fullName', e.target.value)} required autoComplete="name" error={fieldErrors.fullName} />
-                    <div className="grid gap-4 sm:grid-cols-2">
-                        <Input label="Date of birth" type="date" value={formData.dob} onChange={e => set('dob', e.target.value)} required error={fieldErrors.dob} />
-                        <Select
-                            label="Gender"
-                            value={formData.gender}
-                            onChange={e => set('gender', e.target.value)}
-                            options={[
-                                { value: '', label: 'Select' },
-                                { value: 'Male', label: 'Male' },
-                                { value: 'Female', label: 'Female' },
-                                { value: 'Other', label: 'Other' },
-                            ]}
-                            required
-                            error={fieldErrors.gender}
-                        />
-                    </div>
-                    <Input label="Mobile number" type="tel" value={formData.phone} onChange={e => set('phone', e.target.value)} required autoComplete="tel" placeholder="+91 98765 43210" error={fieldErrors.phone} helperText={WHATSAPP_VERIFY_NUMBER ? 'You can verify it on WhatsApp on the next screen. Each number can belong to only one Vital account.' : 'Each number can belong to only one Vital account.'} />
+                {section('You', 'Your name and number are shared with a requester only after you offer to donate.', <>
+                    <Input label="Full name" value={form.fullName} onChange={e => set('fullName', e.target.value)} required autoComplete="name" error={fieldErrors.fullName} />
+                    <Input
+                        label="Mobile number"
+                        type="tel"
+                        value={form.phone}
+                        onChange={e => set('phone', e.target.value)}
+                        required
+                        readOnly={phoneVerified}
+                        autoComplete="tel"
+                        placeholder="98765 43210"
+                        error={fieldErrors.phone}
+                        helperText={phoneVerified ? 'Verified. You can change it later in Settings.' : 'Each number can belong to only one Vital account.'}
+                    />
                     {checkbox(
-                        formData.whatsappAlerts,
+                        'whatsappAlerts',
+                        form.whatsappAlerts,
                         v => set('whatsappAlerts', v),
                         'Send me alerts on WhatsApp',
-                        'We’ll message this number when someone nearby needs your blood group. Phone numbers are never shared in WhatsApp. You can turn this off any time in Settings, or by replying STOP.',
+                        'Only when someone nearby needs your blood group. Reply STOP any time.',
                     )}
                 </>)}
 
                 {section('Blood group', savedBloodGroup
-                    ? 'Already saved on your profile. If it’s wrong, you can change it once from Settings after this step.'
-                    : 'If you are not sure, check a recent blood test report or ask a blood bank.', <>
-                    <div className="grid grid-cols-4 gap-1.5" role="radiogroup" aria-label="Blood group" aria-disabled={!!savedBloodGroup}>
+                    ? 'Already saved. If it’s wrong, you can change it once from Settings.'
+                    : 'Not sure? Check a recent blood test report or ask a blood bank.', <>
+                    <div className="grid grid-cols-4 gap-1.5" role="radiogroup" aria-label="Blood group" aria-disabled={!!savedBloodGroup} data-error={fieldErrors.bloodGroup ? 'true' : undefined}>
                         {BLOOD_GROUPS.map(g => (
                             <button
                                 key={g}
                                 type="button"
                                 role="radio"
-                                aria-checked={formData.bloodGroup === g}
+                                aria-checked={form.bloodGroup === g}
                                 disabled={!!savedBloodGroup && g !== savedBloodGroup}
                                 onClick={() => set('bloodGroup', g)}
-                                className={`h-14 rounded-md border font-serif text-3xl transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${formData.bloodGroup === g ? 'border-gray-900 bg-gray-900 text-white' : 'border-gray-300 bg-white text-gray-900 hover:border-gray-400'}`}
+                                className={`h-14 rounded-md border font-serif text-3xl transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${form.bloodGroup === g ? 'border-gray-900 bg-gray-900 text-white' : 'border-gray-300 bg-white text-gray-900 hover:border-gray-400'}`}
                             >
                                 {formatBloodGroup(g)}
                             </button>
                         ))}
                     </div>
                     {fieldErrors.bloodGroup && <p className="text-[13px] text-red-700">{fieldErrors.bloodGroup}</p>}
-                    <Input
-                        label="Date of last donation (if any)"
-                        type="date"
-                        value={formData.lastDonationDate}
-                        max={new Date().toISOString().split('T')[0]}
-                        onChange={e => set('lastDonationDate', e.target.value)}
-                        helperText="Used to calculate when you can donate next."
-                    />
                 </>)}
 
-                {section('Location', 'We alert you to requests near you, so this decides which alerts you receive.', <>
+                {section('Where you live', 'Decides which requests you’re alerted to.', <>
                     <StateDistrictSelect
-                        state={formData.state}
-                        district={formData.district}
-                        onChange={region => setFormData(prev => ({ ...prev, ...region }))}
+                        state={form.state}
+                        district={form.district}
+                        onChange={region => setForm(prev => ({ ...prev, ...region }))}
                         previousState={typedRegion.state}
                         previousDistrict={typedRegion.district}
                         required
                         stateError={fieldErrors.state}
                         districtError={fieldErrors.district}
                     />
-                    <div className="grid gap-4 sm:grid-cols-2">
-                        <Input label="Current PIN code" inputMode="numeric" value={formData.presentZip} onChange={e => set('presentZip', e.target.value)} required placeholder="e.g. 682011" error={fieldErrors.presentZip} />
-                        <Input label="Permanent PIN code" inputMode="numeric" value={formData.permanentZip} onChange={e => set('permanentZip', e.target.value)} required placeholder="e.g. 682011" error={fieldErrors.permanentZip} />
-                    </div>
-                    <div>
-                        <h3 className="mb-1 text-[13px] font-medium text-gray-800">Where we alert you from</h3>
-                        <DonorLocationPicker mode="defer" onPick={setPickedPoint} />
-                    </div>
-                    <div>
-                        <p className="mb-2 text-[13px] font-medium text-gray-800">Usually available on</p>
-                        <div className="flex gap-1.5">
-                            {['Weekdays', 'Weekends'].map(day => {
-                                const on = formData.availability.includes(day);
-                                return (
-                                    <button
-                                        key={day}
-                                        type="button"
-                                        aria-pressed={on}
-                                        onClick={() => set('availability', on ? formData.availability.filter(d => d !== day) : [...formData.availability, day])}
-                                        className={`h-9 rounded-full border px-4 text-sm transition-colors ${on ? 'border-gray-900 bg-gray-900 text-gray-50' : 'border-gray-300 bg-white text-gray-700 hover:border-gray-400'}`}
-                                    >
-                                        {day}
-                                    </button>
-                                );
-                            })}
-                        </div>
-                    </div>
+                    <Input
+                        label="PIN code (optional)"
+                        inputMode="numeric"
+                        value={form.presentZip}
+                        onChange={e => set('presentZip', e.target.value.replace(/\D/g, '').slice(0, 6))}
+                        placeholder="e.g. 682011"
+                        error={fieldErrors.presentZip}
+                        helperText="Lets us alert you to hospitals close by, not just in your district."
+                    />
                 </>)}
 
-                {section('Eligibility and consent', 'Both are required to register as a donor. These are your own declarations; Vital does not check them.', <>
+                {section('Before you join', 'Your own declarations. Vital does not check them; the hospital or blood bank decides who can donate.', <>
                     {checkbox(
-                        !formData.hasConditions,
-                        v => set('hasConditions', !v),
-                        'I declare that, to my knowledge, I’m fit to donate',
-                        'I don’t have a serious chronic illness, haven’t had recent major surgery, and don’t have any other condition that rules out donating. This is my own declaration. Vital does not verify it, and the hospital or blood bank decides whether I can donate.',
+                        'eligible',
+                        form.eligible,
+                        v => set('eligible', v),
+                        'I can donate blood',
+                        <>
+                            I’m 18 to 65, weigh at least 45 kg and am in good health, with no condition that rules out donating.{' '}
+                            <Link href="/safety-guidelines" target="_blank" className={linkClass}>Who can donate</Link>
+                        </>,
+                        fieldErrors.eligible,
                     )}
                     {checkbox(
-                        formData.consent,
+                        'consent',
+                        form.consent,
                         v => set('consent', v),
-                        'I agree to share my details for donation',
+                        'I agree to share my details when I offer',
                         <>
-                            My name and mobile number are shared with a requester only when I offer to donate. I’ve read the{' '}
-                            <Link href="/privacy" target="_blank" className="text-gray-900 underline decoration-gray-300 underline-offset-4">Privacy notice</Link>
+                            My name and mobile number go to a requester only when I offer to donate. I’ve read the{' '}
+                            <Link href="/privacy" target="_blank" className={linkClass}>Privacy notice</Link>
                             {' '}and{' '}
-                            <Link href="/terms" target="_blank" className="text-gray-900 underline decoration-gray-300 underline-offset-4">Terms</Link>
-                            , and can withdraw by deleting my account. I understand Vital only connects people, and any contact or donation is my own decision.
+                            <Link href="/terms" target="_blank" className={linkClass}>Terms</Link>
+                            . Vital only connects people; any contact or donation is my own decision.
                         </>,
                         fieldErrors.consent,
                     )}
                 </>)}
 
                 <div className="flex justify-end border-t border-gray-200 pt-6">
-                    <Button type="submit" variant="primary" size="lg">
-                        Complete registration
+                    <Button type="submit" variant="primary" size="lg" className="w-full sm:w-auto">
+                        Join as a donor
                     </Button>
                 </div>
             </form>

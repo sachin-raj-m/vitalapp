@@ -15,6 +15,7 @@ import { EmptyState } from '@/components/EmptyState';
 import { useRequests } from '@/context/RequestsContext';
 import { NotificationBanner } from '@/components/NotificationBanner';
 import { LocationNudge } from '@/components/LocationNudge';
+import { ProfileNudge } from '@/components/ProfileNudge';
 import { fetchUserStats, calculateEligibility, describePoints, type UserStats } from '@/lib/stats';
 
 const greeting = () => {
@@ -58,6 +59,7 @@ export default function DashboardPage() {
         <div className="space-y-10">
             <NotificationBanner />
             <LocationNudge />
+            <ProfileNudge />
 
             <header>
                 <p className="text-sm font-medium text-red-700">{format(new Date(), 'EEEE, d MMMM')}</p>

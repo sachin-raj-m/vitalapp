@@ -16,6 +16,8 @@ import type { User } from '@supabase/supabase-js';
 import { rememberReferral } from '@/lib/referrals';
 import { TurnstileField, type TurnstileHandle } from '@/components/TurnstileField';
 import { GoogleSignIn } from '@/components/auth/GoogleSignIn';
+import { WhatsAppSignIn } from '@/components/auth/WhatsAppSignIn';
+import { PHONE_SIGNIN } from '@/lib/features';
 
 export default function RegisterPage() {
     const router = useRouter();
@@ -37,6 +39,8 @@ export default function RegisterPage() {
     }, []);
 
     const consentError = 'Tick the box to agree to the Terms and Privacy notice before continuing.';
+    // Only here to request blood? That needs no account up front.
+    const requestLink = <Link href="/requests/new" className={authLinkClass}>post a request without an account</Link>;
 
     const handleGoogleSignUp = async () => {
         setError('');
@@ -170,8 +174,10 @@ export default function RegisterPage() {
 
     return (
         <AuthFrame
-            title="Register as a donor"
-            subtitle="First create an account. On the next screen you will add your blood group and where you live. It takes about two minutes."
+            title="Join Vital"
+            subtitle={PHONE_SIGNIN
+                ? 'Create an account with your mobile number, Google or email. Then add your blood group and district, and you’re on the network.'
+                : 'Create an account with Google or email. Then add your blood group and district, and you’re on the network.'}
             footer={<>Already registered? <Link href="/login" className={authLinkClass}>Sign in</Link></>}
         >
             {error && <Alert variant="error" className="mb-6">{error}</Alert>}
@@ -208,6 +214,12 @@ export default function RegisterPage() {
                     onBeforeSignIn={() => { try { localStorage.setItem('pendingConsent', JSON.stringify(consentStamp())); } catch { /* storage unavailable */ } }}
                     onError={message => setError(friendlyAuthError(message))}
                 />
+                {PHONE_SIGNIN && (
+                    <div className="mt-4">
+                        {/* The box above is the consent; the account is created with it. */}
+                        <WhatsAppSignIn consented={agreed} onSignedIn={() => router.push('/complete-registration')} />
+                    </div>
+                )}
             </fieldset>
             <OrDivider />
 
@@ -247,7 +259,10 @@ export default function RegisterPage() {
                 </Button>
             </form>
 
-            <p className="mt-6 text-[13px] leading-relaxed text-gray-500">
+            <p className="mt-6 text-sm leading-relaxed text-gray-600">
+                Need blood for someone? You can {requestLink}.
+            </p>
+            <p className="mt-3 text-[13px] leading-relaxed text-gray-500">
                 {PLATFORM_DISCLAIMER} Any arrangement is between you and the other person, at your own discretion.
             </p>
         </AuthFrame>

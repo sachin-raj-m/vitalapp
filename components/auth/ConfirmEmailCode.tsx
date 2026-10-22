@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/Button';
 import { Alert } from '@/components/ui/Alert';
 import { supabase } from '@/lib/supabase';
 import { TurnstileField, type TurnstileHandle } from '@/components/TurnstileField';
+import { otpError } from '@/lib/auth-errors';
 
 const RESEND_SECONDS = 60;
 
@@ -66,9 +67,9 @@ export function ConfirmEmailCode({
         });
         captcha.current?.reset(); // tokens work once
         if (resendError) {
-            setError(resendError.message.toLowerCase().includes('rate')
-                ? 'Too many codes requested. Wait a few minutes and try again.'
-                : 'Could not send a new code. Please try again.');
+            const e = otpError(resendError.message);
+            if (e.kind === 'wait') setCooldown(e.waitSeconds ?? RESEND_SECONDS);
+            setError(e.kind === 'other' ? 'Could not send a new code. Please try again.' : e.text);
             return;
         }
         setNotice(`New code sent to ${email}. It may take a minute to arrive.`);

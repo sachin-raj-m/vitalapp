@@ -257,6 +257,15 @@ export function MyRequestsContent() {
                     <p className="mt-3 max-w-lg text-gray-600">
                         Track offers from donors and confirm each donation with the donor’s PIN.
                     </p>
+                    {user && !user.is_donor && (
+                        <p className="mt-2 text-sm text-gray-600">
+                            Want to help others too?{' '}
+                            <Link href="/complete-registration" className="text-gray-900 underline decoration-gray-300 underline-offset-4 hover:decoration-gray-900">
+                                Become a donor
+                            </Link>{' '}
+                            in about a minute.
+                        </p>
+                    )}
                 </div>
                 <Link
                     href="/requests/new"
