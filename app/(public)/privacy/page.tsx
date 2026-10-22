@@ -28,6 +28,7 @@ export default function PrivacyPage() {
                     body: (
                         <>
                             <p><strong>When you create an account:</strong> your email address and a password (stored only as a secure hash by our authentication provider), or your Google account email and name if you sign in with Google.</p>
+                            <p><strong>If you sign in with WhatsApp:</strong> your mobile number. We create a one-time sign-in code and WhatsApp sends it to that number. The code is kept encrypted and works for up to 10 minutes; after that it can’t be used and is deleted (within a day at most). You can add an email later, but you don’t have to.</p>
                             <p><strong>When you register as a donor:</strong></p>
                             <ul>
                                 <li>name, mobile number, date of birth and gender;</li>
@@ -83,7 +84,7 @@ export default function PrivacyPage() {
                                 <li><strong>Vercel</strong> hosts the website.</li>
                                 <li>Our <strong>email provider</strong> sends alert, welcome and password-reset emails.</li>
                                 <li><strong>Google</strong>, only if you choose “Continue with Google”.</li>
-                                <li><strong>WhatsApp (Meta)</strong> delivers alerts and replies if you turn on WhatsApp alerts, and receives the code you send to verify your number.</li>
+                                <li><strong>WhatsApp (Meta)</strong> delivers alerts and replies if you turn on WhatsApp alerts, receives the code you send to verify your number, and delivers your sign-in code if you choose “Continue with WhatsApp”.</li>
                                 <li><strong>Cloudflare Turnstile</strong> checks that sign-ins and sign-ups come from a person, not a bot.</li>
                                 <li><strong>Sentry</strong> records app errors so we can fix them, with personal details removed.</li>
                                 <li><strong>OpenStreetMap</strong> turns PIN codes and hospital names into map positions, names the area near your point (Nominatim; we send it a position rounded to about 100 m), and serves the map images.</li>
