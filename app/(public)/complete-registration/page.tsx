@@ -14,7 +14,7 @@ import { cleanNext, isRegistrationComplete, rememberNext, takeNext } from '@/lib
 import { addDays } from 'date-fns';
 import { toast } from 'sonner';
 import Link from 'next/link';
-import { PRIVACY_VERSION, earliestConsentAt } from '@/lib/legal';
+import { PRIVACY_VERSION, earliestConsentAt, hasRecordedConsent } from '@/lib/legal';
 import { takeReferral } from '@/lib/referrals';
 import { MATCH_RADIUS_KM } from '@/lib/geo';
 import { DonorLocationPicker } from '@/components/DonorLocationPicker';
@@ -94,6 +94,9 @@ export default function CompleteRegistration() {
     // A state or district typed by hand before the dropdowns, for the hint.
     const [typedRegion, setTypedRegion] = useState<{ state: string; district: string }>({ state: '', district: '' });
     const [skipping, setSkipping] = useState(false);
+    // Agreed to the current Terms and Privacy notice already (when joining):
+    // the box below then doesn't ask again.
+    const [alreadyAgreed, setAlreadyAgreed] = useState(false);
     // Set once loaded or submitted, so later profile reloads don't reset the page.
     const started = useRef(false);
     // Where to go when done (see the comment at the top).
@@ -122,7 +125,7 @@ export default function CompleteRegistration() {
             // Start from what's already saved, so people only add what's missing.
             const { data: saved } = await supabase
                 .from('profiles')
-                .select('full_name, phone, phone_verified_at, dob, gender, blood_group, district, state, permanent_zip, present_zip, availability, whatsapp_alerts, next_eligible_date')
+                .select('full_name, phone, phone_verified_at, dob, gender, blood_group, district, state, permanent_zip, present_zip, availability, whatsapp_alerts, next_eligible_date, consent_agreed, consent_at, consent_version')
                 .eq('id', user.id)
                 .maybeSingle();
             const authPhone = session?.user?.phone ? waNumber(session.user.phone)?.slice(2) ?? '' : '';
@@ -149,9 +152,15 @@ export default function CompleteRegistration() {
                 if (saved.blood_group) setSavedBloodGroup(saved.blood_group as BloodGroup);
                 setPhoneVerified(!!saved.phone_verified_at && !!saved.phone);
                 setSavedNextEligible(saved.next_eligible_date || null);
+                if (hasRecordedConsent(saved) && saved.consent_version === PRIVACY_VERSION) setAlreadyAgreed(true);
             } else if (authPhone) {
                 setForm(prev => ({ ...prev, phone: authPhone }));
             }
+            // Ticked on the Join page just before continuing with Google.
+            try {
+                const pending = JSON.parse(localStorage.getItem('pendingConsent') || 'null');
+                if (pending?.consent_version === PRIVACY_VERSION && Date.now() - Date.parse(pending.consent_at) < 30 * 60 * 1000) setAlreadyAgreed(true);
+            } catch { /* storage blocked */ }
             setStatus(complete && wantsMore ? 'more' : 'form');
         };
         init().catch(err => {
@@ -558,10 +567,15 @@ export default function CompleteRegistration() {
                         'I can donate, and I agree to share my details when I offer',
                         <>
                             I’m 18 to 65, weigh at least 45 kg and am in good health (<Link href="/safety-guidelines" target="_blank" className={linkClass}>who can donate</Link>).
-                            My name and mobile number go to a requester only when I offer to donate. I agree to the{' '}
-                            <Link href="/terms" target="_blank" className={linkClass}>Terms</Link> and have read the{' '}
-                            <Link href="/privacy" target="_blank" className={linkClass}>Privacy notice</Link>.
-                            {' '}Vital only connects people; any contact or donation is my own decision.
+                            My name and mobile number go to a requester only when I offer to donate.
+                            {alreadyAgreed ? <>
+                                {' '}As in the <Link href="/privacy" target="_blank" className={linkClass}>Privacy notice</Link> you agreed to,
+                                Vital only connects people; any contact or donation is my own decision.
+                            </> : <>
+                                {' '}I agree to the <Link href="/terms" target="_blank" className={linkClass}>Terms</Link> and have read the{' '}
+                                <Link href="/privacy" target="_blank" className={linkClass}>Privacy notice</Link>.
+                                {' '}Vital only connects people; any contact or donation is my own decision.
+                            </>}
                         </>,
                         fieldErrors.ready,
                     )}
