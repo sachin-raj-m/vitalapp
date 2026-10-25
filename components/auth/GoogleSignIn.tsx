@@ -3,7 +3,9 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
-import { GoogleButton } from '@/components/auth/GoogleButton';
+import { rememberNext } from '@/lib/auth-helpers';
+import { GoogleButton, OrDivider, friendlyAuthError } from '@/components/auth/GoogleButton';
+import { TurnstileField, type TurnstileHandle } from '@/components/TurnstileField';
 
 /**
  * "Continue with Google" using Google's own button (Google Identity Services).
@@ -141,6 +143,63 @@ export function GoogleSignIn({
                     {busy ? 'Signing you in…' : 'Loading Google sign-in…'}
                 </div>
             )}
+        </div>
+    );
+}
+
+/**
+ * Google as the secondary way in, under ContinueSignIn's one field: an "or"
+ * line, then Google's button (or the redirect flow when it can't load), with
+ * its own captcha. `next` is where to go once signed in; onBeforeSignIn runs
+ * before either flow (e.g. Join remembers the consent: Google can't carry
+ * user metadata).
+ */
+export function GoogleOption({
+    next,
+    onBeforeSignIn,
+    onError,
+    note,
+}: {
+    next?: string;
+    onBeforeSignIn?: () => void;
+    onError: (message: string) => void;
+    /** Small print under the button. */
+    note?: React.ReactNode;
+}) {
+    const captcha = useRef<TurnstileHandle>(null);
+    const [redirecting, setRedirecting] = useState(false);
+
+    const redirectFlow = async () => {
+        setRedirecting(true);
+        try {
+            onBeforeSignIn?.();
+            // Google's redirect can't carry ?redirect=; /auth/callback picks it up.
+            rememberNext(next);
+            const { error } = await supabase.auth.signInWithOAuth({
+                provider: 'google',
+                // No forced consent screen: returning people go straight back in.
+                options: { redirectTo: `${window.location.origin}/auth/callback` },
+            });
+            if (error) throw error;
+        } catch (err) {
+            onError(friendlyAuthError(err instanceof Error ? err.message : undefined));
+            setRedirecting(false);
+        }
+    };
+
+    return (
+        <div>
+            <OrDivider />
+            <GoogleSignIn
+                next={next}
+                onFallback={redirectFlow}
+                fallbackLoading={redirecting}
+                getCaptchaToken={async () => { const t = await captcha.current?.getToken(); captcha.current?.reset(); return t; }}
+                onBeforeSignIn={onBeforeSignIn}
+                onError={message => onError(friendlyAuthError(message))}
+            />
+            <TurnstileField ref={captcha} />
+            {note && <p className="mt-3 text-[13px] leading-relaxed text-gray-500">{note}</p>}
         </div>
     );
 }
