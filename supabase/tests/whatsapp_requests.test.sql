@@ -71,6 +71,17 @@ SELECT tests.is(public.wa_account_for('919000000301'), NULL::uuid,
 SELECT tests.is(public.wa_account_for('not a number'), NULL::uuid, 'account: junk input finds nobody');
 SELECT tests.is(public.wa_account_for(NULL), NULL::uuid, 'account: NULL finds nobody');
 
+-- An unfinished phone sign-in holds the number unconfirmed: it is released
+-- (only that one), so the proven sender's account can be created.
+INSERT INTO auth.users (id, phone, raw_user_meta_data, raw_app_meta_data) VALUES
+  ('eeeeeeee-0000-4000-8000-0000000000f1', '919000000301', '{"consent_agreed":true,"consent_version":"2026-10-06"}', '{"provider":"phone"}'),
+  ('eeeeeeee-0000-4000-8000-0000000000f2', '919000000309', '{"consent_agreed":true,"consent_version":"2026-10-06"}', '{"provider":"phone"}');
+SELECT tests.is(public.wa_account_for('919000000301'), NULL::uuid, 'account: an unconfirmed sign-in phone is not proof');
+SELECT tests.is(public.wa_release_unconfirmed_phone('+91 90000 00301'), 1, 'release: the unconfirmed holder gives the number up');
+SELECT tests.is(tests.val($q$SELECT coalesce(phone, 'null') FROM auth.users WHERE id = 'eeeeeeee-0000-4000-8000-0000000000f2'$q$), '919000000309',
+  'release: other numbers are untouched');
+SELECT tests.is(public.wa_release_unconfirmed_phone('junk'), 0, 'release: junk input changes nothing');
+
 -- What admin.createUser({ phone, phone_confirm: true, user_metadata }) does.
 INSERT INTO auth.users (id, email, phone, phone_confirmed_at, raw_user_meta_data, raw_app_meta_data) VALUES
   ('eeeeeeee-0000-4000-8000-000000000002', NULL, '919000000301', now(),
@@ -90,6 +101,7 @@ SELECT tests.is(tests.rows($q$SELECT 1 FROM public.profiles WHERE phone_verified
 SELECT tests.login('service');
 SELECT tests.is(public.wa_account_for('+91 90000 00301'), tests.uid('wanew'), 'account: the new account is found next time (any format)');
 SELECT tests.is(public.wa_account_for('9000000301'), tests.uid('wanew'), 'account: found from the 10 digits too');
+SELECT tests.is(public.wa_release_unconfirmed_phone('919000000301'), 0, 'release: a confirmed sign-in phone is never released');
 
 -- A number verified in Settings (VERIFY on WhatsApp).
 SELECT tests.login('postgres');
@@ -153,6 +165,9 @@ SELECT tests.is(public.wa_requests_posted_today('919000000399'), 0, 'cap: a new 
 
 SELECT tests.login('requester');
 SELECT tests.throws($q$SELECT public.wa_requests_posted_today('919000000301')$q$, '42501', 'cap: signed-in users cannot call it');
+SELECT tests.throws($q$SELECT public.wa_release_unconfirmed_phone('919000000301')$q$, '42501', 'release: signed-in users cannot call it');
+SELECT tests.login('anon');
+SELECT tests.throws($q$SELECT public.wa_release_unconfirmed_phone('919000000301')$q$, '42501', 'release: visitors cannot call it');
 
 ROLLBACK;
 

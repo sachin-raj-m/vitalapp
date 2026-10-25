@@ -40,6 +40,12 @@
   4. wa_requests_posted_today(p_wa): how many requests this number posted from
      WhatsApp in the last 24 hours. Service role only.
 
+  5. wa_release_unconfirmed_phone(p_wa): clears the number from auth accounts
+     that hold it as an UNCONFIRMED sign-in phone (a phone sign-in started but
+     never finished), so the account for the proven sender can be created.
+     Same rule as sync_auth_phone_from_profile: the person who proves a number
+     wins it. Confirmed sign-in phones are never touched. Service role only.
+
   Idempotent: safe to run twice.
 */
 
@@ -97,6 +103,22 @@ RETURNS integer LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS
     AND created_at > now() - interval '24 hours';
 $$;
 
+-- 5. Unproven holders of a sign-in phone -------------------------------------
+CREATE OR REPLACE FUNCTION public.wa_release_unconfirmed_phone(p_wa text)
+RETURNS integer LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE
+  v_wa text := public.wa_number(p_wa);
+  n integer;
+BEGIN
+  IF v_wa IS NULL THEN RETURN 0; END IF;
+  UPDATE auth.users SET phone = NULL
+  WHERE public.wa_number(phone) = v_wa AND phone_confirmed_at IS NULL;
+  GET DIAGNOSTICS n = ROW_COUNT;
+  RETURN n;
+END $$;
+
 REVOKE ALL ON FUNCTION public.wa_account_for(text) FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.wa_requests_posted_today(text) FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.wa_account_for(text), public.wa_requests_posted_today(text) TO service_role;
+REVOKE ALL ON FUNCTION public.wa_release_unconfirmed_phone(text) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.wa_account_for(text), public.wa_requests_posted_today(text),
+  public.wa_release_unconfirmed_phone(text) TO service_role;
