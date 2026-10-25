@@ -11,8 +11,9 @@ import { ALERT_REQUEST_COLUMNS, alertDonors, type AlertableRequest } from '@/lib
 import { MATCH_RADIUS_KM } from '@/lib/geo';
 import { sendButtons, sendList, sendText, waNumber } from '@/lib/whatsapp';
 import {
-    BLOOD_GROUP_CHOICES, MAX_DAYS_AHEAD, MAX_UNITS, addDays, indiaToday, isRequestCommand, nextStep, neededByLabel, parseBloodGroup,
-    parseFirstMessage, parseHospitalAnswer, parseMobile, parseName, parseNeededBy, parseUnits, placeNeedsTown, urgencyFor,
+    BLOOD_GROUP_CHOICES, MAX_DAYS_AHEAD, MAX_UNITS, addDays, answerContact, confirmingContact, contactLine, dateQuestion,
+    draftFromFirstMessage, indiaToday, isRequestCommand, nextStep, neededByLabel, parseBloodGroup, parseHospitalAnswer, parseMobile,
+    parseName, parseNeededBy, parseUnits, placeNeedsTown, urgencyFor,
     type PlaceMatch, type RequestDraft, type RequestStep,
 } from '@/lib/whatsapp-request-parse';
 
@@ -20,12 +21,15 @@ import {
  * Posting a blood request over WhatsApp. Server only.
  *
  *   "need O+ blood, 2 units at Medical College Kozhikode"   (or REQUEST, or the
- *   "Request blood" button under the help reply)
+ *   "Request blood" button under the help reply, or a forwarded post with
+ *   "Blood Group : AB +ve" / "Hospital : ..." / "Bystander Name and Contact:" lines)
  *     -> what the message already says is kept; the rest is asked one question
  *        at a time: blood group (list) -> units (list, or typed) -> hospital +
- *        town or PIN (geocoded here) -> needed by [Today] [Tomorrow] [Another
- *        date] -> contact name [Use <profile name>] -> contact number [Use this
- *        number]
+ *        town or PIN (geocoded here; a lone name like "Jubilee Hospital" asks
+ *        for its town) -> needed by [Today] [Tomorrow] [Another date] (saying
+ *        so when the message's date has passed) -> contact name [Use <profile
+ *        name>] -> contact number [Use this number]; a contact taken from the
+ *        message is confirmed instead: [Use this] [Change]
  *     -> summary with the Terms/Privacy line: [Post request] [Edit] [Cancel]
  *     -> on Post: the sender's account (found by the number, or created with
  *        the number confirmed: WhatsApp itself proves it), the request and its
@@ -38,7 +42,8 @@ import {
  * the bot points people to the web form.
  *
  * Payload ids: rq:start, rq:bg:<group>, rq:units:<n>, rq:date:today|tomorrow|pick,
- * rq:name:me, rq:phone:me, rq:post, rq:edit, rq:cancel, rq:field:<step>.
+ * rq:name:me, rq:phone:me, rq:contact:use|change, rq:post, rq:edit, rq:cancel,
+ * rq:field:<step>.
  */
 
 export const requestsEnabled = () => process.env.WHATSAPP_ENABLED === 'true' && process.env.WHATSAPP_REQUESTS === 'true';
@@ -114,7 +119,8 @@ export async function startRequest(from: string, text: string) {
         return say(from, `Too many new requests from this number in the last hour. Please try again later, or use ${SITE_URL}/requests/new.`);
     }
 
-    const draft = parseFirstMessage(text.slice(0, 1000), indiaToday());
+    // A forwarded post's contact is confirmed before the summary; a date in it that has passed is said so.
+    const draft = draftFromFirstMessage(text.slice(0, 1000), indiaToday());
     const accountId = await provenAccount(from);
     if (accountId) {
         const { data: profile } = await serviceClient().from('profiles').select('full_name').eq('id', accountId).maybeSingle();
@@ -174,8 +180,8 @@ export async function answerRequest(from: string, session: Session, text: string
                     await save(from, 'hospital', draft);
                     return say(from, `Thanks. And the hospital’s name? (PIN ${answer.pin} is noted.)`);
                 }
-            } else if (waitingForTown && !answer.town && answer.hospital.split(' ').length <= 3 && placeNeedsTown(draft.hospital!)) {
-                // We asked which town "Medical College" is in.
+            } else if (waitingForTown && !answer.town && answer.hospital.split(' ').length <= 3 && placeNeedsTown(draft.hospital!, true)) {
+                // We asked which town "Medical College" (or "Jubilee Hospital") is in.
                 draft.town = answer.hospital;
                 draft.pin = answer.pin ?? draft.pin ?? null;
                 draft.place = undefined;
@@ -199,6 +205,7 @@ export async function answerRequest(from: string, session: Session, text: string
                 return ask(from, step, draft, [why]);
             }
             draft.dateNeeded = parsed.date;
+            delete draft.pastDate;
             break;
         }
         case 'contact_name': {
@@ -208,10 +215,16 @@ export async function answerRequest(from: string, session: Session, text: string
             break;
         }
         case 'contact_phone': {
+            if (confirmingContact(draft)) {
+                // "Contact: Meenu Juseph, +91 70344 52570 [Use this] [Change]": yes, no, or another contact typed.
+                if (!answerContact(draft, t)) return ask(from, step, draft, ['Tap “Use this” to keep this contact, or “Change” to give another.']);
+                break;
+            }
             const mine = /^(this|same|me|mine|my number|this number|use this number|yes)$/i.test(t);
             const phone = mine ? from.slice(2) : parseMobile(t);
             if (!phone) return ask(from, step, draft, ['Please send a 10-digit Indian mobile number, or tap “Use this number”.']);
             draft.contactPhone = phone;
+            draft.contactPending = false;
             break;
         }
         case 'confirm':
@@ -253,7 +266,9 @@ export async function requestPayload(from: string, parts: string[]) {
     }
 
     // Answers: only for the question we're on (an old list tapped later is re-asked).
-    const expected: Record<string, RequestStep> = { bg: 'blood_group', units: 'units', date: 'date', name: 'contact_name', phone: 'contact_phone' };
+    const expected: Record<string, RequestStep> = {
+        bg: 'blood_group', units: 'units', date: 'date', name: 'contact_name', phone: 'contact_phone', contact: 'contact_phone',
+    };
     if (expected[action] !== step) return ask(from, step, draft, ['Let’s carry on from here:']);
     switch (action) {
         case 'bg': {
@@ -274,6 +289,7 @@ export async function requestPayload(from: string, parts: string[]) {
                 return say(from, `Send the date it’s needed by as DD-MM, for example ${ddmm(addDays(today, 3))}.`);
             }
             draft.dateNeeded = value === 'tomorrow' ? addDays(today, 1) : today;
+            delete draft.pastDate;
             break;
         }
         case 'name':
@@ -281,7 +297,13 @@ export async function requestPayload(from: string, parts: string[]) {
             draft.contactName = draft.profileName;
             break;
         case 'phone':
+            if (confirmingContact(draft)) return ask(from, step, draft);
             draft.contactPhone = from.slice(2);
+            draft.contactPending = false;
+            break;
+        case 'contact':
+            if (!confirmingContact(draft)) return ask(from, step, draft);
+            answerContact(draft, value === 'use' ? 'use' : 'change');
             break;
     }
     return advance(from, draft);
@@ -317,9 +339,9 @@ function editField(from: string, draft: RequestDraft, field: RequestStep) {
         case 'blood_group': delete d.bloodGroup; break;
         case 'units': delete d.units; break;
         case 'hospital': delete d.hospital; delete d.town; delete d.pin; delete d.place; break;
-        case 'date': delete d.dateNeeded; break;
-        case 'contact_name': delete d.contactName; break;
-        case 'contact_phone': delete d.contactPhone; break;
+        case 'date': delete d.dateNeeded; delete d.pastDate; break;
+        case 'contact_name': delete d.contactName; d.contactPending = false; break;
+        case 'contact_phone': delete d.contactPhone; d.contactPending = false; break;
         default: return ask(from, 'edit', draft);
     }
     return advance(from, d);
@@ -327,16 +349,19 @@ function editField(from: string, draft: RequestDraft, field: RequestStep) {
 
 /** Resolves the place if needed, saves the draft and asks the next question (or shows the summary). */
 async function advance(from: string, draft: RequestDraft, prefix: string[] = []) {
+    // Why the hospital still needs a town: said when that question comes (the units may be asked first).
+    let placeMessage: string | null = null;
     if (draft.hospital && !draft.place) {
         const found = await resolvePlace(from, draft);
         if ('place' in found) {
             draft.place = found.place;
-        } else {
-            if (!found.keepName) { delete draft.hospital; delete draft.town; delete draft.pin; }
+        } else if (!found.keepName) {
+            delete draft.hospital; delete draft.town; delete draft.pin;
             prefix.push(found.message);
-        }
+        } else placeMessage = found.message;
     }
     const step = nextStep(draft);
+    if (placeMessage && step === 'hospital') prefix.push(placeMessage);
     if (step === 'confirm') draft.editing = false;
     await save(from, step, draft);
     return ask(from, step, draft, prefix);
@@ -379,12 +404,12 @@ async function ask(from: string, step: RequestStep, draft: RequestDraft, prefix:
         case 'hospital':
             if (draft.hospital && !draft.place) {
                 // We have a name but couldn't place it yet (the reason is in the prefix).
-                return say(from, body(`Which town is ${draft.hospital} in? Send the town, or the hospital’s 6-digit PIN code.`));
+                return say(from, body(`Which town or PIN code is ${draft.hospital} in?`));
             }
             if (draft.pin) return say(from, body(`Which hospital is the patient in? Send its name (PIN ${draft.pin} is noted).`));
             return say(from, body('Which hospital is the patient in? Send its name and town, or its 6-digit PIN code.\n\nFor example: Govt Medical College, Kozhikode 673008'));
         case 'date':
-            return sendButtons(from, body('When is the blood needed by?'), [
+            return sendButtons(from, body(dateQuestion(draft, indiaToday())), [
                 { id: 'rq:date:today', title: 'Today' },
                 { id: 'rq:date:tomorrow', title: 'Tomorrow' },
                 { id: 'rq:date:pick', title: 'Another date' },
@@ -396,6 +421,12 @@ async function ask(from: string, step: RequestStep, draft: RequestDraft, prefix:
             }
             return say(from, body('Who should donors call? Send the contact person’s name.'));
         case 'contact_phone':
+            if (confirmingContact(draft)) {
+                return sendButtons(from, body(`Who should donors call? From your message:\n${contactLine(draft)}`), [
+                    { id: 'rq:contact:use', title: 'Use this' },
+                    { id: 'rq:contact:change', title: 'Change' },
+                ], ctx);
+            }
             return sendButtons(from, body(`And the contact number? Tap “Use this number” for ${formatWaNumber(from)}, or type another 10-digit mobile number.`),
                 [{ id: 'rq:phone:me', title: 'Use this number' }], ctx);
         case 'edit':
@@ -415,9 +446,16 @@ function summary(from: string, d: RequestDraft): string {
     const updates = waNumber(d.contactPhone) === from
         ? 'When a donor offers, we’ll message you here.'
         : 'Offers will show in My requests on Vital (WhatsApp updates only go to the number you’re messaging from).';
+    const urgency = d.urgent && d.dateNeeded ? urgencyFor(d.dateNeeded, indiaToday()) : null;
     return [
         'Please check your request:',
         describe(d),
+        [d.patientName && `Patient: ${d.patientName}`, d.notes && `Notes: ${d.notes}`].filter(Boolean).join('\n'),
+        urgency === 'High'
+            ? 'Urgency: High (needed today or tomorrow).'
+            : urgency
+                ? `Your message says urgent; urgency is set from the date: ${urgency}. If it’s needed sooner, tap Edit and change the date.`
+                : '',
         d.place ? placeNote(d.place, d.pin) : '',
         updates,
         `By posting you agree to Vital’s Terms and Privacy notice: ${SITE}/terms`,
@@ -444,7 +482,7 @@ const fromArea = (a: Area, label: string, zipcode: string | null): PlaceMatch =>
  */
 async function resolvePlace(from: string, d: RequestDraft): Promise<Resolved> {
     const hospital = d.hospital!;
-    if (!d.pin && !d.town && placeNeedsTown(hospital)) {
+    if (!d.pin && !d.town && placeNeedsTown(hospital, true)) {
         return { message: `Many hospitals are called “${hospital}”.`, keepName: true };
     }
     if (!(await rateLimit(`wa-geocode:${from}`, 60 * 60, 12))) {
@@ -587,7 +625,7 @@ async function postRequest(from: string) {
             hospital_name: draft.hospital,
             hospital_address: address,
             urgency_level: urgencyFor(draft.dateNeeded!, today),
-            notes: '',
+            notes: draft.notes ?? '',
             contact_name: draft.contactName,
             location: {
                 latitude: round5(place.latitude),
