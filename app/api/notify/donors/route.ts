@@ -103,7 +103,10 @@ export async function POST(request: Request) {
     if (!bloodRequest || bloodRequest.user_id !== user.id) {
         return NextResponse.json({ error: 'Request not found' }, { status: 404 })
     }
-    if (bloodRequest.status !== 'active') {
+    // Never alert for a closed or already-expired request (needed-by date
+    // before today in India).
+    const todayIndia = new Date(Date.now() + 5.5 * 60 * 60 * 1000).toISOString().slice(0, 10)
+    if (bloodRequest.status !== 'active' || (bloodRequest.date_needed && bloodRequest.date_needed < todayIndia)) {
         return NextResponse.json({ error: 'Request is not open' }, { status: 409 })
     }
     // One broadcast per request: only right after it is created.

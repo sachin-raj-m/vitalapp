@@ -212,6 +212,8 @@ export default function CreateRequestPage() {
             return { message: 'The PIN code should be 6 digits. Fix it or leave it empty.', address: true };
         }
         if (!formData.contactName.trim() || !formData.contactPhone.trim()) return { message: 'Add the contact person’s name and phone number.' };
+        // A past date would post an already-expired request that donors can't see.
+        if (!formData.dateNeeded || formData.dateNeeded < today()) return { message: 'Choose today or a later date for “Needed by”.' };
         return null;
     };
 

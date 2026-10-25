@@ -61,6 +61,8 @@ WHERE id = '33333333-3333-4333-8333-333333333333';
 UPDATE public.profiles SET phone = '0000000004', role = 'admin', verification_status = 'verified', is_donor = false
 WHERE id = '44444444-4444-4444-8444-444444444444';
 
+-- Fixtures include already-expired requests, which new requests can't be (20261025000100).
+ALTER TABLE public.blood_requests DISABLE TRIGGER blood_requests_check_date;
 INSERT INTO public.blood_requests
   (id, user_id, blood_group, units_needed, hospital_name, hospital_address, urgency_level,
    contact_name, location, status, city, date_needed) VALUES
@@ -77,6 +79,7 @@ INSERT INTO public.blood_requests
   ('aaaaaaaa-0000-4000-8000-000000000004', '11111111-1111-4111-8111-111111111111', 'B+', 1,
    'Testville Old Hospital', '4 Example Road', 'High', 'Riya', '{"latitude": 9.98, "longitude": 76.28}',
    'active', 'Testville', current_date - 2);
+ALTER TABLE public.blood_requests ENABLE TRIGGER blood_requests_check_date;
 
 INSERT INTO public.request_contacts (request_id, contact_phone) VALUES
   ('aaaaaaaa-0000-4000-8000-000000000001', '0000000101'),
