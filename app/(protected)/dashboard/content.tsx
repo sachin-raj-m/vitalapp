@@ -4,7 +4,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { format } from 'date-fns';
-import { ArrowRight, Inbox } from 'lucide-react';
+import { ArrowRight, Inbox, Plus } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { CountUp } from '@/components/landing/CountUp';
 import { BloodRequestCard } from '@/components/BloodRequestCard';
@@ -61,11 +61,19 @@ export default function DashboardPage() {
             <LocationNudge />
             <ProfileNudge />
 
-            <header>
-                <p className="text-sm font-medium text-red-700">{format(new Date(), 'EEEE, d MMMM')}</p>
-                <h1 className="display mt-2 text-4xl sm:text-[2.75rem]">
-                    {greeting()}, {firstName}
-                </h1>
+            <header className="flex flex-wrap items-end justify-between gap-x-6 gap-y-4">
+                <div>
+                    <p className="text-sm font-medium text-red-700">{format(new Date(), 'EEEE, d MMMM')}</p>
+                    <h1 className="display mt-2 text-4xl sm:text-[2.75rem]">
+                        {greeting()}, {firstName}
+                    </h1>
+                </div>
+                <Link
+                    href="/requests/new"
+                    className="press inline-flex h-10 items-center gap-1.5 rounded-md border border-gray-300 bg-white px-4 text-sm font-semibold text-gray-900 hover:border-gray-900"
+                >
+                    <Plus className="h-4 w-4 text-red-600" aria-hidden /> Request blood
+                </Link>
             </header>
 
             <dl className="grid gap-3 sm:grid-cols-3 sm:gap-4">

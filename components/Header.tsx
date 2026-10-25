@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Menu, X, ArrowUpRight } from 'lucide-react';
+import { Menu, X, ArrowUpRight, Plus } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { Logo } from './Logo';
 import { cn } from '@/lib/cn';
@@ -23,6 +23,8 @@ export function Header() {
 
   if (isStandaloneRoute(pathname) || isAppRoute(pathname)) return null;
   if (isHybridRoute(pathname) && user) return null;
+
+  const onRequestForm = pathname?.startsWith('/requests/new');
 
   return (
     <header className="sticky top-0 z-50 border-b border-gray-200/70 bg-white/90 backdrop-blur-md">
@@ -71,15 +73,26 @@ export function Header() {
           )}
         </div>
 
-        <button
-          className="-mr-2 rounded-md p-2 text-gray-700 md:hidden"
-          onClick={() => setIsMenuOpen(o => !o)}
-          aria-expanded={isMenuOpen}
-          aria-controls="mobile-menu"
-          aria-label={isMenuOpen ? 'Close menu' : 'Open menu'}
-        >
-          {isMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-        </button>
+        {/* On phones the main action sits in the bar itself, one tap away. */}
+        <div className="flex items-center gap-1 md:hidden">
+          {!onRequestForm && (
+            <Link
+              href="/requests/new"
+              className="press inline-flex h-9 items-center gap-1.5 whitespace-nowrap rounded-md bg-red-600 px-3 text-sm font-semibold text-white shadow-sm shadow-red-600/25 hover:bg-red-700"
+            >
+              <Plus className="h-4 w-4" aria-hidden /> Request blood
+            </Link>
+          )}
+          <button
+            className="-mr-2 rounded-md p-2 text-gray-700"
+            onClick={() => setIsMenuOpen(o => !o)}
+            aria-expanded={isMenuOpen}
+            aria-controls="mobile-menu"
+            aria-label={isMenuOpen ? 'Close menu' : 'Open menu'}
+          >
+            {isMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+          </button>
+        </div>
       </div>
 
       {isMenuOpen && (

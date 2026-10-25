@@ -65,7 +65,7 @@ export function AppSidebar() {
                     href="/requests/new"
                     className="press flex h-10 items-center justify-center gap-1.5 rounded-md bg-red-600 text-sm font-semibold text-white shadow-sm shadow-red-600/25 hover:bg-red-700"
                 >
-                    <Plus className="h-4 w-4" /> Request blood
+                    <Plus className="h-4 w-4" aria-hidden /> Request blood
                 </Link>
             </div>
 
@@ -126,15 +126,26 @@ export function AppSidebar() {
                 <Link href="/dashboard" aria-label="Vital dashboard" className="group -mb-1">
                     <Logo className="text-[22px]" />
                 </Link>
-                <button
-                    onClick={() => setIsMobileOpen(true)}
-                    className="-mr-2 rounded-md p-2 text-gray-700"
-                    aria-label="Open menu"
-                    aria-expanded={isMobileOpen}
-                    aria-controls="app-drawer"
-                >
-                    <Menu className="h-5 w-5" />
-                </button>
+                {/* Requesting blood is the one action that shouldn't wait behind the menu. */}
+                <div className="flex items-center gap-1">
+                    {!pathname?.startsWith('/requests/new') && (
+                        <Link
+                            href="/requests/new"
+                            className="press inline-flex h-9 items-center gap-1.5 whitespace-nowrap rounded-md bg-red-600 px-3 text-sm font-semibold text-white shadow-sm shadow-red-600/25 hover:bg-red-700"
+                        >
+                            <Plus className="h-4 w-4" aria-hidden /> Request blood
+                        </Link>
+                    )}
+                    <button
+                        onClick={() => setIsMobileOpen(true)}
+                        className="-mr-2 rounded-md p-2 text-gray-700"
+                        aria-label="Open menu"
+                        aria-expanded={isMobileOpen}
+                        aria-controls="app-drawer"
+                    >
+                        <Menu className="h-5 w-5" />
+                    </button>
+                </div>
             </header>
 
             <AnimatePresence>
