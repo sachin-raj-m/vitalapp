@@ -30,7 +30,10 @@ export const TEMPLATES = {
 } as const;
 
 export type MessageKind =
-    | 'alert' | 'offer_received' | 'followup' | 'thanks' | 'covered' | 'reply' | 'verify';
+    | 'alert' | 'offer_received' | 'followup' | 'thanks' | 'covered' | 'reply' | 'verify'
+    // Posting a request over WhatsApp (lib/whatsapp-request.ts): the questions
+    // and summary, then "Your request is live" (also the per-number daily cap).
+    | 'request_flow' | 'request_posted';
 
 export const whatsappEnabled = () =>
     process.env.WHATSAPP_ENABLED === 'true' && !!process.env.WHATSAPP_TOKEN && !!process.env.WHATSAPP_PHONE_NUMBER_ID;
@@ -123,8 +126,39 @@ export function sendButtons(to: string, body: string, buttons: Array<{ id: strin
         type: 'interactive',
         interactive: {
             type: 'button',
-            body: { text: body },
+            body: { text: body.slice(0, 1024) },
             action: { buttons: buttons.slice(0, 3).map(b => ({ type: 'reply', reply: { id: b.id, title: b.title.slice(0, 20) } })) },
+        },
+    }, ctx);
+}
+
+/**
+ * A list message: a button that opens up to ten rows. Only valid within 24
+ * hours of the person's last message. Titles are cut to WhatsApp's limits.
+ */
+export function sendList(
+    to: string,
+    body: string,
+    button: string,
+    rows: Array<{ id: string; title: string; description?: string }>,
+    ctx: LogContext,
+) {
+    return post(to, {
+        type: 'interactive',
+        interactive: {
+            type: 'list',
+            body: { text: body.slice(0, 1024) },
+            action: {
+                button: button.slice(0, 20),
+                sections: [{
+                    title: button.slice(0, 24),
+                    rows: rows.slice(0, 10).map(r => ({
+                        id: r.id.slice(0, 200),
+                        title: r.title.slice(0, 24),
+                        ...(r.description ? { description: r.description.slice(0, 72) } : {}),
+                    })),
+                }],
+            },
         },
     }, ctx);
 }

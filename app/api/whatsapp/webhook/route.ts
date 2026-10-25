@@ -6,6 +6,8 @@ import { handleInbound } from '@/lib/whatsapp-bot';
 // Needs Node's crypto and must never be cached.
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+// Posting a request from WhatsApp geocodes the hospital and alerts donors in the same call.
+export const maxDuration = 60;
 
 /** Meta's one-time webhook verification (hub.challenge). */
 export async function GET(request: Request) {
@@ -21,7 +23,7 @@ type WaMessage = {
     from: string; id: string; type: string;
     text?: { body?: string };
     button?: { payload?: string; text?: string };
-    interactive?: { type?: string; button_reply?: { id?: string } };
+    interactive?: { type?: string; button_reply?: { id?: string }; list_reply?: { id?: string } };
 };
 type WaStatus = { id: string; status: string; errors?: Array<{ title?: string }> };
 
@@ -62,7 +64,7 @@ export async function POST(request: Request) {
                 continue;
             }
 
-            const payload = m.button?.payload ?? m.interactive?.button_reply?.id;
+            const payload = m.button?.payload ?? m.interactive?.button_reply?.id ?? m.interactive?.list_reply?.id;
             try {
                 if (payload) await handleInbound({ from, kind: 'payload', value: payload });
                 else if (m.type === 'text' && m.text?.body) await handleInbound({ from, kind: 'text', value: m.text.body });

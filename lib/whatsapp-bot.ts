@@ -7,6 +7,8 @@ import { onDonationConfirmed } from '@/lib/donation-events';
 import { TEMPLATES, sendButtons, sendTemplate, sendText, waNumber } from '@/lib/whatsapp';
 import { PHONE_CODE_MAX_ATTEMPTS, PHONE_PURPOSE, parseVerifyMessage, phoneCodeHash } from '@/lib/phone-verification';
 import { PHONE_LOGIN_MAX_DELIVERIES, decryptCode, isLoginMessage, loginCodeMessage } from '@/lib/phone-login';
+import { answerRequest, cancelRequest, requestPayload, requestSession, requestsEnabled, startRequest } from '@/lib/whatsapp-request';
+import { isRequestCommand, looksLikeBloodNeed } from '@/lib/whatsapp-request-parse';
 
 /**
  * Replies to people messaging Vital's WhatsApp number. Inputs are button taps
@@ -22,6 +24,10 @@ import { PHONE_LOGIN_MAX_DELIVERIES, decryptCode, isLoginMessage, loginCodeMessa
  *                     (the code comes from registration or Settings)
  *                     LOGIN -> the sign-in code waiting for the sender's number
  *                     ("Continue with WhatsApp", lib/phone-login.ts)
+ *   Blood request     "need O+ blood…" / REQUEST / [Request blood] -> a short
+ *                     guided chat that posts a request after [Post request]
+ *                     (lib/whatsapp-request.ts; payloads rq:*). While a draft
+ *                     is open, text answers its question; CANCEL drops it.
  *
  * Every action re-checks the database: a payload only names a request or
  * offer, and the sender's number must belong to the right person.
@@ -42,8 +48,21 @@ const SELF_CHECK = [
 const HELP = [
     'This is Vital, the free blood donor network.',
     'Reply STOP to stop alerts, START to turn them back on, or LINK for a fresh contact link.',
+    `Need blood? Post a request at ${SITE_URL.replace(/^https?:\/\//, '')}/requests/new`,
     `For anything else, visit ${SITE_URL.replace(/^https?:\/\//, '')}`,
 ].join('\n\n');
+
+// When requests can be posted here (WHATSAPP_REQUESTS=true).
+const HELP_WITH_REQUESTS = [
+    'This is Vital, the free blood donor network.',
+    'Need blood? Tap “Request blood”, or send what you need, like: Need O+ blood, 2 units at Govt Medical College, Kozhikode.',
+    'Reply STOP to stop alerts, START to turn them back on, or LINK for a fresh contact link.',
+    `For anything else, visit ${SITE_URL.replace(/^https?:\/\//, '')}`,
+].join('\n\n');
+
+const sendHelp = (to: string) => requestsEnabled()
+    ? sendButtons(to, HELP_WITH_REQUESTS, [{ id: 'rq:start', title: 'Request blood' }], { kind: 'reply' })
+    : sendText(to, HELP, { kind: 'reply' });
 
 const VERIFY_HELP = `That code isn’t right or has expired. In Settings on ${SITE_URL.replace(/^https?:\/\//, '')}, tap “Verify on WhatsApp” for a new one and send it from the number on your profile.`;
 
@@ -66,21 +85,39 @@ export async function handleInbound(msg: Inbound) {
             case 'fu_yes': return askUnits(from, id);
             case 'fu_later': return followUpLater(from, id);
             case 'fu_no': return followUpNo(from, id);
-            default: return reply(from, HELP);
+            case 'rq': return requestPayload(from, [id, extra]);
+            default: return sendHelp(from);
         }
     }
 
     const text = msg.value.trim();
     const word = text.toUpperCase();
-    if (word === 'STOP' || word === 'UNSUBSCRIBE') return setAlerts(from, false);
+    if (word === 'STOP' || word === 'UNSUBSCRIBE') {
+        // Opting out also drops a request being drafted.
+        await serviceClient().from('whatsapp_sessions').delete().eq('wa_number', from).eq('awaiting', 'request');
+        return setAlerts(from, false);
+    }
     if (word === 'START' || word === 'SUBSCRIBE') return setAlerts(from, true);
     if (word === 'LINK') return resendLink(from);
     const verifyCode = parseVerifyMessage(text);
     if (verifyCode) return verifyNumber(from, verifyCode);
     if (/^VERIFY\b/.test(word)) return reply(from, VERIFY_HELP);
     if (isLoginMessage(text)) return sendLoginCode(from);
+
+    // A request being drafted: the text answers its current question.
+    const drafting = requestsEnabled() ? await requestSession(from) : null;
+    const asksForBlood = isRequestCommand(text) || looksLikeBloodNeed(text);
+    if (drafting && drafting !== 'expired') {
+        if (/^(CANCEL|CANCEL REQUEST|QUIT|EXIT)[.!]?$/.test(word)) return cancelRequest(from);
+        return answerRequest(from, drafting, text);
+    }
+    if (drafting === 'expired' && !asksForBlood) {
+        return reply(from, 'Your request draft expired after 30 minutes without a reply, so nothing was posted. Send REQUEST to start again.');
+    }
+
     if (/^\d{4}$/.test(text)) return checkPin(from, text);
-    return reply(from, HELP);
+    if (asksForBlood) return startRequest(from, text);
+    return sendHelp(from);
 }
 
 const reply = (to: string, body: string, ctx: { userId?: string | null; requestId?: string | null; donationId?: string | null } = {}) =>
@@ -236,7 +273,7 @@ async function askForPin(from: string, donationId: string, units: number) {
         return reply(from, `Please choose between 1 and ${Math.max(remaining, 1)} units.`, { donationId: offer.id });
     }
     await serviceClient().from('whatsapp_sessions').upsert({
-        wa_number: from, awaiting: 'pin', donation_id: offer.id, request_id: offer.request_id, units,
+        wa_number: from, awaiting: 'pin', donation_id: offer.id, request_id: offer.request_id, units, step: null, draft: null,
         expires_at: new Date(Date.now() + PIN_WAIT_HOURS * 3600_000).toISOString(), updated_at: new Date().toISOString(),
     });
     return reply(from, `Thank you. Please type the 4-digit PIN ${offer.donorFirst} gives you, to confirm ${units === 1 ? '1 unit' : `${units} units`}.`, { donationId: offer.id, requestId: offer.request_id });
