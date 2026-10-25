@@ -16,7 +16,7 @@ const csp = [
   `script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com https://accounts.google.com/gsi/client${isDev ? " 'unsafe-eval'" : ''}`,
   // Leaflet marker HTML and React style props use inline styles.
   "style-src 'self' 'unsafe-inline' https://accounts.google.com/gsi/style",
-  "img-src 'self' data: blob: https://tile.openstreetmap.org",
+  "img-src 'self' data: blob: https://tile.openstreetmap.org https://api.producthunt.com",
   "font-src 'self'",
   `connect-src 'self' https://accounts.google.com/gsi/${supabaseHost ? ` https://${supabaseHost} wss://${supabaseHost}` : ''}${isDev ? ' ws: http://localhost:* http://127.0.0.1:*' : ''}`,
   "worker-src 'self'",
