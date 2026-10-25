@@ -32,6 +32,8 @@ export interface CallOptions {
 export interface Place {
     latitude: number;
     longitude: number;
+    /** The feature's own name ("General Hospital Ernakulam"), if it has one. */
+    name?: string | null;
     /** Short, human name: "Kakkanad, Kochi". */
     label: string;
     /** Full name as Nominatim gives it. */
@@ -95,6 +97,7 @@ function toPlace(raw: Raw): Place | null {
     return {
         latitude,
         longitude,
+        name: raw.name?.trim() || null,
         label: (parts.length ? parts.join(', ') : displayName.split(',').slice(0, 2).join(',')).slice(0, 120),
         displayName: displayName.slice(0, 300),
         city,

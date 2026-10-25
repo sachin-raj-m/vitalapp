@@ -4,8 +4,7 @@ import { authedFetch } from '@/lib/api';
 import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { MapPin, Search } from 'lucide-react';
-import { differenceInCalendarDays, format } from 'date-fns';
+import { MapPin } from 'lucide-react';
 import { BLOOD_GROUPS, formatBloodGroup } from '@/lib/blood-compatibility';
 import { Input, Textarea } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
@@ -24,10 +23,11 @@ import { QuickVerify } from '@/components/auth/QuickVerify';
 import type { User } from '@supabase/supabase-js';
 import { PHONE_SIGNIN } from '@/lib/features';
 
-/** A place from /api/geocode (server-side Nominatim). */
+/** A place from /api/geocode (server-side Photon or Nominatim). */
 interface GeoPlace {
     latitude: number;
     longitude: number;
+    name?: string | null;
     label: string;
     displayName: string;
     city: string | null;
@@ -36,6 +36,8 @@ interface GeoPlace {
 }
 
 type PinSource = 'search' | 'map' | 'gps';
+/** Suggestions while typing the hospital's name. */
+type SuggestStatus = 'idle' | 'loading' | 'done' | 'error' | 'limited';
 
 // "Ernakulam" vs "ernakulam district", "Kochi" vs "Kochi City": same place.
 const sameName = (a: string, b: string) => {
@@ -46,11 +48,18 @@ const sameName = (a: string, b: string) => {
 const round5 = (n: number) => Math.round(n * 1e5) / 1e5;
 /** Using the phone's position for the hospital only makes sense if it's this close. */
 const MAX_REQUEST_GPS_ACCURACY_M = 1000;
-const today = () => format(new Date(), 'yyyy-MM-dd');
+/** Today's date in India (yyyy-MM-dd), whatever the device's time zone; the database uses the same. */
+const today = () => {
+    const parts = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date());
+    const part = (type: string) => parts.find(p => p.type === type)?.value ?? '';
+    return `${part('year')}-${part('month')}-${part('day')}`;
+};
+const dayNumber = (ymd: string) => Date.UTC(Number(ymd.slice(0, 4)), Number(ymd.slice(5, 7)) - 1, Number(ymd.slice(8, 10))) / 86_400_000;
+const PAST_DATE = 'Past dates can’t be chosen. A request needs blood today or later.';
 
 /** No separate question: needed today or tomorrow is urgent, within 3 days soon. */
 const urgencyFor = (dateNeeded: string): UrgencyLevel => {
-    const days = differenceInCalendarDays(new Date(dateNeeded), new Date());
+    const days = dayNumber(dateNeeded) - dayNumber(today());
     return days <= 1 ? 'High' : days <= 3 ? 'Medium' : 'Low';
 };
 
@@ -100,10 +109,20 @@ export default function CreateRequestPage() {
     const [pinPlace, setPinPlace] = useState<GeoPlace | null>(null);
     const [locating, setLocating] = useState(false);
     const [searching, setSearching] = useState(false);
-    const [searchResults, setSearchResults] = useState<GeoPlace[] | null>(null);
     const [searchError, setSearchError] = useState('');
     const [addressOpen, setAddressOpen] = useState(false);
     const pinRequest = useRef(0);
+    // What the pin last filled in, so picking another place can replace it (but never what was typed).
+    const autoFilled = useRef({ address: '', city: '', zipcode: '' });
+
+    // Suggestions as the hospital's name is typed (Photon via /api/geocode).
+    const [suggestQuery, setSuggestQuery] = useState<{ q: string; near: string } | null>(null);
+    const [suggestions, setSuggestions] = useState<GeoPlace[]>([]);
+    const [suggestStatus, setSuggestStatus] = useState<SuggestStatus>('idle');
+    const [listOpen, setListOpen] = useState(false);
+    const [activeIndex, setActiveIndex] = useState(-1);
+    // Set when an earlier date was put back to today on leaving the field.
+    const [dateReset, setDateReset] = useState(false);
 
     const setPin = (latitude: number, longitude: number, source: PinSource, accuracy: number | null = null, known?: GeoPlace) => {
         if (!insideIndia(latitude, longitude)) {
@@ -113,13 +132,17 @@ export default function CreateRequestPage() {
         setFormData(prev => ({ ...prev, location: { ...prev.location, latitude, longitude, source, accuracy_m: accuracy } }));
         const fill = (place: GeoPlace) => {
             setPinPlace(place);
-            // Fill empty fields from the pin; never overwrite what the poster typed.
-            setFormData(prev => ({
-                ...prev,
-                hospitalAddress: prev.hospitalAddress || place.displayName.split(',').slice(0, 4).join(',').trim(),
-                city: prev.city || place.city || place.district || '',
-                zipcode: prev.zipcode || place.zipcode || '',
-            }));
+            // Fill empty fields from the pin (or ones the last pin filled); never overwrite what the poster typed.
+            const last = autoFilled.current;
+            setFormData(prev => {
+                const next = {
+                    address: !prev.hospitalAddress || prev.hospitalAddress === last.address ? place.displayName.split(',').slice(0, 4).join(',').trim() : prev.hospitalAddress,
+                    city: !prev.city || prev.city === last.city ? place.city || place.district || '' : prev.city,
+                    zipcode: !prev.zipcode || prev.zipcode === last.zipcode ? place.zipcode || '' : prev.zipcode,
+                };
+                autoFilled.current = next;
+                return { ...prev, hospitalAddress: next.address, city: next.city, zipcode: next.zipcode };
+            });
         };
         setPinPlace(null);
         if (known) { fill(known); return; }
@@ -130,29 +153,66 @@ export default function CreateRequestPage() {
             .catch(() => { /* the address fields stay editable */ });
     };
 
+    // The fallback when suggestions find nothing or fail: one explicit, wider
+    // search (Nominatim, whose policy forbids searching on every keystroke).
     const searchHospital = async () => {
         const q = [formData.hospitalName, formData.city].filter(s => s.trim()).join(', ').trim();
         setSearchError('');
         if (q.length < 3) {
-            setSearchError('Type the hospital’s name (and the town if you know it), then search.');
+            setSearchError('Type the hospital’s name (and the town if you know it).');
             return;
         }
+        setSuggestQuery(null);
         setSearching(true);
         try {
             const res = await fetch(`/api/geocode?search=${encodeURIComponent(q)}`);
-            if (res.status === 429) throw new Error('Too many searches. Please wait a minute and try again.');
+            if (res.status === 429) throw new Error('Too many searches. Please wait a minute and try again, or tap the map.');
             if (!res.ok) throw new Error('The map search is unavailable right now. Tap the map to mark the hospital instead.');
             const body = await res.json();
             const results: GeoPlace[] = Array.isArray(body?.results) ? body.results : [];
-            setSearchResults(results);
+            setSuggestions(results);
+            setSuggestStatus('done');
+            setActiveIndex(-1);
+            setListOpen(results.length > 0);
             if (results.length === 0) setSearchError('No match found. Try a shorter name or add the town, or tap the map to mark it.');
         } catch (err) {
             setSearchError(err instanceof Error ? err.message : 'Search failed.');
-            setSearchResults(null);
         } finally {
             setSearching(false);
         }
     };
+
+    // Suggestions ~400 ms after the last keystroke; a newer keystroke cancels
+    // the wait and aborts a request still in flight.
+    useEffect(() => {
+        if (!suggestQuery) return;
+        const controller = new AbortController();
+        const timer = setTimeout(async () => {
+            setSuggestStatus('loading');
+            try {
+                const near = suggestQuery.near ? `&near=${suggestQuery.near}` : '';
+                const res = await fetch(`/api/geocode?suggest=${encodeURIComponent(suggestQuery.q)}${near}`, { signal: controller.signal });
+                if (res.status === 429) {
+                    setSuggestions([]);
+                    setSuggestStatus('limited');
+                    return;
+                }
+                if (!res.ok) throw new Error('suggestions failed');
+                const body = await res.json();
+                const results: GeoPlace[] = Array.isArray(body?.results) ? body.results : [];
+                setSuggestions(results);
+                setActiveIndex(-1);
+                setSuggestStatus('done');
+                // Open the list only if they're still in the field.
+                setListOpen(document.activeElement?.id === 'hospital-name');
+            } catch {
+                if (controller.signal.aborted) return;
+                setSuggestions([]);
+                setSuggestStatus('error');
+            }
+        }, 400);
+        return () => { clearTimeout(timer); controller.abort(); };
+    }, [suggestQuery]);
 
     // Prefill the contact with the signed-in user's details once they load.
     useEffect(() => {
@@ -206,15 +266,73 @@ export default function CreateRequestPage() {
     const formProblem = (): { message: string; address?: boolean } | null => {
         if (!formData.bloodGroup) return { message: 'Choose the blood group needed.' };
         if (!formData.hospitalName.trim()) return { message: 'Enter the hospital’s name.' };
-        if (!hasLocation) return { message: 'Mark the hospital on the map (search for it, or tap the map) so nearby donors are alerted.' };
+        if (!hasLocation) return { message: 'Mark the hospital on the map (type its name and pick it, or tap the map) so nearby donors are alerted.' };
         if (!formData.city.trim() && !formData.zipcode.trim()) return { message: 'Add the hospital’s town or PIN code (under the map).', address: true };
         if (formData.zipcode.trim() && !/^[1-9][0-9]{5}$/.test(formData.zipcode.trim())) {
             return { message: 'The PIN code should be 6 digits. Fix it or leave it empty.', address: true };
         }
         if (!formData.contactName.trim() || !formData.contactPhone.trim()) return { message: 'Add the contact person’s name and phone number.' };
         // A past date would post an already-expired request that donors can't see.
-        if (!formData.dateNeeded || formData.dateNeeded < today()) return { message: 'Choose today or a later date for “Needed by”.' };
+        if (!formData.dateNeeded || formData.dateNeeded < today()) return { message: PAST_DATE };
         return null;
+    };
+
+    const onHospitalChange = (value: string) => {
+        setFormData(prev => ({ ...prev, hospitalName: value }));
+        setSearchError('');
+        const q = value.trim();
+        if (q.length < 3) {
+            setSuggestQuery(null);
+            setSuggestions([]);
+            setSuggestStatus('idle');
+            setListOpen(false);
+            return;
+        }
+        // Nearer places first once a pin is down (rounded to ~10 km).
+        const near = hasLocation ? `${formData.location.latitude.toFixed(1)},${formData.location.longitude.toFixed(1)}` : '';
+        setSuggestQuery(prev => (prev?.q === q && prev.near === near ? prev : { q, near }));
+    };
+
+    const choosePlace = (place: GeoPlace) => {
+        if (place.name) setFormData(prev => ({ ...prev, hospitalName: place.name! }));
+        setPin(place.latitude, place.longitude, 'search', null, place);
+        setSuggestQuery(null);
+        setSuggestions([]);
+        setSuggestStatus('idle');
+        setListOpen(false);
+        setActiveIndex(-1);
+        setSearchError('');
+    };
+
+    const showList = listOpen && suggestions.length > 0;
+
+    const onHospitalKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+        const n = suggestions.length;
+        if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+            if (!n) return;
+            e.preventDefault();
+            setListOpen(true);
+            setActiveIndex(i => (e.key === 'ArrowDown' ? (i + 1) % n : i <= 0 ? n - 1 : i - 1));
+        } else if (e.key === 'Enter') {
+            // Never submits the form from here.
+            e.preventDefault();
+            if (showList && activeIndex >= 0) choosePlace(suggestions[activeIndex]);
+            else if (showList && n === 1) choosePlace(suggestions[0]);
+            else if (!showList && suggestStatus !== 'loading' && !searching) searchHospital();
+        } else if (e.key === 'Escape' && showList) {
+            e.preventDefault();
+            setListOpen(false);
+            setActiveIndex(-1);
+        }
+    };
+
+    const pastDate = !!formData.dateNeeded && formData.dateNeeded < today();
+    // Some mobile browsers ignore min: an earlier date goes back to today on leaving the field.
+    const onDateBlur = () => {
+        if (pastDate) {
+            setFormData(prev => ({ ...prev, dateNeeded: today() }));
+            setDateReset(true);
+        }
     };
 
     const handleSubmit = (e: React.FormEvent) => {
@@ -419,51 +537,81 @@ export default function CreateRequestPage() {
                             label="Needed by"
                             value={formData.dateNeeded}
                             min={today()}
-                            onChange={(e) => setFormData({ ...formData, dateNeeded: e.target.value || today() })}
+                            onChange={(e) => {
+                                setFormData({ ...formData, dateNeeded: e.target.value || today() });
+                                setDateReset(false);
+                            }}
+                            onBlur={onDateBlur}
                             required
+                            aria-invalid={pastDate || undefined}
+                            aria-describedby="date-needed-note date-needed-warning"
+                            className={pastDate ? 'border-red-500 hover:border-red-500 focus:border-red-600' : undefined}
                         />
+                    </div>
+                    <div>
+                        <p id="date-needed-note" className="text-[13px] text-gray-500">Requests are for blood needed today or later, so earlier dates can’t be chosen.</p>
+                        <div id="date-needed-warning" role="alert" className="text-[13px] text-red-700">
+                            {(pastDate || dateReset) && <p className="mt-1">{PAST_DATE}{dateReset && !pastDate ? ' It’s been set to today.' : ''}</p>}
+                        </div>
                     </div>
                 </>)}
 
                 {section('Hospital', 'Donors near the pin are alerted, so place it on the hospital itself.', <>
                     <div>
-                        <div className="flex gap-2">
-                            <div className="flex-1">
-                                <Input
-                                    label="Hospital"
-                                    value={formData.hospitalName}
-                                    onChange={(e) => setFormData({ ...formData, hospitalName: e.target.value })}
-                                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); searchHospital(); } }}
-                                    required
-                                    placeholder="e.g. General Hospital, Kochi"
-                                    aria-describedby="hospital-search-hint"
-                                />
-                            </div>
-                            <Button type="button" variant="secondary" onClick={searchHospital} isLoading={searching} className="mt-[26px] shrink-0">
-                                <Search className="mr-1.5 h-3.5 w-3.5" aria-hidden /> Find
-                            </Button>
-                        </div>
-                        <p id="hospital-search-hint" className="mt-1.5 text-[13px] text-gray-500">Type the name and tap Find, then pick the right result. Or tap the map.</p>
-                        {searchError && <p role="alert" className="mt-1.5 text-[13px] text-red-700">{searchError}</p>}
-                        {searchResults && searchResults.length > 0 && (
-                            <ul className="mt-2 divide-y divide-gray-200 rounded-md border border-gray-200 bg-white" aria-label="Search results">
-                                {searchResults.map((place, i) => (
-                                    <li key={`${place.latitude},${place.longitude},${i}`}>
-                                        <button
-                                            type="button"
-                                            onClick={() => {
-                                                setPin(place.latitude, place.longitude, 'search', null, place);
-                                                setSearchResults(null);
-                                            }}
-                                            className="block w-full px-3 py-2.5 text-left hover:bg-gray-50 focus-visible:bg-gray-50"
-                                        >
-                                            <span className="block text-sm font-medium text-gray-900">{place.label}</span>
-                                            <span className="block text-xs text-gray-600">{place.displayName}</span>
-                                        </button>
+                        <div className="relative">
+                            <Input
+                                id="hospital-name"
+                                label="Hospital"
+                                value={formData.hospitalName}
+                                onChange={(e) => onHospitalChange(e.target.value)}
+                                onKeyDown={onHospitalKeyDown}
+                                onFocus={() => { if (suggestions.length) setListOpen(true); }}
+                                onBlur={() => { setListOpen(false); setActiveIndex(-1); }}
+                                required
+                                placeholder="e.g. General Hospital, Kochi"
+                                autoComplete="off"
+                                role="combobox"
+                                aria-autocomplete="list"
+                                aria-expanded={showList}
+                                aria-controls="hospital-suggestions"
+                                aria-activedescendant={showList && activeIndex >= 0 ? `hospital-option-${activeIndex}` : undefined}
+                                aria-describedby="hospital-search-hint"
+                            />
+                            <ul
+                                id="hospital-suggestions"
+                                role="listbox"
+                                aria-label="Matching places"
+                                hidden={!showList}
+                                className="absolute inset-x-0 top-full z-20 mt-1 max-h-80 divide-y divide-gray-200 overflow-y-auto rounded-md border border-gray-300 bg-white shadow-lg"
+                            >
+                                {showList && suggestions.map((place, i) => (
+                                    <li
+                                        key={`${place.latitude},${place.longitude},${i}`}
+                                        id={`hospital-option-${i}`}
+                                        role="option"
+                                        aria-selected={i === activeIndex}
+                                        // Keeps focus in the field, so the list is still open when the tap lands.
+                                        onMouseDown={(e) => e.preventDefault()}
+                                        onClick={() => choosePlace(place)}
+                                        onMouseEnter={() => setActiveIndex(i)}
+                                        className={`cursor-pointer px-3 py-2.5 ${i === activeIndex ? 'bg-gray-100' : 'bg-white'}`}
+                                    >
+                                        <span className="block text-sm font-medium text-gray-900">{place.label}</span>
+                                        <span className="block text-xs text-gray-600">{place.displayName}</span>
                                     </li>
                                 ))}
                             </ul>
-                        )}
+                        </div>
+                        <p id="hospital-search-hint" className="mt-1.5 text-[13px] text-gray-500" aria-live="polite">
+                            {searching ? <span aria-hidden>Searching more widely…</span>
+                                : suggestStatus === 'loading' ? <span aria-hidden>Looking for matches…</span>
+                                : suggestStatus === 'limited' ? 'Too many searches. Wait a minute, or tap the map to mark the hospital.'
+                                : suggestStatus === 'error' ? <>Suggestions aren’t loading right now. <button type="button" onClick={searchHospital} className={linkClass}>Search instead</button>, or tap the map.</>
+                                : suggestStatus === 'done' && suggestions.length === 0 && !searchError ? <>No matches yet. Add the town, <button type="button" onClick={searchHospital} className={linkClass}>search more widely</button>, or tap the map.</>
+                                : showList ? `${suggestions.length} ${suggestions.length === 1 ? 'match' : 'matches'}. Pick the hospital, or keep typing.`
+                                : 'Start typing the name and matching places appear. Or tap the map.'}
+                        </p>
+                        {searchError && <p role="alert" className="mt-1.5 text-[13px] text-red-700">{searchError}</p>}
                     </div>
                     <div>
                         <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2">
@@ -487,7 +635,7 @@ export default function CreateRequestPage() {
                                 ? <>Pin {pinPlace ? <>near <span className="text-gray-800">{pinPlace.label}</span></> : 'placed'}
                                     {formData.location.source === 'gps' && formData.location.accuracy_m ? ` (from your device, ${describeAccuracy(formData.location.accuracy_m)})` : ''}.
                                     {' '}If it’s not on the hospital, zoom in and tap the right spot.</>
-                                : 'Find the hospital above, or tap the map to mark it.'}
+                                : 'Pick the hospital from the matches above, or tap the map to mark it.'}
                         </p>
                     </div>
                     {hasLocation && (
