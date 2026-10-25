@@ -3,6 +3,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Input, Select } from '@/components/ui/Input';
+import { DatePicker, todayInIndia } from '@/components/ui/DatePicker';
 import { Alert } from '@/components/ui/Alert';
 import { Button } from '@/components/ui/Button';
 import { supabase } from '@/lib/supabase';
@@ -402,12 +403,13 @@ export default function CompleteRegistration() {
                     </>)}
 
                     {section('Your last donation', 'Donors wait 90 days (men) or 120 days (women) between donations. We pause alerts until then.', <>
-                        <Input
+                        <DatePicker
                             label="Date of your last donation (if any)"
-                            type="date"
                             value={more.lastDonationDate}
-                            max={new Date().toISOString().split('T')[0]}
-                            onChange={e => setM('lastDonationDate', e.target.value)}
+                            max={todayInIndia()}
+                            placeholder="No date"
+                            clearable
+                            onChange={value => setM('lastDonationDate', value)}
                         />
                         <div className="grid gap-4 sm:grid-cols-2">
                             <Select
