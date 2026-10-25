@@ -86,7 +86,8 @@ export default function CreateRequestPage() {
 
     const [formData, setFormData] = useState({
         bloodGroup: '' as BloodGroup,
-        unitsNeeded: 1,
+        // The field's text, so it can be cleared and retyped; parsed once on submit.
+        unitsNeeded: '1',
         dateNeeded: today(),
         hospitalName: '',
         hospitalAddress: '',
@@ -123,6 +124,8 @@ export default function CreateRequestPage() {
     const [activeIndex, setActiveIndex] = useState(-1);
     // Set when an earlier date was put back to today on leaving the field.
     const [dateReset, setDateReset] = useState(false);
+    // Units is checked on leaving the field or posting, never while typing.
+    const [unitsChecked, setUnitsChecked] = useState(false);
 
     const setPin = (latitude: number, longitude: number, source: PinSource, accuracy: number | null = null, known?: GeoPlace) => {
         if (!insideIndia(latitude, longitude)) {
@@ -262,9 +265,21 @@ export default function CreateRequestPage() {
         if (scroll) window.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
+    // 1 to 20 units per request, as the donation and WhatsApp flows allow.
+    const unitsProblem = (text: string): string | null => {
+        if (!text) return 'Enter how many units are needed.';
+        const units = parseInt(text, 10);
+        if (units < 1) return 'Units must be at least 1.';
+        if (units > 20) return 'Up to 20 units per request. For more, post another request.';
+        return null;
+    };
+    const unitsError = unitsChecked ? unitsProblem(formData.unitsNeeded) : null;
+
     // What's still missing from the form, if anything (address: under the map).
     const formProblem = (): { message: string; address?: boolean } | null => {
         if (!formData.bloodGroup) return { message: 'Choose the blood group needed.' };
+        const units = unitsProblem(formData.unitsNeeded);
+        if (units) return { message: units };
         if (!formData.hospitalName.trim()) return { message: 'Enter the hospital’s name.' };
         if (!hasLocation) return { message: 'Mark the hospital on the map (type its name and pick it, or tap the map) so nearby donors are alerted.' };
         if (!formData.city.trim() && !formData.zipcode.trim()) return { message: 'Add the hospital’s town or PIN code (under the map).', address: true };
@@ -349,6 +364,7 @@ export default function CreateRequestPage() {
     };
 
     const submit = async (userId: string | null) => {
+        setUnitsChecked(true);
         const problem = formProblem();
         if (problem) {
             if (problem.address) setAddressOpen(true);
@@ -359,6 +375,7 @@ export default function CreateRequestPage() {
             return;
         }
 
+        const unitsNeeded = parseInt(formData.unitsNeeded, 10);
         setIsLoading(true);
         setError('');
 
@@ -393,7 +410,7 @@ export default function CreateRequestPage() {
                 .insert({
                     user_id: userId,
                     blood_group: formData.bloodGroup,
-                    units_needed: formData.unitsNeeded,
+                    units_needed: unitsNeeded,
                     date_needed: formData.dateNeeded,
                     hospital_name: formData.hospitalName.trim(),
                     hospital_address: address,
@@ -444,7 +461,7 @@ export default function CreateRequestPage() {
                 metadata: {
                     bloodGroup: formData.bloodGroup,
                     city: formData.city,
-                    units: formData.unitsNeeded
+                    units: unitsNeeded
                 }
             });
 
@@ -524,12 +541,20 @@ export default function CreateRequestPage() {
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                         <Input
-                            type="number"
+                            type="text"
+                            inputMode="numeric"
+                            pattern="[0-9]*"
+                            maxLength={2}
+                            autoComplete="off"
                             label="Units"
-                            min={1}
-                            max={20}
                             value={formData.unitsNeeded}
-                            onChange={(e) => setFormData({ ...formData, unitsNeeded: Math.min(20, Math.max(1, parseInt(e.target.value) || 1)) })}
+                            onChange={(e) => {
+                                // Digits only (no minus sign), at most 2; empty is allowed while typing.
+                                setFormData({ ...formData, unitsNeeded: e.target.value.replace(/\D/g, '').slice(0, 2) });
+                                setUnitsChecked(false);
+                            }}
+                            onBlur={() => setUnitsChecked(true)}
+                            error={unitsError ?? undefined}
                             required
                         />
                         <Input
