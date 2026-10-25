@@ -7,6 +7,7 @@ import Link from 'next/link';
 import { MapPin } from 'lucide-react';
 import { BLOOD_GROUPS, formatBloodGroup } from '@/lib/blood-compatibility';
 import { Input, Textarea } from '@/components/ui/Input';
+import { DatePicker, addDaysYmd } from '@/components/ui/DatePicker';
 import { Button } from '@/components/ui/Button';
 import { Alert } from '@/components/ui/Alert';
 import { useAuth } from '@/context/AuthContext';
@@ -539,7 +540,7 @@ export default function CreateRequestPage() {
                             ))}
                         </div>
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-[minmax(0,2fr)_minmax(0,3fr)] gap-4">
                         <Input
                             type="text"
                             inputMode="numeric"
@@ -557,20 +558,25 @@ export default function CreateRequestPage() {
                             error={unitsError ?? undefined}
                             required
                         />
-                        <Input
-                            type="date"
+                        <DatePicker
+                            id="date-needed"
                             label="Needed by"
                             value={formData.dateNeeded}
                             min={today()}
-                            onChange={(e) => {
-                                setFormData({ ...formData, dateNeeded: e.target.value || today() });
+                            max={addDaysYmd(today(), 90)}
+                            today={today()}
+                            presets={[
+                                { label: 'Today', value: today() },
+                                { label: 'Tomorrow', value: addDaysYmd(today(), 1) },
+                                { label: 'In 2 days', value: addDaysYmd(today(), 2) },
+                            ]}
+                            onChange={(value) => {
+                                setFormData({ ...formData, dateNeeded: value || today() });
                                 setDateReset(false);
                             }}
                             onBlur={onDateBlur}
-                            required
-                            aria-invalid={pastDate || undefined}
-                            aria-describedby="date-needed-note date-needed-warning"
-                            className={pastDate ? 'border-red-500 hover:border-red-500 focus:border-red-600' : undefined}
+                            invalid={pastDate}
+                            describedBy="date-needed-note date-needed-warning"
                         />
                     </div>
                     <div>
