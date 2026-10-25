@@ -1,13 +1,17 @@
 import { NextResponse } from 'next/server';
 import { clientIp, rateLimitAll, tooManyRequests } from '@/lib/rate-limit';
 import { reversePlace, searchPlaces, UpstreamError, type Place } from '@/lib/nominatim';
+import { suggestPlaces } from '@/lib/place-suggest';
 
 const MAX_TEXT = 100;
 const CACHE = { 'Cache-Control': 'public, max-age=3600, s-maxage=86400, stale-while-revalidate=86400' };
 
 /**
- * Server-side geocoding (Nominatim, India only), so the browser never calls a
- * third party. Modes:
+ * Server-side geocoding (India only), so the browser never calls a third
+ * party. Nominatim for explicit lookups, Photon for suggestions while typing
+ * (Nominatim's policy forbids autocomplete). Modes:
+ *   ?suggest=text[&near=lat,lng]          up to 5 places as you type, as { results: Place[] }
+ *                                         (Photon, lib/place-suggest.ts; near = bias)
  *   ?zip=682011 | ?city=Kochi | ?q=text   first match, as [{ lat, lon, display_name }]
  *   ?search=text                          up to 5 places, as { results: Place[] }
  *                                         (hospital search on the request form)
@@ -22,6 +26,7 @@ export async function GET(request: Request) {
     const city = searchParams.get('city')?.trim();
     const query = searchParams.get('q')?.trim();
     const search = searchParams.get('search')?.trim();
+    const suggest = searchParams.get('suggest')?.trim();
     const latParam = searchParams.get('lat');
     const lngParam = searchParams.get('lng');
 
@@ -29,6 +34,24 @@ export async function GET(request: Request) {
     let params = '';
     let lat = NaN;
     let lng = NaN;
+
+    if (suggest !== undefined) {
+        if (suggest.length > MAX_TEXT) return NextResponse.json({ error: 'Search is too long' }, { status: 400 });
+        if (suggest.length < 3) return NextResponse.json({ error: 'Search is too short' }, { status: 400 });
+        const [nearLat, nearLng] = (searchParams.get('near') ?? '').split(',').map(Number);
+        const near = Number.isFinite(nearLat) && Number.isFinite(nearLng) ? { latitude: nearLat, longitude: nearLng } : null;
+        // Typing makes many calls: a separate, roomier budget than the lookups below.
+        const ip = clientIp(request);
+        if (!(await rateLimitAll([[`suggest:ip:${ip}`, 60, 60], [`suggest:iphour:${ip}`, 60 * 60, 600]]))) return tooManyRequests(60);
+        try {
+            const results = await suggestPlaces(suggest, near);
+            return NextResponse.json({ results }, { headers: CACHE });
+        } catch (error) {
+            console.error('Suggestion error:', error instanceof UpstreamError ? error.message : error);
+            const busy = error instanceof UpstreamError && error.reason === 'busy';
+            return NextResponse.json({ error: 'Suggestions are unavailable right now' }, { status: busy ? 503 : 502 });
+        }
+    }
 
     if (latParam !== null || lngParam !== null) {
         mode = 'reverse';
