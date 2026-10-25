@@ -12,7 +12,7 @@ const GoogleMark = () => (
 
 export function GoogleButton({ onClick, isLoading }: { onClick: () => void; isLoading?: boolean }) {
     return (
-        <Button type="button" variant="secondary" size="lg" className="w-full" onClick={onClick} isLoading={isLoading} leftIcon={<GoogleMark />}>
+        <Button type="button" variant="secondary" size="md" className="w-full font-medium" onClick={onClick} isLoading={isLoading} leftIcon={<GoogleMark />}>
             Continue with Google
         </Button>
     );
