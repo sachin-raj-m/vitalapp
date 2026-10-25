@@ -35,6 +35,24 @@ SELECT tests.allowed($q$UPDATE public.blood_requests SET status = 'cancelled'
   WHERE id = 'aaaaaaaa-0000-4000-8000-000000000004'$q$, 1,
   'request date: an expired request can still be cancelled');
 
+-- Units must be 1 to 20 (20261026000200).
+SELECT tests.login('requester');
+SELECT tests.throws($q$INSERT INTO public.blood_requests
+  (user_id, blood_group, units_needed, hospital_name, hospital_address, urgency_level, contact_name, location, status, city, date_needed)
+  VALUES (auth.uid(), 'O+', 0, 'Zero Units', '1 Road', 'High', 'Riya', '{"latitude": 9.98, "longitude": 76.28}', 'active', 'Testville',
+          (now() AT TIME ZONE 'Asia/Kolkata')::date)$q$,
+  '23514', 'request units: 0 units is refused');
+SELECT tests.throws($q$INSERT INTO public.blood_requests
+  (user_id, blood_group, units_needed, hospital_name, hospital_address, urgency_level, contact_name, location, status, city, date_needed)
+  VALUES (auth.uid(), 'O+', 21, 'Too Many', '1 Road', 'High', 'Riya', '{"latitude": 9.98, "longitude": 76.28}', 'active', 'Testville',
+          (now() AT TIME ZONE 'Asia/Kolkata')::date)$q$,
+  '23514', 'request units: 21 units is refused');
+SELECT tests.allowed($q$INSERT INTO public.blood_requests
+  (user_id, blood_group, units_needed, hospital_name, hospital_address, urgency_level, contact_name, location, status, city, date_needed)
+  VALUES (auth.uid(), 'O+', 20, 'Twenty Units', '1 Road', 'High', 'Riya', '{"latitude": 9.98, "longitude": 76.28}', 'active', 'Testville',
+          (now() AT TIME ZONE 'Asia/Kolkata')::date)$q$, 1,
+  'request units: 20 units is accepted');
+
 ROLLBACK;
 
 \o
