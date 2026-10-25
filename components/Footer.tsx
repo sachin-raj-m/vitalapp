@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
 import { usePathname } from 'next/navigation';
 import { Logo } from './Logo';
+import { ProductHuntBadge } from './ProductHuntBadge';
 import { isAppRoute, isHybridRoute, isStandaloneRoute } from '@/lib/routes';
 import { PLATFORM_DISCLAIMER } from '@/lib/legal';
 
@@ -26,22 +27,7 @@ export const Footer: React.FC = () => {
             <p className="mt-4 text-sm leading-relaxed text-gray-500">
               A free platform for voluntary blood donors in India. Vital is free to use and is not involved in any payment.
             </p>
-            <a
-              href="https://www.producthunt.com/products/vital-3?embed=true&utm_source=badge-featured&utm_medium=badge&utm_campaign=badge-vital-5"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="mt-5 inline-block"
-            >
-              {/* Product Hunt's own badge image (an SVG that stays current), so a plain img. */}
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                alt="Vital - Blood, when it’s needed | Product Hunt"
-                width={250}
-                height={54}
-                loading="lazy"
-                src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1292382&theme=light&t=1792942091888"
-              />
-            </a>
+            <ProductHuntBadge className="mt-5" />
           </div>
 
           <div className="grid grid-cols-2 gap-x-16 gap-y-3 sm:grid-cols-3">

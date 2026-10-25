@@ -8,6 +8,7 @@ import { supabase } from '@/lib/supabase';
 import { GRIEVANCE_EMAIL } from '@/lib/legal';
 import { BloodTypeExplorer } from '@/components/landing/BloodTypeExplorer';
 import { LiveRequests } from '@/components/landing/LiveRequests';
+import { ProductHuntBadge } from '@/components/ProductHuntBadge';
 import { NetworkNumbers } from '@/components/landing/NetworkNumbers';
 import { HeartbeatLine } from '@/components/landing/HeartbeatLine';
 import { Reveal } from '@/components/landing/Reveal';
@@ -139,6 +140,7 @@ export default function HomePage({ initialStats }: { initialStats: PublicStats |
                                 </a>
                             </span>
                         </p>
+                        <ProductHuntBadge className="mt-6" />
                     </div>
                 </div>
 
